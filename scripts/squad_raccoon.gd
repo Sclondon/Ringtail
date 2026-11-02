@@ -214,7 +214,13 @@ func _go(to: Mind, seconds: float) -> void:
 
 ## Whether something solid is close in front of it, low enough to hop over.
 func _blocked(way: Vector3) -> bool:
-	var from := global_position + Vector3.UP * 0.2
-	var query := PhysicsRayQueryParameters3D.create(from, from + way.normalized() * 0.45, 1)
-	query.exclude = [get_rid()]
-	return not get_world_3d().direct_space_state.intersect_ray(query).is_empty()
+	# (and low down, a kerb or a step: a steep face only, not the ground rising ahead; they stuck at the pavement's
+	# edge: the user, 2026-11-02, "the boiding kits get stuck on the sidewalk in the road")
+	for high: float in [0.2, 0.05]:
+		var from := global_position + Vector3.UP * high
+		var query := PhysicsRayQueryParameters3D.create(from, from + way.normalized() * 0.45, 1)
+		query.exclude = [get_rid()]
+		var hit := get_world_3d().direct_space_state.intersect_ray(query)
+		if not hit.is_empty() and (hit.normal as Vector3).y < 0.6:
+			return true
+	return false

@@ -42,7 +42,8 @@ func _run(level: Node3D) -> void:
 	var errands := {}
 	for leg: StringName in [&"move_up", &"move_left", &"move_down", &"move_right", &""]:
 		if leg != &"":
-			Input.action_press(leg)
+			# (a run, not a full push: full, he bounds off the end of the playground and they follow him off it)
+			Input.action_press(leg, 0.7)
 		for _i in (150 if leg != &"" else 300):
 			await physics_frame
 			for m in squad.members:
