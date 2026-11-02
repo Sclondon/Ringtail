@@ -7,7 +7,7 @@ render_mode cull_disabled, specular_disabled;
 uniform vec3 albedo : source_color = vec3(1.0);
 uniform float emission = 0.0;
 // Rows of the grid the corners snap to (0: off).
-uniform float snap = 240.0;
+uniform float snap = 480.0;
 
 void vertex() {
 	if (snap > 0.0) {

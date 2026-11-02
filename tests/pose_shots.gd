@@ -5,7 +5,7 @@ extends SceneTree
 ## Needs a window (pictures cannot be taken headless); it is kept off the screen.
 
 const SIZE := Vector2i(360, 400)
-const MOVES := ["stand", "walk", "run", "sprint", "duckwalk", "duck", "jump", "glide", "whip", "spin"]
+const MOVES := ["stand", "walk", "run", "sprint", "duckwalk", "duck", "jump", "glide", "spin", "air_spin"]
 
 var out := "user://pose_shots"
 var only: Array[String] = []
@@ -88,10 +88,10 @@ func _do(move: String) -> void:
 			Input.action_press(&"jump")
 			player._queue_jump()
 			await _frames(45)
-		"whip":
+		"spin":
 			Input.action_press(&"tail")
 			await _frames(9)
-		"spin":
+		"air_spin":
 			Input.action_press(&"jump")
 			player._queue_jump()
 			await _frames(14)

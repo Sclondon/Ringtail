@@ -7,16 +7,18 @@ Read README.md first. Started 2026-11-01.
 - A Banjo-Kazooie-inspired 3D platformer, a new Godot project. Original content, not a recreation.
 - The hero is **a plain raccoon** (no costume). It began as a cowboy frog whose tongue was the lasso; the user
   switched to a raccoon and said not to use Frogulizer's frog.
-- His signature is **tail moves**.
+- His signature is **tail moves**. The tail attack is a **spin**: "the tail attak shiould be a spin" (2026-11-01; it was a
+  whip on the ground before).
 - "mostly upright but he needs all 4 animations for duckwalking and sprinting".
-- **Desktop first**. **N64 retro filter** look. First slice: movement plus one small world.
+- **Desktop first**. **N64 retro filter** look. Then "the filters are too strong" (2026-11-01): softened to about 520
+  lines, 6-bit colour, dither 0.25, world corners snapped to 480 rows (`scripts/n64_filter.gd`, `shaders/world.gdshader`). First slice: movement plus one small world.
 - "No need for a halloween touch its not halloween anymore."
 
 ## Claude's picks (placeholders until the user says otherwise)
 
 - The name "Ringtail", "World 1" as a back yard and alley at dusk, "Crumbs" (notes) and "Bottlecaps" (jiggies),
   the yard cats as the enemy, the five Bottlecap challenges, three hearts.
-- The tail moves: whip (ground), spin (air, once a jump), twirl (jump held while falling).
+- The twirl (jump held while falling), and the lift the spin gives in the air (once a jump).
 - Per-pixel lighting in the world shader (vertex lighting with shadows drew a checkerboard on the lawn).
 - No partner character: none was asked for.
 

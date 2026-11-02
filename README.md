@@ -13,7 +13,7 @@ first. Local repo only for now.
 | Jump; **hold on the way down to twirl the tail and fall slowly** | Space | A | ⤒ |
 | Duck: **duck-walk on all fours**, crawl under low things | C / Ctrl | B | ⤓ |
 | Sprint: **on all fours, a bounding gallop** (or hold the stick right over) | Shift | LB / LT | » |
-| Tail: a **whip** on the ground, a **spin** in the air (once a jump) | E / K | X | spiral |
+| Tail: a **spin**, hitting all round him (in the air it lifts him a little, once a jump) | E / K | X | spiral |
 
 Everything else the GameCommon character controller does works too: ledge catching (jump again to climb up),
 wall kicks, dives and rolls, ladders, swimming, picking up and throwing.
@@ -23,7 +23,7 @@ wall kicks, dives and rolls, ladders, swimming, picking up and throwing.
 
 - **Up the chimney**: crates to the porch roof, the trellis up to the house roof, catch the chimney top from the ridge.
 - **The billboard**: dumpster, pallets, catch the power pole's crossarm, then glide 6 m along the alley to the catwalk.
-- **Cat scrap**: beat all three yard cats (whip or spin); the cap appears on the porch.
+- **Cat scrap**: beat all three yard cats (tail spin); the cap appears on the porch.
 - **Alley dash**: run into the stopwatch by the gate and take the 8 glowing crumbs in 25 s.
 - **Under the porch**: duck-walk into the crawlspace at the front of the porch.
 
@@ -35,7 +35,7 @@ fills the hearts.
 - `raccoon.tscn`: the Player (GameCommon's `player.tscn`) with `RaccoonRig` (`scripts/raccoon_rig.gd`) and `TailMoves`.
 - `scripts/raccoon_rig.gd`: his poses laid over the boy's rig: on all fours for duck-walk and sprint, the tail as
   a chain on springs, the tail moves.
-- `scripts/tail_moves.gd`: whip, spin, twirl; hits anything in the group `tail_hittable`.
+- `scripts/tail_moves.gd`: spin, twirl; hits anything in the group `tail_hittable`.
 - `scripts/world.gd` (`World`): loads `models/world1.glb`, makes its materials N64 ones and its meshes solid
   (not those named `nocol_`), places things at the model's markers, keeps score and hearts.
 - `scripts/pickup.gd`, `yard_cat.gd`, `trampoline.gd`, `race.gd`, `hud.gd`, `icon.gd`, `n64_filter.gd`.
@@ -57,6 +57,6 @@ G="/c/Program Files (x86)/Steam/steamapps/common/Godot Engine/godot.windows.opt.
 "$G" --path . --audio-driver Dummy --fixed-fps 60 --resolution 960x540 -s res://tests/pose_shots.gd -- --out=<dir> [moves]
 ```
 
-`pose_shots` photographs each move (stand, walk, run, sprint, duckwalk, duck, jump, glide, whip, spin) from four
+`pose_shots` photographs each move (stand, walk, run, sprint, duckwalk, duck, jump, glide, spin, air_spin) from four
 sides. A dev panel (in the editor, with `--dev`, or `?dev` on the web) toggles the N64 filter and jumps to each
 Bottlecap.

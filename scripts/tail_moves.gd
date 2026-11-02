@@ -3,10 +3,9 @@ extends Node
 ## The raccoon's tail moves, a child of the Player named "TailMoves" (RaccoonRig finds
 ## it there and poses them):
 ##
-## - Whip (the tail button on the ground): a lash round past his left side and out
-##   in front, hitting what is ahead of him.
-## - Spin (the tail button in the air): once round with the tail flung out, a little
-##   lift, hitting everything around him.
+## - Spin (the tail button; the user, 2026-11-01: "the tail attack should be a spin"):
+##   once round with the tail flung out, hitting everything around him. In the air it
+##   also lifts him a little, once a jump.
 ## - Twirl (jump held while falling): the tail whirled over his head, and he comes down slowly.
 ##
 ## Anything in the group `tail_hittable` with a `tail_hit(from: Vector3, push: Vector3)`
@@ -14,10 +13,6 @@ extends Node
 
 signal struck(what: Node)
 
-@export var whip_time := 0.42
-@export var whip_reach := 1.55
-## The whip hits in a cone this wide (radians either side of straight ahead).
-@export var whip_cone := 1.1
 @export var spin_time := 0.5
 @export var spin_reach := 1.35
 @export var spin_lift := 2.2
@@ -27,7 +22,6 @@ signal struck(what: Node)
 @export var glide_after := 0.22
 
 ## How far through each move he is (1: not doing it).
-var whip := 1.0
 var spin := 1.0
 var gliding := false
 
@@ -69,20 +63,14 @@ func _physics_process(delta: float) -> void:
 	if grounded:
 		_spun_this_jump = false
 
-	if (_pressed or (_listening() and Input.is_action_just_pressed(&"tail"))) and free and whip >= 1.0 and spin >= 1.0:
-		if grounded:
-			whip = 0.0
-		elif not _spun_this_jump:
-			spin = 0.0
+	if (_pressed or (_listening() and Input.is_action_just_pressed(&"tail"))) and free and spin >= 1.0 and (grounded or not _spun_this_jump):
+		spin = 0.0
+		if not grounded:
 			_spun_this_jump = true
 			_player.velocity.y = maxf(_player.velocity.y, spin_lift)
 		_struck.clear()
 	_pressed = false
 
-	if whip < 1.0:
-		whip = minf(whip + delta / whip_time, 1.0)
-		if whip > 0.25 and whip < 0.7:
-			_strike(whip_reach, whip_cone)
 	if spin < 1.0:
 		spin = minf(spin + delta / spin_time, 1.0)
 		if spin > 0.05 and spin < 0.9:

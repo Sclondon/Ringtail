@@ -9,8 +9,8 @@ extends CharacterRig
 ##   duckwalking and sprinting").
 ## - His tail (bones tail_0..tail_5): a chain of points on springs, drawn towards a
 ##   shape for what he is doing and swinging after him, so it follows through.
-## - The tail moves (TailMoves, a child of the Player): the whip, the spin and the
-##   twirl that slows his fall.
+## - The tail moves (TailMoves, a child of the Player): the spin and the twirl
+##   that slows his fall.
 
 const TAIL_BONES := 6
 ## Where each foot is in the cycle when it comes down: [hind left, hind right, fore left, fore right].
@@ -34,7 +34,6 @@ var _gallop := 0.0
 var _qphase := 0.0
 var _glide := 0.0
 var _twirl := 0.0
-var _whip_w := 0.0
 var _spin_w := 0.0
 
 
@@ -76,29 +75,24 @@ func _pose_extra(delta: float) -> void:
 	var stride := lerpf(0.44, 1.3, _gallop)
 	_qphase = fposmod(_qphase + speed / stride * delta, 1.0)
 
-	var whip := 1.0
 	var spin := 1.0
 	var gliding := false
 	if _moves:
-		whip = _moves.whip
 		spin = _moves.spin
 		gliding = _moves.gliding
 	_glide = _approach(_glide, 1.0 if gliding else 0.0, 10.0, delta)
 	_twirl = fposmod(_twirl + delta * TAU * 2.4 * _glide, TAU)
-	_whip_w = _approach(_whip_w, 1.0 if whip < 1.0 else 0.0, 30.0, delta)
 	_spin_w = _approach(_spin_w, 1.0 if spin < 1.0 else 0.0, 30.0, delta)
 
 	if _quad > 0.002:
 		_pose_quad(smoothstep(0.0, 1.0, _quad), speed, stride)
 	if _glide > 0.002:
 		_pose_glide(_glide)
-	if _whip_w > 0.002:
-		_pose_whip(whip, _whip_w)
 	if _spin_w > 0.002:
 		# (round once, quickest in the middle of it)
 		var turn := TAU * smoothstep(0.0, 1.0, spin) if spin < 1.0 else 0.0
 		_hips.basis = Basis(Vector3.UP, turn * _spin_w) * _hips.basis
-	_pose_tail(delta, speed, whip, spin)
+	_pose_tail(delta, speed, spin)
 
 
 ## On all fours, by `w`.
@@ -169,18 +163,8 @@ func _pose_glide(w: float) -> void:
 	_head.basis = _slerp(_head.basis, Basis(Vector3.RIGHT, -0.25), w * 0.7)
 
 
-## The whip: he winds up turned to his right, and unwinds to the left as the tail lashes round.
-func _pose_whip(at: float, w: float) -> void:
-	var twist := lerpf(-0.55, 0.85, smoothstep(0.15, 0.55, at)) if at < 1.0 else 0.0
-	_hips.basis = Basis(Vector3.UP, twist * 0.45 * w) * _hips.basis
-	_spine.basis = Basis(Vector3.UP, twist * 0.35 * w) * _spine.basis
-	if _chest:
-		_chest.basis = Basis(Vector3.UP, twist * 0.25 * w) * _chest.basis
-	_head.basis = Basis(Vector3.UP, -twist * 0.6 * w) * _head.basis
-
-
 ## The tail's shape for now, in the hips' space, as a direction for each segment.
-func _tail_shape(speed: float, whip: float, spin: float) -> Array[Vector3]:
+func _tail_shape(speed: float, spin: float) -> Array[Vector3]:
 	var run := clampf(speed / 3.0, 0.0, 1.0)
 	var wag := sin(_time * 2.1) * 0.25 * (1.0 - run) + sin(TAU * _phase) * 0.12 * run
 	var dirs: Array[Vector3] = []
@@ -199,13 +183,6 @@ func _tail_shape(speed: float, whip: float, spin: float) -> Array[Vector3]:
 			var angle := _twirl - k * 0.22
 			var out := 0.25 + 0.06 * k
 			dirs[k] = dirs[k].slerp((axis * cos(out) + (u * cos(angle) + v * sin(angle)) * sin(out)).normalized(), _glide)
-	if _whip_w > 0.001 and whip < 1.0:
-		# Round past his left side and out in front, the tip coming last and fastest.
-		var sweep := smoothstep(0.1, 0.6, whip)
-		for k in TAIL_BONES:
-			var lag := (1.0 - sweep) * 0.3 * k
-			var angle := PI - (2.7 * sweep - lag) * (1.0 - smoothstep(0.75, 1.0, whip))
-			dirs[k] = dirs[k].slerp(Vector3(sin(angle), 0.12, cos(angle)).normalized(), _whip_w)
 	if _spin_w > 0.001 and spin < 1.0:
 		# Flung straight out behind as he spins
 		for k in TAIL_BONES:
@@ -213,8 +190,8 @@ func _tail_shape(speed: float, whip: float, spin: float) -> Array[Vector3]:
 	return dirs
 
 
-func _pose_tail(delta: float, speed: float, whip: float, spin: float) -> void:
-	var dirs := _tail_shape(speed, whip, spin)
+func _pose_tail(delta: float, speed: float, spin: float) -> void:
+	var dirs := _tail_shape(speed, spin)
 	var hips := _hips.global_transform
 	var size := global_basis.get_scale().y
 	var root := _tail[0].global_position
@@ -222,7 +199,7 @@ func _pose_tail(delta: float, speed: float, whip: float, spin: float) -> void:
 	for k in TAIL_BONES:
 		targets.append(targets[k] + (hips.basis.orthonormalized() * dirs[k]) * _tail_len[k] * size)
 	var fresh := _points[0].distance_to(root) > 2.0 or _points[TAIL_BONES] == Vector3.ZERO
-	var snap := maxf(_whip_w, maxf(_spin_w, _glide))
+	var snap := maxf(_spin_w, _glide)
 	var steps := 2
 	var dt := delta / steps
 	for _s in steps:

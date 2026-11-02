@@ -75,7 +75,7 @@ func _run() -> void:
 			slowest = minf(slowest, player.velocity.y)
 	_check(glided and slowest > -moves.glide_fall - 0.6, "twirl slows the fall (%.2f m/s)" % slowest)
 
-	# A tail whip at a cat beats it
+	# A tail spin on the ground beats a cat beside him
 	var cat := get_nodes_in_group(&"cats")[0] as YardCat
 	cat.set_physics_process(false)
 	# (behind it along the way he faces, so it is in front of him)
@@ -86,7 +86,7 @@ func _run() -> void:
 	await _frames(2)
 	moves.press()
 	await _frames(20)
-	_check(cat.mode == YardCat.Mode.DAZED, "tail whip beats a cat")
+	_check(cat.mode == YardCat.Mode.DAZED, "tail spin on the ground beats a cat")
 	cat.set_physics_process(true)
 
 	# A spin in the air
