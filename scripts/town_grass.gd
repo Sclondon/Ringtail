@@ -16,6 +16,10 @@ var _covered := {}
 var _space: PhysicsDirectSpaceState3D
 ## Reed patches: (x, z, radius).
 var _patches: Array[Vector3] = []
+## Tall grass patches to hide in: (x, z, radius).
+var _tall: Array[Vector3] = []
+## The lawn of the world now (for `hidden`).
+static var current: TownGrass
 
 
 static func place(world: Node3D, player: Node3D, markers := {}) -> TownGrass:
@@ -42,6 +46,8 @@ static func place(world: Node3D, player: Node3D, markers := {}) -> TownGrass:
 	# (the field holds on to it: its mask and height are calls on it, and nothing else keeps it)
 	field.set_meta(&"lawn", lawn)
 	lawn._grow_reeds(world, markers)
+	lawn._grow_tall(world, markers)
+	current = lawn
 	Grass.push(player)
 	return lawn
 
@@ -76,6 +82,55 @@ func _grow_reeds(world: Node3D, markers: Dictionary) -> void:
 		"seed": 3,
 	})
 	reeds.set_meta(&"lawn", self)
+
+
+## Tall grass to hide in where the world model has `tallgrass_<n>` markers (scale.x the patch's radius): the same
+## grass, but taller than he is and thick (the user, 2026-11-02, "tall grass to hide in in spots as well").
+func _grow_tall(world: Node3D, markers: Dictionary) -> void:
+	for name: String in markers:
+		if name.begins_with("tallgrass_"):
+			var at: Transform3D = markers[name]
+			_tall.append(Vector3(at.origin.x, at.origin.z, maxf(at.basis.get_scale().x, 0.5)))
+	if _tall.is_empty():
+		return
+	var reach := Rect2(Vector2(_tall[0].x, _tall[0].y), Vector2.ZERO)
+	for patch in _tall:
+		reach = reach.expand(Vector2(patch.x, patch.y) - Vector2.ONE * patch.z).expand(Vector2(patch.x, patch.y) + Vector2.ONE * patch.z)
+	var tall := Grass.field(world, reach, 3.0, {
+		"mask": tall_at,
+		"height": height,
+		"ground": _ground_colour(),
+		"blade_height": 0.85,
+		"blade_width": 0.03,
+		"lean": 0.18,
+		"dryness": 0.35,
+		"flowers": 0.02,
+		"push_bend": 0.9,
+		"seed": 5,
+	})
+	tall.set_meta(&"lawn", self)
+
+
+## Tall grass at `p`: in a patch (thinning at its edge) and on open lawn.
+func tall_at(p: Vector2) -> float:
+	var most := 0.0
+	for patch in _tall:
+		var d := Vector2(patch.x, patch.y).distance_to(p) / patch.z
+		most = maxf(most, 1.0 - smoothstep(0.7, 1.0, d))
+	return most * mask(p) if most > 0.0 else 0.0
+
+
+## Whether `at` (someone's feet) is down in tall grass, well inside a patch: hidden there from what hunts him.
+static func hidden(at: Vector3) -> bool:
+	if current == null:
+		return false
+	var p := Vector2(at.x, at.z)
+	if absf(at.y - current.height(p)) > 0.4:
+		return false
+	for patch in current._tall:
+		if Vector2(patch.x, patch.y).distance_to(p) < patch.z * 0.75:
+			return true
+	return false
 
 
 ## Reeds at `p`: in a patch (thinning to its edge) and on open lawn.
