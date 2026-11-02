@@ -22,9 +22,10 @@ const OLD_GREY := {"size": 1.12, "girth": 1.55, "head": 1.05, "ears": 0.85, "mar
 		"colours": {"fur": Color(0.55, 0.54, 0.53), "light": Color(0.88, 0.87, 0.85), "limb": Color(0.33, 0.32, 0.32), "tan": Color(0.66, 0.65, 0.63), "ring": Color(0.2, 0.2, 0.2)}}
 const LANKY := {"size": 1.22, "girth": 0.8, "head": 0.95, "ears": 1.35, "fur": "sleek", "tail": [1.3, 0.85]}
 const RUNT := {"size": 0.38, "girth": 1.0, "head": 1.12, "ears": 1.45, "fur": "soft"}
-## The giant of the grove (the user, 2026-11-02: "1 giant Totoro-sized raccoon"): a raccoon, about six times the
-## size of the rest, round and fat, gentle and sleepy (Claude's picks for its look and its name).
-const GIANT := {"giant": true, "size": 6.0, "girth": 1.6, "head": 1.05, "ears": 0.9, "marks": "frosted", "fur": "shaggy", "tail": [1.1, 1.45],
+## The giant of the grove (the user, 2026-11-02: "1 giant Totoro-sized raccoon"; then "the totoro raccoon is too big
+## now": about four times the size of the rest), round and fat, gentle and sleepy (Claude's picks for its look and
+## its name), egg-shaped (EGG).
+const GIANT := {"giant": true, "egg": true, "size": 4.0, "girth": 1.6, "head": 0.88, "ears": 0.9, "marks": "frosted", "fur": "soft", "tail": [1.1, 1.45],
 		"colours": {"fur": Color(0.47, 0.42, 0.38), "light": Color(0.86, 0.82, 0.76), "limb": Color(0.27, 0.24, 0.22), "tan": Color(0.6, 0.55, 0.49), "ring": Color(0.19, 0.17, 0.16)}}
 const GIANT_LINES := ["Old Mossback", "Mmmmm... hello... little one.", "...", "The grove is... warm... today.",
 		"Mmm. Stay a while.", "Zzz... mm? Oh. Still here?", "The little ones... climb on me. I don't mind."]
@@ -100,7 +101,9 @@ static func place(world: Node3D, markers: Dictionary, hero: Player) -> void:
 		oak = (markers["great_oak"] as Transform3D).origin
 		var out := Vector3(heart.x - oak.x, 0.0, heart.z - oak.z)
 		out = out.normalized() if out.length() > 0.5 else Vector3.BACK
-		heart = oak + out * 7.5
+		# (no nearer than 9.5 m: the oak is broad, and the giant sits between)
+		if Vector2(heart.x - oak.x, heart.z - oak.z).length() < 9.5:
+			heart = Vector3(oak.x, heart.y, oak.z) + out * 9.5
 	var spot := 0
 	for k in 3:
 		var a := TAU * k / 3 + 0.4
@@ -135,6 +138,8 @@ static func place(world: Node3D, markers: Dictionary, hero: Player) -> void:
 	mossback.home = seat
 	mossback.say(GIANT_LINES)
 	mossback.rotation.y = atan2(heart.x - seat.x, heart.z - seat.z)
+	if oak != Vector3.INF:
+		band._fit = [mossback, oak, heart]
 	# (two play tag; the third sometimes, with whichever)
 	kits[0].playmate = kits[1]
 	kits[1].playmate = kits[0]
@@ -211,6 +216,9 @@ static func _shape_bones(rig: RaccoonRig, kit: bool, build: Dictionary) -> void:
 	var skeleton := rig._skeleton
 	if skeleton == null:
 		return
+	if build.get("egg", false):
+		_egg_bones(skeleton, build)
+		return
 	var girth := float(build.girth)
 	var sizes := {
 		# (the head sits on the widened middle: its own size kept, not the middle's width too)
@@ -224,6 +232,33 @@ static func _shape_bones(rig: RaccoonRig, kit: bool, build: Dictionary) -> void:
 			continue
 		var rest := skeleton.get_bone_rest(index)
 		skeleton.set_bone_rest(index, Transform3D(rest.basis.scaled_local(sizes[bone]), rest.origin))
+
+
+## The giant's egg (the user, 2026-11-02: "he needs to have more of an egg silhouette too"): widest at the belly,
+## narrowing up to the shoulders, the head sat low on them with hardly a neck. Each bone's size as seen in the world
+## (bone -> size); a bone's rest takes its size over its parent's, so the parent's does not carry on into it.
+const EGG := {
+	"hips": Vector3(2.0, 1.0, 1.8), "spine": Vector3(1.75, 1.25, 1.7), "chest": Vector3(1.05, 0.6, 1.05),
+	"neck": Vector3(1.0, 0.5, 1.0), "upper_arm_l": Vector3(1.15, 1.15, 1.15), "upper_arm_r": Vector3(1.15, 1.15, 1.15),
+	"thigh_l": Vector3(1.3, 1.0, 1.3), "thigh_r": Vector3(1.3, 1.0, 1.3), "shin_l": Vector3(1.2, 1.0, 1.2),
+	"shin_r": Vector3(1.2, 1.0, 1.2), "tail_0": Vector3(1.1, 1.1, 1.1),
+}
+
+
+static func _egg_bones(skeleton: Skeleton3D, build: Dictionary) -> void:
+	var sizes := EGG.duplicate()
+	sizes["head"] = Vector3.ONE * float(build.head)
+	sizes["ear_l"] = Vector3.ONE * float(build.head) * float(build.ears)
+	sizes["ear_r"] = sizes["ear_l"]
+	var seen: Array[Vector3] = []
+	for index in skeleton.get_bone_count():
+		var parent := skeleton.get_bone_parent(index)
+		var above: Vector3 = seen[parent] if parent >= 0 else Vector3.ONE
+		var bone := skeleton.get_bone_name(index)
+		var size: Vector3 = sizes.get(bone, above)
+		seen.append(size)
+		var rest := skeleton.get_bone_rest(index)
+		skeleton.set_bone_rest(index, Transform3D(rest.basis.scaled_local(size / above), rest.origin))
 
 
 ## A kit's big head and round middle: the bones' rest made bigger (the rig keeps a bone's rest size in every pose).
@@ -307,6 +342,8 @@ const CHATS := [
 	["Have you tried the station bins?", "Too many people.", "Too many sandwiches, you mean.", "...Tomorrow, then."],
 ]
 
+## The giant, the oak and the base, till it is set against the bark (once the trees are in the physics).
+var _fit: Array = []
 var _chats: Array[Dictionary] = []
 var _chat_wait := 5.0
 
@@ -333,6 +370,8 @@ func _free(who: Villager) -> bool:
 
 
 func _physics_process(delta: float) -> void:
+	if not _fit.is_empty():
+		_fit_giant()
 	_chat_wait -= delta
 	if _chat_wait <= 0.0:
 		_chat_wait = randf_range(6.0, 12.0)
@@ -433,3 +472,35 @@ static func celebrate(at: Vector3) -> void:
 	for member in current.members:
 		if is_instance_valid(member) and member.home != Vector3.INF and member.global_position.distance_to(at) < 35.0:
 			member.celebrate()
+
+
+## Sets the giant with its back to the great oak's bark (the trunk's girth is the town's, and it grows: the user,
+## 2026-11-02, "the giant tree not big enough"): a ray from the base to the trunk finds the bark, and it sits that far
+## out plus its own width, on whatever is under it there (a root, the ground).
+func _fit_giant() -> void:
+	var giant: Villager = _fit[0]
+	var oak: Vector3 = _fit[1]
+	var heart: Vector3 = _fit[2]
+	if not is_instance_valid(giant):
+		_fit.clear()
+		return
+	var space := get_viewport().get_world_3d().direct_space_state
+	var high := Vector3.UP * 2.5
+	var hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(heart + high, oak + high, 1, [giant.get_rid(), giant._solid.get_rid()]))
+	_fit.clear()
+	if hit.is_empty():
+		return
+	var out := Vector3(heart.x - oak.x, 0.0, heart.z - oak.z).normalized()
+	# (out past the trunk's flare, to where the ground is about the base's level: a root or two is all right)
+	var seat: Vector3 = hit.position + out * (0.25 * giant.rig.scale.x)
+	seat.y = heart.y
+	for step in 40:
+		var at := seat + out * 0.25 * step
+		var down := space.intersect_ray(PhysicsRayQueryParameters3D.create(at + Vector3.UP * 4.0, at + Vector3.DOWN * 6.0, 1, [giant.get_rid(), giant._solid.get_rid()]))
+		if not down.is_empty() and down.position.y < heart.y + 0.7:
+			seat = down.position
+			break
+	giant.global_position = seat + Vector3.UP * 0.1
+	giant.home = seat
+	giant.velocity = Vector3.ZERO
+	giant.rotation.y = atan2(out.x, out.z)

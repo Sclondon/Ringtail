@@ -45,19 +45,31 @@ func _run(world: World) -> void:
 	eye.look_at_from_position(spawn + Vector3.UP * 1.4, giant.global_position + Vector3.UP * 1.5)
 	eye.make_current()
 	await _shot("from_spawn")
-	# Close up, from the front and the side
+	# Close up, sitting, from four sides (the user, 2026-11-02: "he needs to have more of an egg silhouette too"), and above
+	giant._go(Villager.Doing.SIT, 60.0)
+	for _i in 120:
+		await physics_frame
 	var facing := Vector3(sin(giant.rotation.y), 0.0, cos(giant.rotation.y))
-	eye.look_at_from_position(giant.global_position + facing * 6.0 + Vector3.UP * 1.8, giant.global_position + Vector3.UP * 1.6)
-	await _shot("close_front")
-	eye.look_at_from_position(giant.global_position + facing.cross(Vector3.UP) * 6.5 + Vector3.UP * 1.8, giant.global_position + Vector3.UP * 1.6)
-	await _shot("close_side")
+	for side in 4:
+		var way := facing.rotated(Vector3.UP, side * PI / 2.0)
+		eye.look_at_from_position(giant.global_position + way * 5.0 + Vector3.UP * 1.3, giant.global_position + Vector3.UP * 1.0)
+		await _shot("sit_%s" % ["front", "left", "back", "right"][side])
+	eye.look_at_from_position(giant.global_position + facing * 1.5 + Vector3.UP * 6.0, giant.global_position + Vector3.UP * 0.8)
+	await _shot("sit_above")
+	# He beside it, for scale, from the front
+	player.global_position = giant.global_position + facing * 1.6 + facing.cross(Vector3.UP) * 1.2 + Vector3.UP * 0.3
+	for _i in 30:
+		await physics_frame
+	eye.look_at_from_position(giant.global_position + facing * 6.5 + Vector3.UP * 1.4, giant.global_position + Vector3.UP * 0.9)
+	await _shot("beside_him")
 	# He comes down on top of it and stands there
-	player.global_position = giant.global_position + Vector3.UP * 4.5
+	player.global_position = giant.global_position + facing * 0.3 + Vector3.UP * 2.5
 	player.velocity = Vector3.ZERO
 	for _i in 90:
 		await physics_frame
-	var up_on := player.is_on_floor() and player.global_position.y - giant.global_position.y > 2.0
-	print("GIANT size %.1f height of him on it %.2f on floor %s -> %s" % [giant.rig.scale.x, player.global_position.y - giant.global_position.y, player.is_on_floor(), "STANDS ON IT" if up_on else "NOT ON IT"])
+	print("GIANT oak %s heart %s giant %s" % [world.markers.get("great_oak", Transform3D()).origin, world.markers.get("grove_heart", Transform3D()).origin, giant.global_position])
+	var up_on := player.is_on_floor() and player.global_position.y - giant.global_position.y > 0.8
+	print("GIANT size %.1f drum %.2f height of him on it %.2f on floor %s -> %s" % [giant.rig.scale.x, giant._solid_shape.height, player.global_position.y - giant.global_position.y, player.is_on_floor(), "STANDS ON IT" if up_on else "NOT ON IT"])
 	world.camera.make_current()
 	await _shot("on_top")
 	print("GIANT SHOTS DONE ", out)

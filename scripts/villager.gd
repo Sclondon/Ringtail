@@ -246,8 +246,10 @@ func _physics_process(delta: float) -> void:
 		var off := Vector3(home.x - global_position.x, 0.0, home.z - global_position.z)
 		if off.length() > 3.5:
 			want += off.normalized() * (off.length() - 3.5) * 2.0
-	want += villagers.apart(self) * 4.0
-	if hero_flat.length() < 0.7:
+	# (the giant is not shoved about by those standing on it or climbing it)
+	if not giant:
+		want += villagers.apart(self) * 4.0
+	if hero_flat.length() < 0.7 and not giant:
 		want -= hero_flat.normalized() * (0.7 - hero_flat.length()) * 5.0
 	want = want.limit_length(sprint_speed * 1.2)
 
@@ -269,7 +271,7 @@ func _physics_process(delta: float) -> void:
 		air_time = 0.0
 		vy = -0.1
 		# (over what is in its way, a hop; stuck a while, it gives that haunt up)
-		if want.length() > 1.0 and _blocked(want):
+		if want.length() > 1.0 and _blocked(want) and not giant:
 			vy = 4.6 if kit else 5.4
 			jumped.emit()
 		elif _pounce_now:
@@ -737,7 +739,8 @@ func _make_solid() -> void:
 	# (not synced to the physics step: synced, it kept the place it was made at, not where the giant settled)
 	_solid.sync_to_physics = false
 	_solid_shape = CylinderShape3D.new()
-	_solid_shape.radius = 1.15
+	# (sized to it: 0.92 m round its belly at size 4)
+	_solid_shape.radius = 0.23 * rig.scale.x
 	_solid_shape.height = 3.0
 	var shape := CollisionShape3D.new()
 	shape.shape = _solid_shape
@@ -754,7 +757,7 @@ func _keep_solid() -> void:
 	if _solid == null:
 		return
 	# (its lap and belly, not its whole height: up there he stands on its belly, below its head)
-	var tall := lerpf(2.2, 1.5, sit_progress)
+	var tall := lerpf(0.34, 0.25, sit_progress) * rig.scale.x
 	_solid_shape.height = tall
 	(_solid.get_child(0) as CollisionShape3D).position.y = tall * 0.5
 
