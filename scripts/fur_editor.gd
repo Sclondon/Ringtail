@@ -109,7 +109,7 @@ func _ready() -> void:
 func _stage() -> void:
 	var environment := Environment.new()
 	environment.background_mode = Environment.BG_COLOR
-	environment.background_color = Color(0.12, 0.13, 0.17)
+	environment.background_color = Color(0.09, 0.14, 0.11)
 	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	environment.ambient_light_color = Color(0.55, 0.55, 0.62)
 	environment.ambient_light_energy = 0.35
@@ -131,7 +131,7 @@ func _stage() -> void:
 	disc.height = 0.08
 	plinth.mesh = disc
 	plinth.position.y = -0.04
-	plinth.material_override = Toon.surface(Color(0.32, 0.28, 0.3))
+	plinth.material_override = Toon.surface(Color(0.36, 0.26, 0.18))
 	add_child(plinth)
 	_camera = Camera3D.new()
 	_camera.fov = 32.0
@@ -229,14 +229,8 @@ func _build_panel() -> void:
 	_root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(_root)
+	# (the project theme's panel: UiStyle)
 	_panel = PanelContainer.new()
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.08, 0.07, 0.1, 0.92)
-	style.content_margin_left = 18
-	style.content_margin_right = 18
-	style.content_margin_top = 14
-	style.content_margin_bottom = 14
-	_panel.add_theme_stylebox_override(&"panel", style)
 	_root.add_child(_panel)
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override(&"separation", 10)
@@ -282,7 +276,7 @@ func _build_panel() -> void:
 		var turn := Button.new()
 		turn.custom_minimum_size = Vector2(64, 56)
 		turn.focus_mode = Control.FOCUS_NONE
-		var arrow := Icon.make(Icon.Kind.LEFT if way < 0 else Icon.Kind.RIGHT, 36.0)
+		var arrow := Icon.make(Icon.Kind.LEFT if way < 0 else Icon.Kind.RIGHT, 36.0, UiStyle.CREAM)
 		arrow.set_anchors_preset(Control.PRESET_FULL_RECT)
 		turn.add_child(arrow)
 		turn.button_down.connect(func() -> void:
@@ -428,7 +422,7 @@ func _colour_row(material: String, named: String) -> void:
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override(&"separation", 8)
 		_list.add_child(row)
-		var name := _label(part, 15, Color(1, 1, 1, 0.7))
+		var name := _label(part, 15, Color(UiStyle.CREAM, 0.75))
 		name.custom_minimum_size.x = 92
 		row.add_child(name)
 		var slider := HSlider.new()
@@ -458,7 +452,7 @@ func _shape_slider(key: String, own: Array, index: int, named: String, low: floa
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override(&"separation", 8)
 	(parent if parent else _list).add_child(row)
-	var name := _label(named, 15, Color(1, 1, 1, 0.7))
+	var name := _label(named, 15, Color(UiStyle.CREAM, 0.75))
 	name.custom_minimum_size.x = 92
 	row.add_child(name)
 	var slider := HSlider.new()
@@ -630,7 +624,7 @@ func _icon_button(parent: Control, what: Icon.Kind, words: String, pressed: Call
 	row.set_anchors_preset(Control.PRESET_FULL_RECT)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	row.add_child(Icon.make(what, 38.0))
+	row.add_child(Icon.make(what, 38.0, UiStyle.CREAM))
 	var label := _label(words, 18)
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(label)
@@ -644,7 +638,7 @@ func _arrow(parent: Control, what: Icon.Kind, pressed: Callable) -> void:
 	var button := Button.new()
 	button.custom_minimum_size = Vector2(56, 48)
 	button.focus_mode = Control.FOCUS_NONE
-	var symbol := Icon.make(what, 30.0)
+	var symbol := Icon.make(what, 30.0, UiStyle.CREAM)
 	symbol.set_anchors_preset(Control.PRESET_FULL_RECT)
 	button.add_child(symbol)
 	button.pressed.connect(pressed)

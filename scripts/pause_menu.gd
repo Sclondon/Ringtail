@@ -25,21 +25,25 @@ func _ready() -> void:
 		start.button_index = JOY_BUTTON_START
 		InputMap.action_add_event(&"pause", start)
 	_veil = ColorRect.new()
-	(_veil as ColorRect).color = Color(0.04, 0.03, 0.06, 0.62)
+	(_veil as ColorRect).color = Color(0.02, 0.05, 0.035, 0.6)
 	_veil.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(_veil)
+	# (everything on a card in the middle: UiStyle "Card")
+	var centre := CenterContainer.new()
+	centre.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_veil.add_child(centre)
+	var card := PanelContainer.new()
+	card.theme_type_variation = &"Card"
+	centre.add_child(card)
 	var middle := VBoxContainer.new()
-	middle.set_anchors_preset(Control.PRESET_CENTER)
-	middle.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	middle.grow_vertical = Control.GROW_DIRECTION_BOTH
 	middle.alignment = BoxContainer.ALIGNMENT_CENTER
-	middle.add_theme_constant_override(&"separation", 26)
-	_veil.add_child(middle)
+	middle.add_theme_constant_override(&"separation", 22)
+	card.add_child(middle)
 	var title := Label.new()
 	title.text = "Paused"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override(&"font_size", 46)
-	title.add_theme_color_override(&"font_outline_color", Color(0.08, 0.05, 0.1))
+	title.add_theme_color_override(&"font_color", UiStyle.AMBER.lerp(UiStyle.CREAM, 0.35))
 	title.add_theme_constant_override(&"outline_size", 10)
 	middle.add_child(title)
 	var row := HBoxContainer.new()
@@ -57,6 +61,7 @@ func _ready() -> void:
 	var named := Label.new()
 	named.text = "Pixels"
 	named.add_theme_font_size_override(&"font_size", 24)
+	named.add_theme_color_override(&"font_color", UiStyle.MOSS.lerp(UiStyle.CREAM, 0.4))
 	dial.add_child(named)
 	var slider := HSlider.new()
 	slider.min_value = 0.0
@@ -87,7 +92,7 @@ func _big(parent: Control, what: Icon.Kind, words: String, pressed: Callable) ->
 	button.custom_minimum_size = Vector2(150, 150)
 	button.focus_mode = Control.FOCUS_NONE
 	button.tooltip_text = words
-	var symbol := Icon.make(what, 76.0)
+	var symbol := Icon.make(what, 72.0, UiStyle.CREAM)
 	symbol.set_anchors_preset(Control.PRESET_FULL_RECT)
 	symbol.offset_bottom = -30
 	button.add_child(symbol)
@@ -100,6 +105,7 @@ func _big(parent: Control, what: Icon.Kind, words: String, pressed: Callable) ->
 	label.offset_top = -38
 	label.offset_bottom = -8
 	label.add_theme_font_size_override(&"font_size", 18)
+	label.add_theme_constant_override(&"outline_size", 5)
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	button.add_child(label)
 	button.pressed.connect(pressed)

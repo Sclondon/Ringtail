@@ -679,3 +679,21 @@ Read README.md first. Started 2026-11-01.
   animals 18-30k -> 2-5.4k (mouse 2.1k, porcupine 5.4k), dogs 15k -> 4.9k, crow 6.6k -> 4.2k, owl 8.7k -> 5.2k. What is
   left on most is the fur (ruffs ~1.4k, whiskers). `LOWPOLY=off` in the environment builds the old full ones.
   `tests/tri_count.gd` prints every animal's count (and its `_lo`).
+
+## The UI's look (2026-11-02)
+
+- The user: "give the UI a pass, the basic shapes are ugly", and "what are the go buttons?" (the testing panel's jumps
+  to each Bottlecap: now folded away behind a small spanner button at the bottom left, shown only in the editor or
+  with --dev / ?dev).
+- `UiStyle` (scripts/ui_style.gd) builds the project theme, saved as `ui/theme.tres` (project.godot gui/theme/custom)
+  by `tools/make_theme.gd`: run it after changing UiStyle. A Pacific Northwest wood (Claude's picks, every colour):
+  deep fir-green tiles in a dark bark rim with a thick lower lip that sinks when pressed, amber when picked or held,
+  cream lettering outlined in bark; variations "Badge" (the HUD's counts and the zone's name, pills in a wooden
+  rim, bouncing when a count changes), "Card" (the pause screen's middle) and "Small" (testing buttons).
+- `Icon` draws every symbol as a sticker: outlined in bark over a soft drop shadow, a touch of shine; the scurry
+  button is a raccoon's five-fingered fore paw print, the tail button his ringed tail curled; new TOOLS (spanner).
+  The day/night dial has a wooden rim to match. The speech bubbles keep Gloaming's see-through look (the user's call).
+- Check: `tests/ui_shots.gd -- --out=<dir>` (window; every symbol, HUD by day and night, a bounce, the testing panel,
+  the fishing button, as the crow, pause, the fur editor; also at --resolution 390x844).
+- Not done: on a tall phone screen the HUD's counts are drawn at desktop size (the canvas is 1280 wide), so small;
+  the pause screen zooms itself, the HUD does not.

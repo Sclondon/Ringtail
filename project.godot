@@ -28,6 +28,7 @@ import/blender/enabled=false
 
 [gui]
 
+theme/custom="res://ui/theme.tres"
 theme/custom_font="res://fonts/PixelifySans.ttf"
 
 [input_devices]

@@ -390,8 +390,12 @@ class DayDial extends Control:
 	func _draw() -> void:
 		var c := size * 0.5
 		var r := minf(size.x, size.y) * 0.46
-		var ink := Color(0.08, 0.05, 0.1, 0.85)
-		draw_circle(c, r + 3.0, ink)
+		var ink := UiStyle.BARK
+		# (framed like the HUD's badges: a soft shadow, a bark rim round a wooden ring: UiStyle)
+		draw_circle(c + Vector2(0.0, 3.0), r + 7.0, Color(0.0, 0.0, 0.0, 0.3))
+		draw_circle(c, r + 7.0, ink)
+		draw_circle(c, r + 5.0, UiStyle.WOOD)
+		draw_circle(c, r + 2.0, ink)
 		draw_circle(c, r, Color(0.08, 0.1, 0.25))
 		# (the day's half of the sky above, the night's below; the hour turns the dial so now is at the top)
 		var turn := (day.hour - 12.0) / 24.0 * TAU
@@ -403,8 +407,12 @@ class DayDial extends Control:
 		var sun_at := c + Vector2(0.0, -r * 0.5)
 		# (whichever is up shows at the top: the sun by day, the moon by night)
 		if day.night < 0.5:
-			draw_circle(sun_at, r * 0.28, Color(1.0, 0.85, 0.3))
+			for k in 8:
+				var ray := Vector2.from_angle(TAU * k / 8.0)
+				draw_line(sun_at + ray * r * 0.33, sun_at + ray * r * 0.45, Color(1.0, 0.85, 0.3), 2.5)
+			draw_circle(sun_at, r * 0.3, ink)
+			draw_circle(sun_at, r * 0.26, Color(1.0, 0.85, 0.3))
 		else:
 			draw_circle(sun_at, r * 0.26, Color(0.92, 0.94, 1.0))
 			draw_circle(sun_at + Vector2(r * 0.11, -r * 0.06), r * 0.22, Color(0.08, 0.1, 0.25))
-		draw_arc(c, r, 0.0, TAU, 32, Color(1.0, 1.0, 1.0, 0.5), 2.0)
+		draw_arc(c, r - 1.0, 0.0, TAU, 40, Color(1.0, 1.0, 1.0, 0.25), 2.0)

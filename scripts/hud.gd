@@ -21,6 +21,9 @@ var _tail_touch: Button
 ## The buttons' symbols, by action (swapped playing as a bird).
 var _icons := {}
 var _dev: VBoxContainer
+## The counts in badges, and what each said last (to bounce one that changes).
+var _counted: Array[Label] = []
+var _seen := {}
 var pause: PauseMenu
 
 
@@ -35,19 +38,20 @@ func _ready() -> void:
 	top_left.position = Vector2(22, 16)
 	top_left.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(top_left)
+	top_left.add_theme_constant_override(&"separation", 8)
 	_hearts = HBoxContainer.new()
-	_hearts.add_theme_constant_override(&"separation", 6)
-	top_left.add_child(_hearts)
+	_hearts.add_theme_constant_override(&"separation", 4)
+	_badge(top_left).add_child(_hearts)
 	# (which side of the hill he is on: its own food and kits are counted below; in the grove, the whole hill's)
-	_zone = _label(24, Color(1.0, 0.94, 0.8))
-	top_left.add_child(_zone)
+	_zone = _label(22, UiStyle.CREAM)
+	_badge(top_left).add_child(_zone)
 	_crumbs = _counter(top_left, Icon.Kind.CRUMB, Color(0.85, 0.6, 0.33))
 	# (the lost kits led home, when there are any to find)
 	_kits = _counter(top_left, Icon.Kind.KIT, Color(0.9, 0.88, 0.84))
 	if world.lost_kits and world.lost_kits.total > 0:
 		world.lost_kits.changed.connect(func(_home: int, _total: int) -> void: _show_counts())
 	else:
-		_kits.get_parent().visible = false
+		_kits.get_meta(&"badge").visible = false
 	if world.zones:
 		world.zones.changed.connect(_show_counts)
 	_show_counts.call_deferred()
@@ -57,6 +61,7 @@ func _ready() -> void:
 	top_right.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	top_right.offset_right = -22
 	top_right.offset_top = 16
+	top_right.add_theme_constant_override(&"separation", 12)
 	root.add_child(top_right)
 	_caps = _counter(top_right, Icon.Kind.CAP, Color(0.98, 0.78, 0.25))
 	# The pause button, always on screen (Esc, P or Start too): the pause screen and the model editor (the user,
@@ -68,7 +73,7 @@ func _ready() -> void:
 	stop.custom_minimum_size = Vector2(64, 64)
 	stop.focus_mode = Control.FOCUS_NONE
 	stop.tooltip_text = "Pause (Esc)"
-	var bars := Icon.make(Icon.Kind.PAUSE, 40.0)
+	var bars := Icon.make(Icon.Kind.PAUSE, 36.0, UiStyle.CREAM)
 	bars.set_anchors_preset(Control.PRESET_FULL_RECT)
 	stop.add_child(bars)
 	stop.pressed.connect(pause.open)
@@ -82,6 +87,8 @@ func _ready() -> void:
 	_clock_row.offset_top = 14
 	root.add_child(_clock_row)
 	_clock = _counter(_clock_row, Icon.Kind.CLOCK, Color(0.6, 0.95, 1.0))
+	# (it ticks every frame: no bounce)
+	_counted.erase(_clock)
 
 	_message = _label(26, Color.WHITE)
 	_message.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
@@ -115,7 +122,7 @@ func _ready() -> void:
 	_tail_touch.offset_bottom = -310
 	_tail_touch.focus_mode = Control.FOCUS_NONE
 	_tail_touch.button_down.connect(_tail)
-	var spiral := Icon.make(Icon.Kind.TAIL, 64.0)
+	var spiral := Icon.make(Icon.Kind.TAIL, 64.0, UiStyle.CREAM)
 	spiral.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_tail_touch.add_child(spiral)
 	root.add_child(_tail_touch)
@@ -154,46 +161,70 @@ func _label(size: int, colour: Color) -> Label:
 	var label := Label.new()
 	label.add_theme_font_size_override(&"font_size", size)
 	label.add_theme_color_override(&"font_color", colour)
-	label.add_theme_color_override(&"font_outline_color", Color(0.08, 0.05, 0.1))
 	label.add_theme_constant_override(&"outline_size", 8)
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return label
 
 
+## A count in a framed badge (UiStyle "Badge"), its symbol at the left; it bounces when the count changes (_process).
 func _counter(parent: Control, what: Icon.Kind, colour: Color) -> Label:
+	var badge := _badge(parent)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override(&"separation", 8)
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(Icon.make(what, 40.0, colour))
-	var label := _label(30, colour)
+	var label := _label(28, colour.lerp(UiStyle.CREAM, 0.35))
 	row.add_child(label)
-	parent.add_child(row)
+	badge.add_child(row)
+	label.set_meta(&"badge", badge)
+	_counted.append(label)
 	return label
+
+
+## A framed pill to hold a count or a name (UiStyle "Badge").
+func _badge(parent: Control) -> PanelContainer:
+	var badge := PanelContainer.new()
+	badge.theme_type_variation = &"Badge"
+	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	badge.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	parent.add_child(badge)
+	return badge
+
+
+## A badge's little bounce when its count changes.
+func _bounce(label: Label) -> void:
+	var badge: Control = label.get_meta(&"badge")
+	badge.pivot_offset = badge.size * 0.5
+	var tween := badge.create_tween()
+	tween.tween_property(badge, ^"scale", Vector2.ONE * 1.18, 0.08).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.tween_property(badge, ^"scale", Vector2.ONE, 0.35).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
 
 
 func _show_hearts(count: int) -> void:
 	for child in _hearts.get_children():
 		child.queue_free()
 	for k in World.MAX_HEARTS:
-		_hearts.add_child(Icon.make(Icon.Kind.HEART if k < count else Icon.Kind.HEART_EMPTY, 38.0, Color(1.0, 0.3, 0.38)))
+		_hearts.add_child(Icon.make(Icon.Kind.HEART if k < count else Icon.Kind.HEART_EMPTY, 36.0, Color(0.95, 0.3, 0.3)))
 
 
 func _button(what: Icon.Kind, key: String, action: StringName) -> void:
 	var button := Button.new()
 	button.custom_minimum_size = Vector2(88, 88)
 	button.focus_mode = Control.FOCUS_NONE
-	var symbol := Icon.make(what, 46.0)
+	var symbol := Icon.make(what, 46.0, UiStyle.CREAM)
 	symbol.set_anchors_preset(Control.PRESET_FULL_RECT)
-	symbol.offset_bottom = -18
+	symbol.offset_top = 2
+	symbol.offset_bottom = -24
 	button.add_child(symbol)
 	_icons[action] = symbol
-	var shortcut := _label(14, Color(1, 1, 1, 0.7))
+	var shortcut := _label(14, Color(UiStyle.CREAM, 0.6))
 	shortcut.text = key
 	shortcut.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
 	shortcut.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	shortcut.offset_left = -40
 	shortcut.offset_right = 40
-	shortcut.offset_top = -22
+	shortcut.offset_top = -28
+	shortcut.offset_bottom = -10
 	shortcut.add_theme_constant_override(&"outline_size", 4)
 	button.add_child(shortcut)
 	button.button_down.connect(func() -> void: _press(action, true))
@@ -242,6 +273,12 @@ func say(text: String) -> void:
 func _process(delta: float) -> void:
 	_message_t -= delta
 	_message.modulate.a = clampf(_message_t, 0.0, 1.0)
+	# (a count that changed bounces its badge; the zone's name shows its badge only with a name)
+	for label in _counted:
+		if _seen.has(label) and _seen[label] != label.text:
+			_bounce(label)
+		_seen[label] = label.text
+	_zone.get_parent().visible = _zone.visible
 	# (the raccoon's scurry and tail are a bird's settle and peck: BirdPlayer)
 	var as_bird := BirdPlayer.active(world) != null
 	for pair: Array in [[&"scurry", Icon.Kind.SCURRY, Icon.Kind.PERCH], [&"tail", Icon.Kind.TAIL, Icon.Kind.PECK]]:
@@ -261,15 +298,36 @@ func _process(delta: float) -> void:
 		_clock.text = "%.1f   ·   %d left" % [maxf(world.race.left, 0.0), world.race.remaining()]
 
 
-## For testing (in the editor, with --dev, or ?dev on the web): a jump to each Bottlecap. (The pixel filter is the
-## pause screen's Pixels dial.)
+## For testing (in the editor, with --dev, or ?dev on the web): a jump to each Bottlecap ("Go: <name>"), folded away
+## behind a small spanner button at the bottom left until pressed (the user, 2026-11-02, "what are the go buttons?":
+## they cluttered his screen in the editor). (The pixel filter is the pause screen's Pixels dial.)
 func _dev_panel(root: Control) -> void:
+	var corner := VBoxContainer.new()
+	corner.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	corner.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	corner.offset_left = 22
+	corner.offset_bottom = -22
+	corner.add_theme_constant_override(&"separation", 6)
+	root.add_child(corner)
 	_dev = VBoxContainer.new()
-	_dev.position = Vector2(22, 215)
-	root.add_child(_dev)
+	_dev.add_theme_constant_override(&"separation", 4)
+	_dev.visible = false
+	corner.add_child(_dev)
+	var fold := Button.new()
+	fold.theme_type_variation = &"Small"
+	fold.custom_minimum_size = Vector2(48, 48)
+	fold.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	fold.focus_mode = Control.FOCUS_NONE
+	fold.tooltip_text = "Testing: go to each Bottlecap"
+	var spanner := Icon.make(Icon.Kind.TOOLS, 30.0, UiStyle.CREAM)
+	spanner.set_anchors_preset(Control.PRESET_FULL_RECT)
+	fold.add_child(spanner)
+	fold.pressed.connect(func() -> void: _dev.visible = not _dev.visible)
+	corner.add_child(fold)
 	for name: String in World.CAP_NAMES:
 		var go := Button.new()
 		go.text = "Go: " + name
+		go.theme_type_variation = &"Small"
 		go.focus_mode = Control.FOCUS_NONE
 		go.pressed.connect(func() -> void:
 			var at: Transform3D = world.markers.get("cap_" + name, Transform3D.IDENTITY)
