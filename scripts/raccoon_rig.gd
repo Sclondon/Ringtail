@@ -119,7 +119,10 @@ var _caps_were := 0
 
 var _tail: Array[Node3D] = []
 ## How long and how thick his tail is, of its own (the model editor's; the user, 2026-11-02: "I should be able to
-## control tail length and thickness as well"): every segment drawn out along itself, and the joints fattened across.
+## control tail length and thickness as well"). Length is a scale on the tail's root joint, the same every way (a
+## skeleton keeps a bone's scale only along its own axes: drawn out along the tail, or fattened across it, the tail
+## bent and grew both ways; "both change both aspects and the tail angle"); its thickness is the fur shader's
+## (FurLook: each point of the tail pushed out from its line), less what the length made it.
 var tail_length := 1.0
 var tail_thickness := 1.0
 var _tail_dir: Array[Vector3] = []
@@ -938,7 +941,7 @@ func _pose_tail(delta: float, speed: float, spin: float) -> void:
 	# weight at the end of the tail so when he spins his tail gets flung outward")
 	var flung := _spin_w * smoothstep(SPIN_WIND - 0.05, SPIN_WIND + 0.05, spin) if spin < 1.0 else 0.0
 	flung = maxf(flung, _tj_w)
-	stretch = lerpf(stretch, SPIN_STRETCH, flung) * tail_length
+	stretch = lerpf(stretch, SPIN_STRETCH, flung)
 	# (which way he faces, from his hips' forward laid level: their Euler angles jump about when they are pitched,
 	# hunched or on all fours, and left the tail stuck pointing one way as he spun: the user, 2026-11-02)
 	var ahead := _hips.global_basis.z
@@ -961,7 +964,7 @@ func _pose_tail(delta: float, speed: float, spin: float) -> void:
 			_speeds[k] = carry * _speeds[k]
 	var targets := PackedVector3Array([root])
 	for k in TAIL_BONES:
-		targets.append(targets[k] + (hips.basis.orthonormalized() * dirs[k]) * _tail_len[k] * size * stretch)
+		targets.append(targets[k] + (hips.basis.orthonormalized() * dirs[k]) * _tail_len[k] * size * stretch * tail_length)
 	var fresh := _points[0].distance_to(root) > 2.0 or _points[TAIL_BONES] == Vector3.ZERO
 	# (not stiffened for the spin: its lag is the whip)
 	var snap := _glide
@@ -989,7 +992,7 @@ func _pose_tail(delta: float, speed: float, spin: float) -> void:
 		# (each segment keeps its length)
 		for k in range(1, TAIL_BONES + 1):
 			var span := _points[k] - _points[k - 1]
-			var length := _tail_len[k - 1] * size * stretch
+			var length := _tail_len[k - 1] * size * stretch * tail_length
 			_points[k] = _points[k - 1] + (span.normalized() if span.length_squared() > 0.000001 else hips.basis.z * -1.0) * length
 	# Each joint turned to lie along its stretch of the chain, and drawn out along itself: the turn worked out from
 	# the turns before it (not read back from the joints, which carry their stretch), and the stretch of the one
@@ -998,8 +1001,10 @@ func _pose_tail(delta: float, speed: float, spin: float) -> void:
 	for k in TAIL_BONES:
 		var want := turned.inverse() * (_points[k + 1] - _points[k]).normalized()
 		var turn := Basis(Quaternion(_tail_dir[k], want.normalized()))
-		var undo := Basis.IDENTITY if k == 0 else _shaped(_tail_dir[k - 1], 1.0 / stretch, 1.0 / tail_thickness)
-		_tail[k].basis = undo * turn * _shaped(_tail_dir[k], stretch, tail_thickness)
+		var undo := Basis.IDENTITY if k == 0 else _along(_tail_dir[k - 1], 1.0 / stretch)
+		_tail[k].basis = undo * turn * _along(_tail_dir[k], stretch)
+		if k == 0:
+			_tail[k].basis = _tail[k].basis * tail_length
 		turned = turned * turn
 
 
@@ -1007,13 +1012,6 @@ func _pose_tail(delta: float, speed: float, spin: float) -> void:
 static func _along(axis: Vector3, by: float) -> Basis:
 	var extra := by - 1.0
 	return Basis(Vector3.RIGHT + axis * axis.x * extra, Vector3.UP + axis * axis.y * extra, Vector3.BACK + axis * axis.z * extra)
-
-
-## A basis that scales by `along` along `axis` (unit) and by `across` square to it.
-static func _shaped(axis: Vector3, along: float, across: float) -> Basis:
-	var extra := along - across
-	return Basis(Vector3.RIGHT * across + axis * axis.x * extra, Vector3.UP * across + axis * axis.y * extra,
-			Vector3.BACK * across + axis * axis.z * extra)
 
 
 static func _slerp(from: Basis, to: Basis, w: float) -> Basis:

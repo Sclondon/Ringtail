@@ -41,6 +41,9 @@ func _run() -> void:
 		await _row("furs")
 	if only.is_empty() or "shapes" in only:
 		await _row("shapes")
+	for what: String in SINGLES:
+		if what in only:
+			await _singles(what)
 	if "eyes" in only:
 		await _eyes()
 	if only.is_empty() or "menus" in only:
@@ -177,6 +180,68 @@ func _eyes() -> void:
 			eye.look_at_from_position(head + from, head)
 			await _frames(3)
 			await _shoot("eyes_%d_%s" % [k, view[0]])
+		stand.queue_free()
+		await _frames(2)
+	stage.queue_free()
+
+
+## Rows of single figures, each close up from the front, its side and a quarter: the fur shapes, parts and fixes.
+const SINGLES := {
+	"spikes": [{}, {"shape": "teardrop"}, {"shape": "ribbon"}, {"shape": "wavy"}, {"shape": "curl"}, {"shape": "blunt"},
+		{"shape": "forked"}],
+	"parts": [{"mane": [1.0, 0.0, 1.0, 0.4]}, {"mane": [1.0, 0.0, 1.0, 2.4]}, {"parts": {"back": [2.0, 2.0, 1.0]}},
+		{"parts": {"arms": [1.0, 1.0, 0.2]}}, {"parts": {"legs": [0.4, 1.0, 1.0]}}, {"parts": {"crown": [2.2, 1.6, 1.0]}}],
+	"mane": [{"mane": [1.0, 0.0, 1.0, 0.4]}, {}, {"mane": [1.0, 0.0, 1.0, 2.4]}],
+	"clip": [{"body": [1.0, 0.9, 1.0]}, {"body": [1.0, -0.9, 1.0]}, {"body": [2.2, 0.0, 1.0]},
+		{"body": [1.6, 0.9, 1.0], "run": true}, {"run": true}, {"tail": [1.0, 2.0]}, {"tail": [1.6, 1.0]}],
+}
+
+
+func _singles(what: String) -> void:
+	var stage := Node3D.new()
+	root.add_child(stage)
+	var environment := Environment.new()
+	environment.background_mode = Environment.BG_COLOR
+	environment.background_color = Color(0.5, 0.62, 0.72)
+	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	environment.ambient_light_color = Color(0.55, 0.55, 0.6)
+	environment.ambient_light_energy = 0.6
+	var lit := WorldEnvironment.new()
+	lit.environment = environment
+	stage.add_child(lit)
+	var sun := DirectionalLight3D.new()
+	sun.rotation_degrees = Vector3(-45.0, 30.0, 0.0)
+	sun.light_energy = 0.9
+	stage.add_child(sun)
+	var eye := Camera3D.new()
+	eye.fov = 30.0
+	stage.add_child(eye)
+	eye.make_current()
+	var looks: Array = SINGLES[what]
+	for k in looks.size():
+		var look: Dictionary = (looks[k] as Dictionary).duplicate(true)
+		var running: bool = look.get("run", false)
+		look.erase("run")
+		var stand := FurEditor.Stand.new()
+		var rig := RaccoonRig.new()
+		rig.model = load("res://models/raccoon.glb")
+		rig.key_poses = false
+		rig.cap_hand = false
+		rig.dusty = false
+		rig.look = look
+		stand.add_child(rig)
+		stage.add_child(stand)
+		if running:
+			# (bounding flat out on the spot)
+			stand.velocity = Vector3(0.0, 0.0, 6.0)
+			stand.is_sprinting = true
+		rig.restyle()
+		await _frames(40)
+		for view: Array in [["front", Vector3(0, 0.15, 1)], ["side", Vector3(1, 0.15, 0.02)], ["quarter", Vector3(0.7, 0.35, 0.7)]]:
+			var middle := Vector3(0.0, 0.95, 0.0) if what == "mane" else Vector3(0.0, 0.45, -0.1)
+			eye.look_at_from_position(middle + (view[1] as Vector3).normalized() * (1.1 if what == "mane" else 3.0), middle)
+			await _frames(3)
+			await _shoot("%s_%d_%s" % [what, k, view[0]])
 		stand.queue_free()
 		await _frames(2)
 	stage.queue_free()

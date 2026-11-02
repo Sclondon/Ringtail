@@ -47,6 +47,10 @@ var _panel: PanelContainer
 var _list: VBoxContainer
 var _under: HBoxContainer
 var _tab_buttons: Array[Button] = []
+## The fur shape's part picked, and the box its sliders are in.
+const PART_NAMES := {"all": "All", "back": "Back", "chest": "Chest", "arms": "Arms", "legs": "Legs", "crown": "Crown", "mane": "Mane"}
+var _part := "all"
+var _part_box: VBoxContainer
 
 
 ## A body for the rig to stand on the turntable (what a rig reads of whoever it poses; nothing moves it).
@@ -316,29 +320,65 @@ func _fill() -> void:
 			_choose("cat", (cat_index + 1) % count)
 			_fill())
 	_choices("Fur", FurLook.CAT_TYPES if kind == "cat" else FurLook.TYPES, "fur", "spiky")
+	if kind == "raccoon":
+		# (each spike's own shape: the user, "why is there not any fur shape options beside triangle")
+		_choices("Shape", FurLook.SHAPES, "shape", "triangle")
 	_choices("Texture", FurLook.TEXTURES, "texture", "solid")
 	_choices("Drawn on the fur", FurLook.MARKS, "marks", "plain")
 	if kind == "raccoon":
 		# (live, in the fur shader: FurLook; the user, "I should be able to control the angle of the fur and how
 		# dense, and the ring mane as well", "and the fur length")
+		# (and by part: "I should be able to control the width and size of each fur blade, and the density on
+		# different body parts")
 		_list.add_child(_label("Fur shape", 22, ACCENT))
-		_shape_slider("body", FurLook.BODY_SHAPE, 0, "Length", 0.3, 2.2)
-		_shape_slider("body", FurLook.BODY_SHAPE, 1, "Angle", -0.9, 0.9)
-		_shape_slider("body", FurLook.BODY_SHAPE, 2, "Density", 0.0, 1.0)
-		_list.add_child(_label("Mane", 22, ACCENT))
-		_shape_slider("mane", FurLook.MANE_SHAPE, 2, "Count", 0.0, 1.0)
-		_shape_slider("mane", FurLook.MANE_SHAPE, 0, "Length", 0.3, 2.6)
-		_shape_slider("mane", FurLook.MANE_SHAPE, 3, "Width", 0.3, 2.6)
-		_shape_slider("mane", FurLook.MANE_SHAPE, 1, "Angle", -0.9, 0.9)
+		var picks := GridContainer.new()
+		picks.columns = 4
+		picks.add_theme_constant_override(&"h_separation", 6)
+		picks.add_theme_constant_override(&"v_separation", 6)
+		_list.add_child(picks)
+		_part_box = VBoxContainer.new()
+		_part_box.add_theme_constant_override(&"separation", 6)
+		_list.add_child(_part_box)
+		var group := ButtonGroup.new()
+		for part: String in PART_NAMES:
+			var pick := _button(picks, PART_NAMES[part], func() -> void:
+				_part = part
+				_fill_part())
+			pick.toggle_mode = true
+			pick.button_group = group
+			pick.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			pick.set_pressed_no_signal(part == _part)
+		_fill_part()
 	# ("I should be able to control tail length and thickness as well")
 	_list.add_child(_label("Tail", 22, ACCENT))
 	_shape_slider("tail", FurLook.TAIL_SHAPE, 0, "Length", 0.5, 1.8)
-	_shape_slider("tail", FurLook.TAIL_SHAPE, 1, "Thickness", 0.5, 2.0)
+	if kind == "raccoon":
+		_shape_slider("tail", FurLook.TAIL_SHAPE, 1, "Thickness", 0.5, 2.0)
 	if kind == "cat":
 		_choices("Markings", FurLook.PATTERNS, "pattern", "none")
 	_list.add_child(_label("Colours", 22, ACCENT))
 	for pair: Array in FurLook.COLOURS[kind]:
 		_colour_row(pair[0], pair[1])
+
+
+## The fur shape's sliders for the part picked: all of it (length, angle, density), the mane (count, length, width,
+## angle), or one part (size, width, density).
+func _fill_part() -> void:
+	for child in _part_box.get_children():
+		child.queue_free()
+	if _part == "all":
+		_shape_slider("body", FurLook.BODY_SHAPE, 0, "Length", 0.3, 2.2, _part_box)
+		_shape_slider("body", FurLook.BODY_SHAPE, 1, "Angle", -0.9, 0.9, _part_box)
+		_shape_slider("body", FurLook.BODY_SHAPE, 2, "Density", 0.0, 1.0, _part_box)
+	elif _part == "mane":
+		_shape_slider("mane", FurLook.MANE_SHAPE, 2, "Count", 0.0, 1.0, _part_box)
+		_shape_slider("mane", FurLook.MANE_SHAPE, 0, "Length", 0.3, 2.6, _part_box)
+		_shape_slider("mane", FurLook.MANE_SHAPE, 3, "Width", 0.3, 2.6, _part_box)
+		_shape_slider("mane", FurLook.MANE_SHAPE, 1, "Angle", -0.9, 0.9, _part_box)
+	else:
+		_shape_slider("parts", FurLook.PART_SHAPE, 0, "Size", 0.2, 2.4, _part_box, _part)
+		_shape_slider("parts", FurLook.PART_SHAPE, 1, "Width", 0.3, 3.0, _part_box, _part)
+		_shape_slider("parts", FurLook.PART_SHAPE, 2, "Density", 0.0, 1.0, _part_box, _part)
 
 
 ## A heading and a grid of buttons, one of them pressed: the look's `key`.
@@ -353,7 +393,17 @@ func _choices(heading: String, options: Array, key: String, own: String) -> void
 	for option: String in options:
 		var button := _button(grid, FurLook.NAMES.get(option, option), func() -> void:
 			look[key] = option
-			_changed())
+			# (a fur shape other than the triangle is built at the plain fur type, and a fur type with triangles)
+			var other := ""
+			if key == "shape" and option != "triangle" and look.get("fur", "spiky") != "spiky":
+				look["fur"] = "spiky"
+				other = "fur"
+			elif key == "fur" and option != "spiky" and look.get("shape", "triangle") != "triangle":
+				look["shape"] = "triangle"
+				other = "shape"
+			_changed()
+			if other != "":
+				_fill.call_deferred())
 		button.toggle_mode = true
 		button.button_group = group
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -402,10 +452,11 @@ func _colour_row(material: String, named: String) -> void:
 
 ## One number of the look's `key` (an Array, `own` where it has none), at `index`, on a slider; changed live (only the
 ## shader's numbers and the tail's: no new mesh), kept when let go.
-func _shape_slider(key: String, own: Array, index: int, named: String, low: float, high: float) -> void:
+## (`part`: a part of look "parts", by name, rather than the look's `key` itself)
+func _shape_slider(key: String, own: Array, index: int, named: String, low: float, high: float, parent: Control = null, part := "") -> void:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override(&"separation", 8)
-	_list.add_child(row)
+	(parent if parent else _list).add_child(row)
 	var name := _label(named, 15, Color(1, 1, 1, 0.7))
 	name.custom_minimum_size.x = 92
 	row.add_child(name)
@@ -416,12 +467,20 @@ func _shape_slider(key: String, own: Array, index: int, named: String, low: floa
 	slider.custom_minimum_size = Vector2(120, 32)
 	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	slider.focus_mode = Control.FOCUS_NONE
-	slider.value = float((look.get(key, own) as Array)[index])
+	var parts: Dictionary = look.get("parts", {})
+	slider.value = float(((parts.get(part, own) if part != "" else look.get(key, own)) as Array)[index])
 	row.add_child(slider)
 	slider.value_changed.connect(func(value: float) -> void:
-		var now: Array = (look.get(key, own) as Array).duplicate()
-		now[index] = value
-		look[key] = now
+		if part != "":
+			var all: Dictionary = (look.get("parts", {}) as Dictionary).duplicate(true)
+			var now: Array = (all.get(part, own) as Array).duplicate()
+			now[index] = value
+			all[part] = now
+			look["parts"] = all
+		else:
+			var now: Array = (look.get(key, own) as Array).duplicate()
+			now[index] = value
+			look[key] = now
 		_changed(true))
 	slider.drag_ended.connect(func(_moved: bool) -> void: _keep())
 

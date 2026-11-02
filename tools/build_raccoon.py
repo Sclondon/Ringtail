@@ -391,7 +391,8 @@ def cones(dark):
             along = t + (0.035 if spiky and j % 2 == 0 else 0.0)
             p = tail_point(along) + (X * math.cos(a) + up * math.sin(a)) * r
             vert = made.verts.new(kit.to_blender(reshape(p)))
-            tags[vert] = (region, (1.0 if j % 2 == 0 else 0.45) if spiky else 0.0, None, TAIL_FUR, (0.0 if j % 2 == 0 else float((j // 2) % 2)) if spiky else float(j % 2))
+            # (its root the tail's line there: the fur shader fattens the tail out from it, FurLook's tail_girth)
+            tags[vert] = (region, (1.0 if j % 2 == 0 else 0.45) if spiky else 0.0, tail_point(t), TAIL_FUR, (0.0 if j % 2 == 0 else float((j // 2) % 2)) if spiky else float(j % 2))
             loop.append(vert)
         return loop
 
@@ -420,7 +421,7 @@ def cones(dark):
         join(base, rim)
         if last:
             tip = made.verts.new(kit.to_blender(reshape(tail_point(1.06))))
-            tags[tip] = (region, 1.0, None, TAIL_FUR, 0.0)
+            tags[tip] = (region, 1.0, tail_point(1.0), TAIL_FUR, 0.0)
             for j in range(len(rim)):
                 made.faces.new((rim[j], rim[(j + 1) % len(rim)], tip))
         else:
@@ -608,6 +609,16 @@ def ruffs(_b):
         centre = centre + Vector((rng.uniform(-1, 1), rng.uniform(-1, 1), rng.uniform(-1, 1))) * 0.008
         u = axis.cross(Z if abs(axis.z) < 0.9 else X).normalized()
         v = axis.cross(u).normalized()
+        if SHAPE != "triangle":
+            # (a ring of locks of the fur's shape, each from the ruff's root out to where a zigzag tip would be)
+            twist = rng.uniform(0.0, math.tau)
+            for j in range(SPIKES):
+                a = math.tau * j / SPIKES + twist + rng.uniform(-0.22, 0.22) * math.tau / SPIKES
+                out = u * math.cos(a) * wide + v * math.sin(a)
+                root = centre - axis * 0.035 + out * radius * 0.7
+                tip = centre + axis * lean * rng.uniform(0.4, 1.7) + out * radius * _flare(flare) * rng.uniform(0.72, 1.4)
+                tuft(made, tags, root, (tip - root).normalized(), (tip - root).length, radius * 0.55, region, rng)
+            return
         base = ring(centre - axis * 0.035, axis, u, v, radius * 0.7, wide=wide, region=region)
         rim = ring(centre, axis, u, v, radius * _flare(flare), lean, True, wide, region, (centre - axis * 0.035, radius * 0.7))
         back = ring(centre + axis * 0.01, axis, u, v, radius * 0.7, wide=wide, region=region)
@@ -671,14 +682,18 @@ def ruffs(_b):
     return mesh
 
 
-def tuft(made, tags, root, direction, length, width, region, rng, group=BODY):
+def tuft(made, tags, root, direction, length, width, region, rng, group=BODY, side=None):
     """One loose spike of fur: a flat-ish four-sided point from `root` along `direction`, its tip springing."""
     # (the fur type: FUR_TYPES)
     length *= FUR_NOW["length"]
     width *= FUR_NOW["width"]
     if FUR_NOW["droop"] > 0.0:
         direction = (direction - Y * FUR_NOW["droop"]).normalized()
-    u = direction.cross(Y if abs(direction.y) < 0.9 else X).normalized()
+    # (`side`, if given, is the way its flat side lies: a mane's tufts lie flat round the ring of it)
+    if side is not None:
+        u = (side - direction * side.dot(direction)).normalized()
+    else:
+        u = direction.cross(Y if abs(direction.y) < 0.9 else X).normalized()
     v = direction.cross(u).normalized()
     base = []
     for j in range(4):
@@ -688,11 +703,79 @@ def tuft(made, tags, root, direction, length, width, region, rng, group=BODY):
         tags[vert] = (region, 0.0, root, group, float(j % 2))
         base.append(vert)
     bend = Vector((rng.uniform(-1, 1), rng.uniform(-1, 1), rng.uniform(-1, 1))) * 0.25
+    if SHAPE != "triangle":
+        made.faces.new(base[::-1])
+        lock(made, tags, root, base, (direction + bend).normalized(), u, v, length, width, region, group)
+        return
     tip = made.verts.new(kit.to_blender(reshape(root + (direction + bend).normalized() * length)))
     tags[tip] = (region, 1.0, root, group, _ranks.random())
     for j in range(4):
         made.faces.new((base[j], base[(j + 1) % 4], tip))
     made.faces.new(base[::-1])
+
+
+# --- Fur shapes (the user, 2026-11-02: "why is there not any fur shape options beside triangle"): each spike's own
+# shape, a build of its own (`-- shape=<shape>`, models/raccoon_shape_<shape>.glb, at the plain fur type). "triangle"
+# is the plain build's spikes; the others are locks: rings of four points along a centre line, each ring as wide as
+# the shape's profile there, closed at the tip (or cut square), and with them the ruffs are rings of locks.
+SHAPES = ["triangle", "teardrop", "ribbon", "wavy", "curl", "blunt", "forked"]
+SHAPE = "triangle"
+# (along the lock: how far, and how wide there; and for each shape whether it ends in a point)
+_PROFILES = {
+    "teardrop": ([0.0, 0.25, 0.5, 0.75, 0.92, 1.0], [1.0, 1.55, 1.4, 0.95, 0.45, 0.0]),
+    "ribbon": ([0.0, 0.3, 0.6, 0.85, 1.0], [0.55, 0.5, 0.48, 0.4, 0.0]),
+    "wavy": ([0.0, 0.2, 0.4, 0.6, 0.8, 1.0], [0.8, 0.75, 0.7, 0.6, 0.45, 0.0]),
+    "curl": ([0.0, 0.15, 0.3, 0.45, 0.6, 0.75, 0.9, 1.0], [0.7, 0.65, 0.6, 0.55, 0.5, 0.42, 0.3, 0.0]),
+    "blunt": ([0.0, 0.5, 0.88, 1.0], [1.0, 1.05, 1.1, 1.1]),
+    "forked": ([0.0, 0.5, 1.0], [0.62, 0.55, 0.0]),
+}
+
+
+def lock(made, tags, root, base, direction, u, v, length, width, region, group):
+    """A lock of fur of SHAPE from the four-point `base` ring, `direction` its way out, (u, v) across it."""
+    if SHAPE == "forked":
+        # (two narrow points splayed from the base)
+        for side in (1.0, -1.0):
+            way = (direction + u * side * 0.35).normalized()
+            _lock_tube(made, tags, root, base, lambda a, way=way: way * length * a, u, v, width, region, group)
+        return
+    if SHAPE == "ribbon":
+        length *= 1.35
+    if SHAPE == "wavy":
+        line = lambda a: direction * length * a + u * math.sin(a * math.tau) * length * 0.16
+    elif SHAPE == "curl":
+        # (it rolls round on itself: a spiral out from its line, a turn and a half)
+        line = lambda a: direction * length * a * 0.75 + (u * math.cos(a * 9.4) - u + v * math.sin(a * 9.4)) * length * 0.22 * a
+    else:
+        line = lambda a: direction * length * a
+    _lock_tube(made, tags, root, base, line, u, v, width, region, group)
+
+
+def _lock_tube(made, tags, root, base, line, u, v, width, region, group):
+    alongs, wides = _PROFILES[SHAPE]
+    rank = _ranks.random()
+    previous = base
+    for k in range(1, len(alongs)):
+        a = alongs[k]
+        centre = root + line(a)
+        if wides[k] <= 0.0:
+            tip = made.verts.new(kit.to_blender(reshape(centre)))
+            tags[tip] = (region, 1.0, root, group, rank)
+            for j in range(4):
+                made.faces.new((previous[j], previous[(j + 1) % 4], tip))
+            return
+        ring = []
+        for j in range(4):
+            t = math.tau * j / 4 + 0.4
+            p = centre + (u * math.cos(t) * 1.4 + v * math.sin(t) * 0.6) * width * 0.5 * wides[k]
+            vert = made.verts.new(kit.to_blender(reshape(p)))
+            tags[vert] = (region, max(a, 0.01), root, group, rank)
+            ring.append(vert)
+        for j in range(4):
+            made.faces.new((previous[j], previous[(j + 1) % 4], ring[(j + 1) % 4], ring[j]))
+        previous = ring
+    # (cut square at the end)
+    made.faces.new(previous)
 
 
 def head_fur(_b):
@@ -716,7 +799,8 @@ def head_fur(_b):
             # (under the jaw it is short, so it doesn't stick into his chest)
             under = max(0.0, -math.sin(t))
             length = rng.uniform(0.04, 0.062) * reach * (1.0 - 0.55 * under)
-            tuft(made, tags, root, (radial - Z * 0.45).normalized(), length, 0.058, REGION["head"], rng, MANE)
+            tuft(made, tags, root, (radial - Z * 0.45).normalized(), length, 0.058, REGION["head"], rng, MANE,
+                 Vector((-math.sin(t), math.cos(t), 0.0)))
     # And short fur over the rest of his head besides: the crown, the back and the sides, laid back (none on the
     # face) (the user, 2026-11-02: "he should have head fur besides the mane ring")
     placed = 0
@@ -993,7 +1077,9 @@ def paint_grit(name):
         layer = mesh.color_attributes.new("Grit", "FLOAT_COLOR", "CORNER")
         tags = mesh.uv_layers.get(kit.METRES)
         spike = mesh.uv_layers.get(SPIKE)
+        plain = mesh.uv_layers.get(kit.PLAIN)
         clean = {k for k, m in enumerate(mesh.materials) if m and m.name.split(".")[0] in CLEAN}
+        axis = [reshape(tail_point(k / 50.0)) for k in range(51)]
         for poly in mesh.polygons:
             for index in poly.loop_indices:
                 if poly.material_index in clean:
@@ -1005,6 +1091,15 @@ def paint_grit(name):
                 g = grit_at(p, flex) / GRIT_SCALE
                 # (red the grit; green and blue what the fur shader shapes a spike by: tag_spikes)
                 shaping = spike.data[index].uv if spike else (0.0, 0.0)
+                # (the tail's own skin, tagged as its cones are: its offset from the tail's line, for its thickness)
+                if tags and plain and flex < 0.0:
+                    near = min(range(51), key=lambda k: (axis[k] - p).length_squared)
+                    t = near / 50.0
+                    if t > 0.04 and (axis[near] - p).length < tail_radius(t) * 1.35 + 0.01:
+                        off = p - axis[near]
+                        tags.data[index].uv = (float(REGION["tail_0"] + min(TAIL_BONES - 1, int(t * TAIL_BONES))) + 0.1 * TAIL_FUR, -0.001)
+                        plain.data[index].uv = (off.x, off.y)
+                        shaping = (off.z, 0.0)
                 layer.data[index].color = (g, min(1.0, max(0.0, shaping[0] * 2.0 + 0.5)), shaping[1], 1.0)
         if spike:
             mesh.uv_layers.remove(spike)
@@ -1031,8 +1126,16 @@ def fur_arg():
     asked = [arg for arg in sys.argv[sys.argv.index("--") + 1:] if arg.startswith("fur=")] if "--" in sys.argv else []
     if kit.PREVIEW_DIR and kit.PREVIEW_DIR.startswith("fur="):
         kit.PREVIEW_DIR = None
-    kit.ONLY = [arg for arg in kit.ONLY if not arg.startswith("fur=")]
+    kit.ONLY = [arg for arg in kit.ONLY if not arg.startswith("fur=") and not arg.startswith("shape=")]
+    if kit.PREVIEW_DIR and kit.PREVIEW_DIR.startswith("shape="):
+        kit.PREVIEW_DIR = None
     return asked[0][4:] if asked else None
+
+
+def shape_arg():
+    """The fur shape asked for after `--` (`shape=<shape>`), or None."""
+    asked = [arg for arg in sys.argv[sys.argv.index("--") + 1:] if arg.startswith("shape=")] if "--" in sys.argv else []
+    return asked[0][6:] if asked else None
 
 
 def fur_parts(parts):
@@ -1053,8 +1156,18 @@ def fur_parts(parts):
 if __name__ == "__main__":
     reshaping()
     kind = fur_arg()
+    shape = shape_arg()
     folder = kit.PREVIEW_DIR
     kit.PREVIEW_DIR = None
+    if shape and shape != "triangle":
+        # A fur shape of its own: models/raccoon_shape_<shape>.glb (at the plain fur type)
+        SHAPE = shape
+        name = NAME + "_shape_" + shape
+        kit.export(name, reshaped_bones(), PARTS, reshaped_weights, MATERIALS)
+        paint_grit(name)
+        if folder:
+            look_at(folder, name)
+        sys.exit(0)
     if kind and kind != "spiky":
         # A fur type of its own: models/raccoon_fur_<type>.glb, the full model only (the editor swaps its mesh in)
         use_fur(kind)

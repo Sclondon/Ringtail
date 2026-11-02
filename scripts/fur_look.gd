@@ -25,6 +25,18 @@ const TEXTURES := ["solid", "straight", "wavy", "curly", "soft", "thick"]
 const BODY_SHAPE := [1.0, 0.0, 1.0]
 const MANE_SHAPE := [1.0, 0.0, 1.0, 1.0]
 const TAIL_SHAPE := [1.0, 1.0]
+## Each part's own [size, width, density] (the user: "I should be able to control the width and size of each fur blade,
+## and the density on different body parts"), by the regions it covers; "crown" is the short fur on his head (the
+## mane is MANE_SHAPE).
+const PART_SHAPE := [1.0, 1.0, 1.0]
+const PARTS := {"back": [0], "chest": [1], "arms": [2, 3, 4, 5], "legs": [6, 7, 8, 9]}
+## The way each region's limb runs at rest (none for the head: out from its middle).
+const LIMB_AXES := [Vector3.UP, Vector3.UP, Vector3.RIGHT, Vector3.RIGHT, Vector3.LEFT, Vector3.LEFT, Vector3.DOWN,
+	Vector3.DOWN, Vector3.DOWN, Vector3.DOWN, Vector3.FORWARD, Vector3.FORWARD, Vector3.FORWARD, Vector3.FORWARD,
+	Vector3.FORWARD, Vector3.FORWARD, Vector3.ZERO]
+## The spikes' own shape (each other than the triangle a model of its own, at the plain fur type:
+## tools/build_raccoon.py `shape=`; the user: "why is there not any fur shape options beside triangle").
+const SHAPES := ["triangle", "teardrop", "ribbon", "wavy", "curl", "blunt", "forked"]
 ## The bone each fur region (tools/build_raccoon.py REGION) grows on, and the way its fur lies back (at rest).
 const REGION_BONES := [&"hips", &"chest", &"upper_arm_l", &"forearm_l", &"upper_arm_r", &"forearm_r", &"thigh_l",
 	&"shin_l", &"thigh_r", &"shin_r", &"tail_0", &"tail_1", &"tail_2", &"tail_3", &"tail_4", &"tail_5", &"head"]
@@ -37,7 +49,8 @@ const NAMES := {"spiky": "Spiky", "soft": "Soft", "shaggy": "Shaggy", "sleek": "
 	"cones": "Tail cones", "plain": "Plain", "frosted": "Frosted tips", "dark_tips": "Dark tips",
 	"streaked": "Streaked", "stippled": "Stippled", "none": "Solid", "tabby": "Tabby", "tuxedo": "Tuxedo",
 	"calico": "Calico", "bicolour": "Patches", "tabby_white": "Tabby & white", "solid": "Solid", "straight": "Straight",
-	"wavy": "Wavy", "curly": "Curly", "thick": "Thick"}
+	"wavy": "Wavy", "curly": "Curly", "thick": "Thick",
+	"triangle": "Triangle", "teardrop": "Teardrop", "ribbon": "Ribbon", "curl": "Curl", "blunt": "Blunt", "forked": "Forked"}
 ## The colours the editor offers, by material name, for each kind.
 const COLOURS := {
 	"raccoon": [["fur", "Fur"], ["light", "Light"], ["limb", "Legs"], ["tan", "Tail bands"], ["ring", "Tail rings"]],
@@ -65,7 +78,9 @@ static var _shader: Shader
 
 
 ## The model file for a kind ("raccoon", "cat") of fur type `fur`.
-static func model_path(kind: String, fur: String) -> String:
+static func model_path(kind: String, fur: String, shape := "triangle") -> String:
+	if kind == "raccoon" and shape in SHAPES and shape != "triangle":
+		return "res://models/raccoon_shape_%s.glb" % shape
 	if kind == "cat":
 		return "res://models/cat.glb" if fur == "spiky" or not fur in CAT_TYPES else "res://models/cat_%s.glb" % fur
 	return "res://models/raccoon.glb" if fur == "spiky" or not fur in TYPES else "res://models/raccoon_fur_%s.glb" % fur
@@ -110,18 +125,29 @@ void vertex() {
 		float flex = UV2.y - 1.001;
 		int region = clamp(int(UV2.x + 0.5), 0, 16);
 		int group = int(round(fract(UV2.x) * 10.0));
+		// (a spike's tip; on a lock (a fur shape) every point out from its root)
+		bool tipped = locks ? flex > 0.0 : flex > 0.99;
 		fur_along = flex;
 		// (across a spike: a tip is in the middle; the points either side of it, and its roots, are one side or the other)
-		fur_across = flex > 0.99 ? 0.5 : (masked ? UV.x : COLOR.b);
+		fur_across = tipped ? 0.5 : (masked ? UV.x : COLOR.b);
 		fur_seed = float(region) * 7.0 + float(group);
-		if (shaped && group <= 2) {
-			vec4 fur = group == 1 ? mane_fur : body_fur;
-			if (distance(fur, vec4(1.0, 0.0, 1.0, 1.0)) > 0.0001) {
-				mat3 turn = turns[region];
-				// (glTF flips V: the y offset comes as 1 - y)
-				vec3 now = turn * vec3(UV.x, 1.0 - UV.y, (COLOR.g - 0.5) * 0.5);
-				vec3 root = VERTEX - now;
-				vec3 off = now * fur.w;
+		// (at the bending joints, elbows and knees, the fur springs half as far)
+		float give = (region == 3 || region == 5 || region == 7 || region == 9) ? 0.5 : 1.0;
+		vec3 lag = lags[region] * flex * flex * give;
+		if (kept && group <= 2) {
+			mat3 turn = turns[region];
+			// (glTF flips V: the y offset comes as 1 - y)
+			vec3 now = turn * vec3(UV.x, 1.0 - UV.y, (COLOR.g - 0.5) * 0.5);
+			vec3 root = VERTEX - now;
+			vec3 off = now;
+			if (shaped) {
+				// (length, angle, density, width: all of it, times its part's size, width and density)
+				vec4 fur = group == 1 ? mane_fur : body_fur;
+				vec4 part = group == 2 ? crown_fur : (group == 0 ? part_fur[region] : vec4(1.0));
+				fur.x *= part.x;
+				fur.w *= part.y;
+				fur.z *= part.z;
+				off = now * fur.w;
 				if (flex > 0.0) {
 					float len = length(now) * fur.x;
 					vec3 dir = len > 0.0001 ? normalize(now) : vec3(0.0, 1.0, 0.0);
@@ -131,16 +157,38 @@ void vertex() {
 						vec3 side = dir - axis * c;
 						float s = length(side);
 						if (s > 0.001) {
-							float c2 = clamp(c + fur.y, -0.3, 0.995);
+							float c2 = clamp(c + fur.y, -0.3, 0.95);
 							dir = axis * c2 + side / s * sqrt(1.0 - c2 * c2);
 						}
 					}
-					off = flex > 0.99 && COLOR.b > fur.z ? vec3(0.0) : dir * len;
+					off = tipped && COLOR.b > fur.z ? vec3(0.0) : dir * len;
 				}
-				VERTEX = root + off;
 			}
+			if (flex > 0.0) {
+				off += lag;
+				// Kept out of his body (the user, 2026-11-02: "they clip into the body a lot"): never closer to the
+				// surface at its root than a little way out from it. Out is from the limb's line (the body, arms
+				// and legs) or the head's middle (the mane and crown).
+				vec3 away = root - origins[group == 0 ? region : 16];
+				vec3 limb = limbs[region];
+				if (group == 0 && dot(limb, limb) > 0.25) {
+					away -= limb * dot(away, limb);
+				}
+				away = dot(away, away) > 0.00000001 ? normalize(away) : vec3(0.0, 1.0, 0.0);
+				float rise = dot(off, away);
+				float least = 0.15 * length(off);
+				if (rise < least) {
+					off += away * (least - rise);
+				}
+			}
+			VERTEX = root + off;
+		} else if (kept && group == 3) {
+			// (the tail, its skin and its cones: out from its line by how thick it is, less what its length made it)
+			vec3 now = turns[region] * vec3(UV.x, 1.0 - UV.y, (COLOR.g - 0.5) * 0.5);
+			VERTEX += now * (tail_girth - 1.0) + lag;
+		} else {
+			VERTEX += lag;
 		}
-		VERTEX += lags[region] * flex * flex;
 	}
 }"""
 
@@ -172,6 +220,17 @@ uniform mat3 turns[17];
 uniform vec3 axes[17];
 uniform vec4 body_fur = vec4(1.0, 0.0, 1.0, 1.0);
 uniform vec4 mane_fur = vec4(1.0, 0.0, 1.0, 1.0);
+// (each part's size, width, density: by region, and the crown's)
+uniform vec4 part_fur[17];
+uniform vec4 crown_fur = vec4(1.0, 1.0, 1.0, 0.0);
+// (kept out of the body: each region's bone where it is now, and the way its limb runs)
+uniform bool kept = false;
+uniform vec3 origins[17];
+uniform vec3 limbs[17];
+// (the spikes are locks: a fur shape, every point out from its root a part of it)
+uniform bool locks = false;
+// (how thick the tail is, over what its length makes it)
+uniform float tail_girth = 1.0;
 // (Gloaming's hair textures: TEXTURES)
 uniform int texture = 0;
 """
@@ -255,6 +314,7 @@ static func swap(rig: RaccoonRig) -> void:
 	if rig._figure == null:
 		return
 	var fur: String = rig.look.get("fur", "")
+	var shape: String = rig.look.get("shape", "triangle")
 	var meshes := rig._figure.find_children("*", "MeshInstance3D", true, false)
 	if meshes.is_empty():
 		return
@@ -262,9 +322,9 @@ static func swap(rig: RaccoonRig) -> void:
 	if not part.has_meta(&"own_mesh"):
 		part.set_meta(&"own_mesh", part.mesh)
 		part.set_meta(&"own_skin", part.skin)
-	if fur == "":
+	if fur == "" and shape == "triangle":
 		return
-	var path := model_path(kind_of(rig), fur)
+	var path := model_path(kind_of(rig), fur if fur != "" else "spiky", shape)
 	if not _meshes.has(path):
 		if not ResourceLoader.exists(path):
 			return
@@ -290,6 +350,8 @@ static func paint(rig: RaccoonRig) -> void:
 	var body: Array = shapes[0]
 	var mane: Array = shapes[1]
 	var shaped: bool = shapes[2]
+	# (kept out of his body always: only his models carry each spike's root, a cat's colours are its markings)
+	var kept := kind_of(rig) == "raccoon"
 	for part: MeshInstance3D in rig._figure.find_children("*", "MeshInstance3D", true, false):
 		if part.mesh == null:
 			continue
@@ -310,8 +372,15 @@ static func paint(rig: RaccoonRig) -> void:
 			material.set_shader_parameter(&"body_fur", Vector4(body[0], body[1], body[2], 1.0))
 			material.set_shader_parameter(&"mane_fur", Vector4(mane[0], mane[1], mane[2], mane[3]))
 			material.set_shader_parameter(&"axes", PackedVector3Array(REGION_AXES))
+			material.set_shader_parameter(&"part_fur", shapes[3])
+			material.set_shader_parameter(&"crown_fur", shapes[4])
+			material.set_shader_parameter(&"kept", kept)
+			material.set_shader_parameter(&"locks", look.get("shape", "triangle") != "triangle")
+			var tail_shape: Array = look.get("tail", TAIL_SHAPE)
+			material.set_shader_parameter(&"tail_girth", float(tail_shape[1]) / maxf(float(tail_shape[0]), 0.01))
 	rig.set_meta(&"shaped", shaped)
-	if shaped:
+	rig.set_meta(&"kept", kept)
+	if kept:
 		shape(rig)
 	var tail: Array = look.get("tail", TAIL_SHAPE)
 	rig.tail_length = float(tail[0])
@@ -324,25 +393,46 @@ static func _shapes(rig: RaccoonRig) -> Array:
 	var look: Dictionary = rig.look
 	var body: Array = look.get("body", BODY_SHAPE)
 	var mane: Array = look.get("mane", MANE_SHAPE)
-	var shaped := kind_of(rig) == "raccoon" and (body != BODY_SHAPE or mane != MANE_SHAPE)
-	return [body, mane, shaped]
+	var parts: Dictionary = look.get("parts", {})
+	var crown: Array = parts.get("crown", PART_SHAPE)
+	var by_region := []
+	by_region.resize(REGION_BONES.size())
+	by_region.fill(Vector4(1.0, 1.0, 1.0, 0.0))
+	var custom := false
+	for named: String in PARTS:
+		var made: Array = parts.get(named, PART_SHAPE)
+		custom = custom or made != PART_SHAPE
+		for region: int in PARTS[named]:
+			by_region[region] = Vector4(made[0], made[1], made[2], 0.0)
+	custom = custom or crown != PART_SHAPE
+	var shaped := kind_of(rig) == "raccoon" and (body != BODY_SHAPE or mane != MANE_SHAPE or custom)
+	return [body, mane, shaped, by_region, Vector4(crown[0], crown[1], crown[2], 0.0)]
 
 
 ## Each frame, while the fur is shaped: how each region's bone has turned from rest, for the shader to lay the
 ## spikes' rest offsets by.
 static func shape(rig: RaccoonRig) -> void:
-	if not rig.get_meta(&"shaped", false) or rig._skeleton == null:
+	if not rig.get_meta(&"kept", false) or rig._skeleton == null:
 		return
 	var skeleton: Skeleton3D = rig._skeleton
 	var turns := []
-	for bone: StringName in REGION_BONES:
-		var index := skeleton.find_bone(bone)
+	var origins := PackedVector3Array()
+	var limbs := PackedVector3Array()
+	for k in REGION_BONES.size():
+		var index := skeleton.find_bone(REGION_BONES[k])
 		var turn := Basis.IDENTITY
+		var at := Vector3.ZERO
 		if index >= 0:
-			turn = (skeleton.get_bone_global_pose(index) * skeleton.get_bone_global_rest(index).affine_inverse()).basis
+			var pose := skeleton.get_bone_global_pose(index)
+			turn = (pose * skeleton.get_bone_global_rest(index).affine_inverse()).basis
+			at = pose.origin
 		turns.append(turn)
+		origins.append(at)
+		limbs.append((turn * LIMB_AXES[k]).normalized() if LIMB_AXES[k] != Vector3.ZERO else Vector3.ZERO)
 	for material in rig._fur_materials:
 		material.set_shader_parameter(&"turns", turns)
+		material.set_shader_parameter(&"origins", origins)
+		material.set_shader_parameter(&"limbs", limbs)
 
 
 # --- Kept looks ---

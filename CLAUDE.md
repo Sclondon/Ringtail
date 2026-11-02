@@ -243,3 +243,22 @@ Read README.md first. Started 2026-11-01.
   all hide him; sprinting through it does not).
 - Tests: `tests/dog_test.gd` (a dog sees, chases and bites him; hidden, it loses him and does not find him again; a
   cat by him hidden does not stalk), `tests/dog_shots.gd -- --out=<dir>` (the looks beside him, four sides, a gallop).
+- More of the model editor (the user, 2026-11-02): "why is there not any fur shape options beside triangle" (Shape:
+  triangle, teardrop, ribbon, wavy, curl, blunt, forked; each but the triangle a build of its own, `build_raccoon.py
+  -- shape=<shape>` writes models/raccoon_shape_<shape>.glb at the plain fur type: every tuft a lock of rings along a
+  centre line to the shape's profile, and the ruffs rings of locks; a shape and a fur type other than spiky do not
+  combine, picking one sets the other back); "I should be able to control the width and size of each fur blade, and
+  the density on different body parts" (Fur shape part picker: All (length, angle, density), Back, Chest, Arms,
+  Legs, Crown (size, width, density each: look "parts", FurLook.PARTS by region), Mane (count, length, width,
+  angle)); "the width changed the fur in the wrong dimension on the mane" (the mane's tufts lie flat round its ring:
+  head_fur passes the ring's tangent as each tuft's flat side); "the tail length and thickness do not work correctly
+  — both change both aspects and the tail angle" (a skeleton keeps a bone's scale only along its own axes, so the
+  stretch along the tail and the fattening across it came out skewed: now Length is one uniform scale on tail_0
+  and the spring chain's lengths, and Thickness is the fur shader's, every tail point (its cones and its skin, tagged
+  from the tail's line in tag_spikes and paint_grit) pushed out by tail_girth = thickness / length;
+  tests/tail_check.gd: Length 1.5 gives 1.50x, the tail's way within 1 degree, Thickness moves no bone; the cats get
+  no Thickness: their colours are their markings); "also they clip into the body a lot" (on every raccoon, `kept`:
+  each blade's tip held at least 15% of its length out from the surface at its root, out from the limb's line or
+  the head's middle, FurLook.shape sending each region's bone place and limb way per frame; laid back the Angle stops
+  short of flat (0.95); the elbows' and knees' fur springs half as far). Shots: `look_shots.gd ... spikes parts clip
+  mane` (single figures front/side/quarter).
