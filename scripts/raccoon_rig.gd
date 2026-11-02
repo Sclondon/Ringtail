@@ -941,14 +941,17 @@ func _pose_glide(w: float) -> void:
 ## The tail's shape for now, in the hips' space, as a direction for each segment.
 func _tail_shape(speed: float, spin: float) -> Array[Vector3]:
 	var run := clampf(speed / 3.0, 0.0, 1.0)
-	var wag := sin(_time * 2.1) * 0.25 * (1.0 - run) + sin(TAU * _phase) * 0.12 * run
+	# (lively: a slow lazy sway with a quicker flick through it standing, a swing with each stride running; the user,
+	# 2026-11-02, "his tail should flow more and follow into the turns like in Sly, and more animated in general")
+	var wag := (sin(_time * 1.7) * 0.32 + sin(_time * 4.3 + 1.0) * 0.08) * (1.0 - run) + sin(TAU * _phase) * 0.22 * run
 	var dirs: Array[Vector3] = []
 	for k in TAIL_BONES:
 		var down: float = lerpf(lerpf(tail_stand[k], tail_run[k], run), tail_quad[k], _quad)
 		# (bobbing with each bound, the tip most)
 		down += sin(TAU * _qphase + 1.2 - k * 0.35) * 0.18 * _gallop * _quad * run
-		down += sin(_time * 1.3 - k * 0.6) * 0.06 * (1.0 - run)
-		var across := wag * (0.4 + 0.15 * k)
+		down += sin(_time * 1.3 - k * 0.6) * 0.1 * (1.0 - run) + sin(TAU * _phase * 2.0 - k * 0.5) * 0.08 * run * (1.0 - _quad)
+		# (each segment a little behind the one before: the sway travels down it as a wave)
+		var across := wag * (0.4 + 0.15 * k) + sin(_time * 1.7 - k * 0.55) * 0.06 * k * (1.0 - run)
 		dirs.append(Vector3(sin(across) * cos(down), -sin(down), -cos(across) * cos(down)).normalized())
 	if _glide > 0.001:
 		# The rotor he hangs from (the user: "spin faster, and he should be hanging from it"): up his back and over
@@ -1001,7 +1004,9 @@ func _pose_tail(delta: float, speed: float, spin: float) -> void:
 	var root := _tail[0].global_position
 	# (it is carried round with him as he turns, most of the way: the springs only make up the lag behind him)
 	if absf(turned_by) > 0.0001 and absf(turned_by) < 1.5:
-		var carry := Basis(Vector3.UP, turned_by * 0.85)
+		# (only a third of the way, so it swings out and follows him into a turn; spinning, or whirling round fast on the
+		# stick, most of the way, so it does not fall right round behind him)
+		var carry := Basis(Vector3.UP, turned_by * lerpf(0.35, 0.85, maxf(flung, smoothstep(6.0, 14.0, absf(turning)))))
 		for k in range(1, TAIL_BONES + 1):
 			_points[k] = root + carry * (_points[k] - root)
 			_speeds[k] = carry * _speeds[k]
@@ -1020,14 +1025,15 @@ func _pose_tail(delta: float, speed: float, spin: float) -> void:
 				_points[k] = targets[k]
 				_speeds[k] = Vector3.ZERO
 				continue
-			var stiff := lerpf(300.0, 110.0, float(k) / TAIL_BONES) * (1.0 + 2.5 * snap)
+			var stiff := lerpf(170.0, 50.0, float(k) / TAIL_BONES) * (1.0 + 2.5 * snap)
 			# (heavier towards its end, so the spring holds it less, and the spin's pull out from him: its turn
 			# squared times how far out it is)
 			var weight := lerpf(1.0, 1.0 + 2.5 * flung, float(k) / TAIL_BONES)
 			stiff *= lerpf(1.0, 0.25, flung) / weight
 			var out := Vector3(_points[k].x - axis.x, 0.0, _points[k].z - axis.z)
-			var fling := out * turning * turning * flung
-			var accel := (targets[k] - _points[k]) * stiff - _speeds[k] * lerpf(15.0, 4.0, flung) + Vector3.DOWN * 2.5 + fling.limit_length(400.0)
+			# (any turn throws it out a little; the spin, hard)
+			var fling := out * turning * turning * maxf(flung, 0.12)
+			var accel := (targets[k] - _points[k]) * stiff - _speeds[k] * lerpf(7.0, 4.0, flung) + Vector3.DOWN * 2.5 + fling.limit_length(400.0)
 			_speeds[k] += accel * dt
 			_points[k] += _speeds[k] * dt
 			# (whirled, it is held to its cone: on springs alone it is flung out wide)
