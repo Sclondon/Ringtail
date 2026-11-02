@@ -41,6 +41,11 @@ func _ready() -> void:
 	var rig := _player.get_node_or_null(^"Rig")
 	if rig and rig.has_signal(&"stepped"):
 		rig.stepped.connect(_footfall)
+	# (a puff of little clouds kicked out from his feet as he jumps off the ground: the user, 2026-11-02, "jumping
+	# should spawn dust particles")
+	_player.jumped.connect(func() -> void:
+		if _player.is_on_floor() or _player.air_time < 0.1:
+			_ring(6, 0.35, 0.07))
 	_player.landed.connect(func(impact: float) -> void:
 		if impact > 3.0:
 			_ring(clampi(int(impact * 0.8), 4, 9), 0.25 + impact * 0.02, 0.09 + impact * 0.006))
