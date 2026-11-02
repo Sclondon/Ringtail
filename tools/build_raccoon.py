@@ -551,14 +551,15 @@ def tuft(made, tags, root, direction, length, width, region, rng):
 
 def head_fur(_b):
     """Fur on his head as a mane: a ring of tufts all round his face, just behind it (the user, 2026-11-02: "the head
-    fur should be like a mane ring around his head", after "you cant really see the fur on his head"). Three rows,
+    fur should be like a mane ring around his head", after "you cant really see the fur on his head"; then "less in
+    number and shorter and wider"), and short fur over the rest of the head. Two rows,
     pointing out from the face and swept back; shorter under the jaw. A finished mesh in Blender's axes (Y up, the
     face towards +Z)."""
     made = bmesh.new()
     tags = {}
     rng = random.Random(5)
     for row, (depth, reach) in enumerate([(0.0, 1.0), (-0.16, 0.85)]):
-        count = 26 - row * 4
+        count = 16 - row * 4
         for k in range(count):
             t = math.tau * (k + rng.uniform(-0.3, 0.3) + row * 0.5) / count
             z = depth + rng.uniform(-0.04, 0.04)
@@ -568,8 +569,21 @@ def head_fur(_b):
             radial = Vector((math.cos(t), math.sin(t), 0.0))
             # (under the jaw it is short, so it doesn't stick into his chest)
             under = max(0.0, -math.sin(t))
-            length = rng.uniform(0.065, 0.105) * reach * (1.0 - 0.55 * under)
-            tuft(made, tags, root, (radial - Z * 0.45).normalized(), length, 0.034, REGION["head"], rng)
+            length = rng.uniform(0.04, 0.062) * reach * (1.0 - 0.55 * under)
+            tuft(made, tags, root, (radial - Z * 0.45).normalized(), length, 0.058, REGION["head"], rng)
+    # And short fur over the rest of his head besides: the crown, the back and the sides, laid back (none on the
+    # face) (the user, 2026-11-02: "he should have head fur besides the mane ring")
+    placed = 0
+    while placed < 60:
+        a = rng.uniform(0.0, math.tau)
+        b = rng.uniform(-0.35, 1.25)
+        n = Vector((math.cos(b) * math.cos(a), math.sin(b), math.cos(b) * math.sin(a)))
+        if n.z > 0.2 and n.y < 0.75:
+            continue
+        root = HEAD_CENTRE + Vector((n.x * HEAD_RADII.x, n.y * HEAD_RADII.y, n.z * HEAD_RADII.z)) * 0.97
+        out = Vector((n.x / HEAD_RADII.x, n.y / HEAD_RADII.y, n.z / HEAD_RADII.z)).normalized()
+        tuft(made, tags, root, (out - Z * 0.4 - Y * 0.6).normalized(), rng.uniform(0.03, 0.05), 0.028, REGION["head"], rng)
+        placed += 1
     bmesh.ops.recalc_face_normals(made, faces=made.faces[:])
     tag_spikes(made, tags)
     mesh = bpy.data.meshes.new("head_fur")
