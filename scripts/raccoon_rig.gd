@@ -1,5 +1,8 @@
 class_name RaccoonRig
 extends CharacterRig
+
+## A paw came down (on all fours: each of the four; upright, CloudDust watches the rig's own feet), where in the world.
+signal stepped(at: Vector3)
 ## The raccoon on the boy's rig. He walks, runs, jumps and climbs as the boy does,
 ## upright; on top of that, laid over the boy's pose in `_pose_extra`:
 ##
@@ -93,6 +96,10 @@ var _speeds := PackedVector3Array()
 var _moves: Node
 var _scurry: Node
 var _climb_w := 0.0
+var _spin_jump: Node
+var _tj_w := 0.0
+var _tj_turn := 0.0
+var _paw_was: Array[float] = [0.0, 0.0, 0.0, 0.0]
 
 var _quad := 0.0
 var _gallop := 0.0
@@ -133,6 +140,7 @@ func _ready() -> void:
 	if _player:
 		_moves = _player.get_node_or_null(^"TailMoves")
 		_scurry = _player.get_node_or_null(^"Scurry")
+		_spin_jump = _player.get_node_or_null(^"SpinJump")
 		if _player.has_signal(&"jumped"):
 			_player.jumped.connect(func() -> void: _leaping = _quad > 0.5 and (_gallop > 0.3 or always_on_fours))
 	_make_fur()
@@ -188,6 +196,15 @@ func _pose_extra(delta: float) -> void:
 		_pose_glide(_glide)
 	if _spin_w > 0.002:
 		_pose_spin(spin, _spin_w)
+	# The spin jump: round and round in the air, arms out, the tail stiff (SpinJump)
+	var twirling: bool = _spin_jump != null and _spin_jump.twirling
+	_tj_w = _approach(_tj_w, 1.0 if twirling else 0.0, 14.0, delta)
+	if _tj_w > 0.002:
+		_tj_turn = fposmod(_tj_turn + delta * 22.0 * _tj_w, TAU)
+		_hips.basis = Basis(Vector3.UP, _tj_turn * _tj_w) * _hips.basis
+		for i in 2:
+			var side := 1.0 if i == 0 else -1.0
+			_solve_arm(i, side, to_global(Basis(Vector3.UP, _tj_turn) * Vector3(side * 0.48, 0.62, 0.0)), _forearm, _tj_w)
 	_sniffing(delta, speed)
 	_pose_face(delta, speed)
 	_pose_tail(delta, speed, spin)
@@ -517,11 +534,13 @@ func _pose_quad(w: float, speed: float, stride: float) -> void:
 	var cycle := TAU * _qphase
 	var bounding := moving * _gallop
 	# (bounding, he is thrown up and forward off his hind feet, and hops up a little again off his fore paws)
-	var flight := _bump(_qphase, 0.22, 0.6) * 0.15 + _bump(fposmod(_qphase - 0.72, 1.0), 0.0, 0.32) * 0.05
+	# (a raccoon's run, 2026-11-01, "higher quality a little bouncier and more raccoonie": a bouncy lope, the rump
+	# thrown high, a humped back, a rolling waddle, hind feet reaching up by the fore paws)
+	var flight := _bump(_qphase, 0.2, 0.62) * 0.21 + _bump(fposmod(_qphase - 0.7, 1.0), 0.0, 0.34) * 0.08
 	var hips_y := _hip_height * lerpf(0.72, 0.77, _gallop) + sin(2.0 * cycle) * 0.01 * moving * (1.0 - _gallop) + flight * bounding
 	# (rump up, shoulders down, as a raccoon goes: his arms are short)
 	# (bounding, his back stretches out flat in the air and rounds as his hind feet come up under him)
-	var lean := lerpf(1.82, 1.75, _gallop) + cos(TAU * (_qphase - 0.9)) * 0.22 * bounding
+	var lean := lerpf(1.82, 1.8, _gallop) + cos(TAU * (_qphase - 0.9)) * 0.3 * bounding
 	# Leaping: stretched out flat going up, rump dropping and front reaching down coming down
 	var up := clampf(_leap_rise, 0.0, 1.0)
 	var down := clampf(-_leap_rise, 0.0, 1.0)
@@ -534,13 +553,16 @@ func _pose_quad(w: float, speed: float, stride: float) -> void:
 		base_feet.append(_hips.transform * _feet[i].transform)
 
 	_hips.position = _hips.position.lerp(Vector3(0.0, hips_y, -0.03), w)
-	_hips.basis = _slerp(_hips.basis, Basis(Vector3.RIGHT, lean * 0.48), w)
+	# (the waddle: his rump rolls and swings from side to side with each bound, more at a walk's amble)
+	var waddle := sin(cycle) * moving * lerpf(0.16, 0.1, _gallop)
+	_hips.basis = _slerp(_hips.basis, Basis(Vector3.UP, waddle * 0.6) * Basis(Vector3.BACK, waddle) * Basis(Vector3.RIGHT, lean * 0.48), w)
 	_spine.basis = _slerp(_spine.basis, Basis(Vector3.RIGHT, lean * 0.33), w)
 	if _chest:
 		_chest.basis = _slerp(_chest.basis, Basis(Vector3.RIGHT, lean * 0.19), w)
 	if _neck:
 		_neck.basis = _slerp(_neck.basis, Basis(Vector3.RIGHT, -lean * 0.45), w)
-	_head.basis = _slerp(_head.basis, Basis(Vector3.RIGHT, -lean * 0.55 + 0.04 + sin(cycle * 2.0) * 0.04 * moving), w)
+	# (head low and nodding against the bound, steadied against the waddle)
+	_head.basis = _slerp(_head.basis, Basis(Vector3.BACK, -waddle * 0.8) * Basis(Vector3.RIGHT, -lean * 0.55 + 0.1 + sin(cycle * 2.0) * 0.05 * moving + sin(cycle + 2.2) * 0.12 * bounding), w)
 
 	var duty := lerpf(0.66, 0.3, _gallop)
 	var half := duty * stride * 0.5 * moving
@@ -552,8 +574,11 @@ func _pose_quad(w: float, speed: float, stride: float) -> void:
 		var at := fposmod(_qphase - lerpf(WALK_FEET[i], BOUND_FEET[i], _gallop), 1.0)
 		var step := _cycle(at, duty, half, lift)
 		# (flung out behind him as he leaves the ground)
-		step.x -= _bump(at, duty - 0.02, 0.62) * 0.16 * bounding
-		var point := Vector3(side * 0.095, ANKLE + step.y, -0.07 + step.x)
+		step.x -= _bump(at, duty - 0.02, 0.5) * 0.16 * bounding
+		# (and swung far forward as he gathers, to land up by his fore paws: the paired tracks a raccoon leaves)
+		step.x += _bump(at, 0.55, 1.0) * 0.2 * bounding
+		var point := Vector3(side * 0.11, ANKLE + step.y, -0.07 + step.x)
+		_footfall(i, at, point, w, moving)
 		# (in a leap: flung out behind going up, drawn up under him coming down)
 		point = point.lerp(Vector3(side * 0.1, ANKLE + 0.14 + 0.08 * up - 0.04 * down, -0.36 * up + 0.04 * down - 0.08), _leap_w)
 		var pitch := step.y / maxf(lift, 0.001) * 0.6 if at >= duty else 0.0
@@ -569,7 +594,8 @@ func _pose_quad(w: float, speed: float, stride: float) -> void:
 		step.x += (_bump(at, 0.68, 1.0) * 0.14 - _bump(at, duty - 0.02, 0.55) * 0.08) * bounding
 		var shoulder := to_local(_shoulders[i].global_position)
 		var fingers := (global_basis * Vector3(-side * 0.12, 0.0, 1.0)).normalized()
-		var point := Vector3(side * 0.13, 0.03 + step.y, shoulder.z + 0.05 + step.x)
+		var point := Vector3(side * 0.095, 0.03 + step.y, shoulder.z + 0.05 + step.x)
+		_footfall(i + 2, at, point, w, moving)
 		# (in a leap: reaching out ahead, and down for the ground coming down)
 		point = point.lerp(Vector3(side * 0.12, 0.16 - 0.12 * down, shoulder.z + 0.28 - 0.06 * down), _leap_w)
 		var pole := (global_basis * Vector3(side * 0.3, 0.0, -1.0)).normalized()
@@ -580,6 +606,13 @@ func _pose_quad(w: float, speed: float, stride: float) -> void:
 ## 0 outside a..b, rising to 1 halfway between and back down.
 static func _bump(x: float, a: float, b: float) -> float:
 	return sin(PI * clampf((x - a) / (b - a), 0.0, 1.0))
+
+
+## Tells of a paw coming down: its cycle has come round past the start (where it is set down).
+func _footfall(paw: int, at: float, point: Vector3, w: float, moving: float) -> void:
+	if at < _paw_was[paw] - 0.5 and w > 0.6 and moving > 0.5:
+		stepped.emit(to_global(Vector3(point.x, 0.0, point.z)))
+	_paw_was[paw] = at
 
 
 ## Where a foot is through one cycle: (how far ahead of its middle, how high).
@@ -612,6 +645,8 @@ func _tail_shape(speed: float, spin: float) -> Array[Vector3]:
 	var dirs: Array[Vector3] = []
 	for k in TAIL_BONES:
 		var down: float = lerpf(lerpf(tail_stand[k], tail_run[k], run), tail_quad[k], _quad)
+		# (bobbing with each bound, the tip most)
+		down += sin(TAU * _qphase + 1.2 - k * 0.35) * 0.18 * _gallop * _quad * run
 		down += sin(_time * 1.3 - k * 0.6) * 0.06 * (1.0 - run)
 		var across := wag * (0.4 + 0.15 * k)
 		dirs.append(Vector3(sin(across) * cos(down), -sin(down), -cos(across) * cos(down)).normalized())
@@ -627,6 +662,9 @@ func _tail_shape(speed: float, spin: float) -> Array[Vector3]:
 				var angle := _twirl - (k - ROTOR_FROM) * 0.3
 				rotor = Vector3(sin(angle), 0.06, cos(angle)).normalized()
 			dirs[k] = dirs[k].slerp(rotor, _glide)
+	if _tj_w > 0.001:
+		for k in TAIL_BONES:
+			dirs[k] = dirs[k].slerp(Vector3(0.0, 0.05, -1.0), _tj_w)
 	if _spin_w > 0.001 and spin < 1.0:
 		# Wound round to his left side as he crouches; then, the tail being the attack, held out stiff and straight
 		# behind him and swept round with him at his own rate (the user: "the tail should be the focus and it doesnt
@@ -644,6 +682,7 @@ func _pose_tail(delta: float, speed: float, spin: float) -> void:
 	var stretch := lerpf(1.0, ROTOR_STRETCH, smoothstep(0.0, 1.0, _glide))
 	# (spinning, it is drawn out a little too, and held stiff to its line: below)
 	var rigid := _spin_w * smoothstep(SPIN_WIND - 0.05, SPIN_WIND + 0.05, spin) if spin < 1.0 else 0.0
+	rigid = maxf(rigid, _tj_w)
 	stretch = lerpf(stretch, SPIN_STRETCH, rigid)
 	var hips := _hips.global_transform
 	var size := global_basis.get_scale().y

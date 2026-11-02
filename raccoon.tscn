@@ -1,4 +1,4 @@
-[gd_scene load_steps=10 format=3]
+[gd_scene load_steps=11 format=3]
 
 [ext_resource type="PackedScene" path="res://player.tscn" id="1"]
 [ext_resource type="Script" path="res://scripts/raccoon_rig.gd" id="2"]
@@ -8,6 +8,7 @@
 [ext_resource type="Script" path="res://scripts/long_jump.gd" id="6"]
 [ext_resource type="Script" path="res://scripts/cloud_dust.gd" id="7"]
 [ext_resource type="Script" path="res://scripts/scurry.gd" id="8"]
+[ext_resource type="Script" path="res://scripts/spin_jump.gd" id="9"]
 
 [node name="Raccoon" instance=ExtResource("1")]
 run_speed = 4.4
@@ -15,6 +16,7 @@ sprint_speed = 6.2
 sprint_delay = 0.05
 slide_min_speed = 5.0
 sleep_after = 75.0
+spin_rate = 28.0
 
 [node name="Rig" parent="." index="1"]
 script = ExtResource("2")
@@ -37,3 +39,6 @@ script = ExtResource("7")
 
 [node name="Scurry" type="Node" parent="." index="6"]
 script = ExtResource("8")
+
+[node name="SpinJump" type="Node" parent="." index="7"]
+script = ExtResource("9")

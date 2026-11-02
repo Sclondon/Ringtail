@@ -204,6 +204,22 @@ func _run() -> void:
 		Input.action_release(&"jump")
 		_check(swimming and highest - pond.surface_y() > 1.7, "a leap out of the water (%.2f m over it)" % (highest - pond.surface_y()))
 
+	# Whipping the stick round he spins; jumping then is a spin jump, higher than a jump
+	await _put(Vector3(0.0, 0.05, 8.0))
+	var spinner := player.get_node(^"SpinJump") as SpinJump
+	player.is_spinning = true
+	player._queue_jump()
+	Input.action_press(&"jump")
+	var spin_top := player.global_position.y
+	var twirled := false
+	for _i in 60:
+		await physics_frame
+		spin_top = maxf(spin_top, player.global_position.y)
+		twirled = twirled or spinner.twirling
+	_release()
+	_check(twirled and spin_top - 0.05 > player.jump_height * 1.3, "a spin jump goes higher (%.2f m)" % (spin_top - 0.05))
+	await _frames(90)
+
 	# Scurrying into a power pole, he climbs it
 	var scurry := player.get_node(^"Scurry") as Scurry
 	await _put(Vector3(3.0, 0.05, -31.2))
