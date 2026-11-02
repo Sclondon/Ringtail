@@ -38,7 +38,7 @@ const BOUND_DOWN := 0.6
 ## paw, then the other.
 const SCURRY_FEET := [0.0, 0.12, 0.46, 0.6]
 ## How long a stride is at that gallop (m), and how high he is thrown in it (of his hip height).
-const SCURRY_STRIDE := 1.7
+const SCURRY_STRIDE := 1.15  # (shorter: quicker feet; the user, 2026-11-02, "the scurry animation needs to be faster")
 const SCURRY_FLIGHT := 0.05
 ## Upright, his strides are this much longer than the boy's would be for his legs (the user, 2026-11-02: "his
 ## regular walking stride needs to be bigger steps" / "but slower"; raccoon.tscn walks him slower too).
@@ -765,6 +765,11 @@ func _pose_quad(w: float, speed: float, stride: float) -> void:
 	# (galloping, gathered, his hips tip back under him as his back arches up behind the shoulders; stretched out
 	# they tip forward)
 	var arch := (gather - 0.4) * galloping
+	# (scurrying, he bristles: back arched high to look bigger, head and tail low to the ground; the user, 2026-11-02,
+	# "when scurrying he should get his head and tail lower to the ground and sort of hold his body angle a bit more to
+	# make himself look bigger to a predator")
+	var bristle := _scurry_gait
+	arch += 0.28 * bristle
 	# Leaping: stretched out flat going up, rump dropping and front reaching down coming down
 	var up := clampf(_leap_rise, 0.0, 1.0)
 	var down := clampf(-_leap_rise, 0.0, 1.0)
@@ -785,7 +790,7 @@ func _pose_quad(w: float, speed: float, stride: float) -> void:
 	if _chest:
 		_chest.basis = _slerp(_chest.basis, Basis(Vector3.RIGHT, lean * 0.19 + arch * 0.16), w)
 	if _neck:
-		_neck.basis = _slerp(_neck.basis, Basis(Vector3.RIGHT, -lean * 0.45 - arch * 0.02), w)
+		_neck.basis = _slerp(_neck.basis, Basis(Vector3.RIGHT, -lean * 0.45 - arch * 0.02 + 0.42 * bristle), w)
 	# (head low and nodding against the bound, steadied against the waddle; galloping, low and level, reaching
 	# forward, held steady against the arching back)
 	_head.basis = _slerp(_head.basis, Basis(Vector3.BACK, -waddle * 0.8) * Basis(Vector3.RIGHT, -lean * 0.55 + 0.1 + sin(cycle * 2.0) * 0.05 * moving + sin(cycle + 2.2) * 0.12 * leaping - arch * 0.02 + 0.05 * galloping), w)
@@ -1176,6 +1181,8 @@ func _tail_shape(speed: float, spin: float) -> Array[Vector3]:
 	var dirs: Array[Vector3] = []
 	for k in TAIL_BONES:
 		var down: float = lerpf(lerpf(tail_stand[k], tail_run[k], run), tail_quad[k], _quad)
+		# (scurrying, the tail held low, near the ground)
+		down += 0.45 * _scurry_gait * _quad * (0.6 + 0.1 * k)
 		# (bobbing with each bound, the tip most)
 		down += sin(TAU * _qphase + 1.2 - k * 0.35) * 0.18 * _gallop * _quad * run
 		down += sin(_time * 1.3 - k * 0.6) * 0.1 * (1.0 - run) + sin(TAU * _phase * 2.0 - k * 0.5) * 0.08 * run * (1.0 - _quad)

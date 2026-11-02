@@ -29,8 +29,10 @@ func _ready() -> void:
 	# (the pickups' star, but painted on, not added to the light behind it: a dark blue can show then; the user,
 	# 2026-11-02, "the climbing sparkles need to appear from farther away and be a darker blue")
 	shader.code = Pickup.STAR_SHADER.replace("blend_add", "blend_mix").replace(
-			"ALBEDO = colour * (arms + core) * COLOR.a;", "ALBEDO = colour;
-	ALPHA = clamp((arms + core) * COLOR.a * 1.6, 0.0, 1.0);")
+			"ALBEDO = colour * (arms + core) * COLOR.a;",
+			# (with a little bright spot at its heart: the user, "the blue sparkles should have a little bright spot in
+			# them too")
+			"ALBEDO = mix(colour, vec3(1.0), clamp(core * 2.6, 0.0, 1.0));\n\tALPHA = clamp((arms + core) * COLOR.a * 1.6, 0.0, 1.0);")
 	var material := ShaderMaterial.new()
 	material.shader = shader
 	material.set_shader_parameter(&"colour", Vector3(0.08, 0.22, 0.85))
