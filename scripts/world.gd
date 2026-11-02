@@ -66,6 +66,8 @@ func _ready() -> void:
 	hud.world = self
 	add_child(hud)
 	var touch := TouchControls.new()
+	# (he sprints only for the sprint button, not for a stick pushed right over: the user, 2026-11-01)
+	touch.sprint_rim = 100.0
 	touch.set_anchors_preset(Control.PRESET_FULL_RECT)
 	var touch_layer := CanvasLayer.new()
 	touch_layer.layer = 3

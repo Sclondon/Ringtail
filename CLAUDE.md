@@ -9,7 +9,12 @@ Read README.md first. Started 2026-11-01.
   switched to a raccoon and said not to use Frogulizer's frog.
 - His signature is **tail moves**. The tail attack is a **spin**: "the tail attak shiould be a spin" (2026-11-01; it was a
   whip on the ground before).
-- "mostly upright but he needs all 4 animations for duckwalking and sprinting".
+- "mostly upright but he needs all 4 animations for duckwalking and sprinting". Then "the all 4s run should be more of
+  a bounding leap, and should only be when you press the sprint button" (`auto_sprint` off, the touch stick's
+  rim sprint off).
+- His look, 2026-11-01: "his arms and legs ar a little too long, and his head should be bigger" (legs 0.82, arms 0.8,
+  head 1.2: `reshape` in tools/build_raccoon.py); "his tail rings hould be spiky cones sorata like zizagzoon";
+  "he shouldnt have a white circly belly" (gone); "his arms and legs need to look more wiry and he needs whiskers".
 - **Desktop first**. **N64 retro filter** look. Then "the filters are too strong" (2026-11-01): softened to about 520
   lines, 6-bit colour, dither 0.25, world corners snapped to 480 rows (`scripts/n64_filter.gd`, `shaders/world.gdshader`). First slice: movement plus one small world.
 - "No need for a halloween touch its not halloween anymore."
@@ -26,7 +31,7 @@ Read README.md first. Started 2026-11-01.
 
 - The raccoon is a figure on the GameCommon boy's skeleton plus `tail_0..5`. `RaccoonRig._pose_extra` lays the
   all-fours pose over the boy's: rump up and shoulders down (his arms are short), a lateral walk ducking and a
-  gallop sprinting, hands planted with `_solve_arm`/`_lay_hand`, feet with `_solve_leg` in the hips' space.
+  bound sprinting (both hind feet, flight stretched out, both fore paws, gather; the rig lifts him in the air), hands planted with `_solve_arm`/`_lay_hand`, feet with `_solve_leg` in the hips' space.
   The tail is a spring chain of points drawn to a shape per state (`TAIL_STAND`/`RUN`/`QUAD`, angles below
   straight back in the hips' space), with the twirl held to a cone leaning up and back so it misses his head.
 - `key_poses` and `cap_hand` are off on his rig (the boy's key poses and cap-holding hand are not his).

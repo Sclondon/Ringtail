@@ -12,7 +12,7 @@ first. Local repo only for now.
 | Camera | right mouse drag | right stick | (touch: drag on the right) |
 | Jump; **hold on the way down to twirl the tail and fall slowly** | Space | A | ⤒ |
 | Duck: **duck-walk on all fours**, crawl under low things | C / Ctrl | B | ⤓ |
-| Sprint: **on all fours, a bounding gallop** (or hold the stick right over) | Shift | LB / LT | » |
+| Sprint (only on the button): **on all fours, bounding leaps** | Shift | LB / LT | » |
 | Tail: a **spin**, hitting all round him (in the air it lifts him a little, once a jump) | E / K | X | spiral |
 
 Everything else the GameCommon character controller does works too: ledge catching (jump again to climb up),
@@ -58,5 +58,5 @@ G="/c/Program Files (x86)/Steam/steamapps/common/Godot Engine/godot.windows.opt.
 ```
 
 `pose_shots` photographs each move (stand, walk, run, sprint, duckwalk, duck, jump, glide, spin, air_spin) from four
-sides. A dev panel (in the editor, with `--dev`, or `?dev` on the web) toggles the N64 filter and jumps to each
+sides, and `bound` is eight pictures through one bound from the side. A dev panel (in the editor, with `--dev`, or `?dev` on the web) toggles the N64 filter and jumps to each
 Bottlecap.

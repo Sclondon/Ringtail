@@ -9,7 +9,7 @@ Then: godot --headless --path . --import
 
 Built on GameCommon's build_character.py, as build_figure_template.py is (see it
 for what scripts/character_rig.gd needs of a figure). He is short in the leg,
-round in the belly, big in the head, with a masked face, white brows and muzzle,
+round in the body, big in the head, with a masked face, white brows and muzzle,
 round ears, dark hand-like paws and long plantigrade feet. The tail (bones
 tail_0..tail_5, a chain under hips) is posed by scripts/raccoon_rig.gd.
 """
@@ -18,6 +18,7 @@ import math
 import os
 import sys
 
+import bmesh
 import bpy
 from mathutils import Matrix, Vector
 
@@ -102,14 +103,10 @@ def body(b):
     b.tube([kit.upright(0.0, y, z, rx, rz) for y, rx, rz, z in profile], 20)
     for side in (1.0, -1.0):
         # Arms straight out (a T-pose): (distance from the shoulder, radius)
-        arm = [(-0.05, 0.062), (0.0, 0.064), (0.09, 0.054), (UPPER_ARM, 0.046), (0.28, 0.041), (0.345, 0.036), (0.375, 0.032)]
+        arm = [(-0.05, 0.058), (0.0, 0.052), (0.06, 0.038), (UPPER_ARM, 0.03), (0.28, 0.029), (0.345, 0.026), (0.375, 0.024)]
         b.tube([(Vector((side * (SHOULDER.x + d), SHOULDER.y, 0.0)), Y * r, Z * r) for d, r in arm], 12)
-        leg = [(HIP_Y + 0.04, 0.086), (HIP_Y - 0.02, 0.098), (0.35, 0.078), (0.30, 0.068), (KNEE_Y, 0.058), (0.17, 0.052), (0.10, 0.044), (0.07, 0.040)]
+        leg = [(HIP_Y + 0.04, 0.08), (HIP_Y - 0.02, 0.08), (0.36, 0.058), (0.31, 0.044), (KNEE_Y, 0.037), (0.17, 0.033), (0.10, 0.03), (0.07, 0.029)]
         b.tube([kit.upright(side * HIP_X, y, 0.0, r, r * 1.08) for y, r in leg], 16)
-
-
-def belly(b):
-    b.ellipsoid(Vector((0.0, 0.585, 0.085)), Vector((0.128, 0.165, 0.098)), None, 16, 9)
 
 
 def feet(b):
@@ -125,7 +122,7 @@ def feet(b):
             across = (k - 2) / 2.0
             b.ellipsoid(ankle + Vector((across * 0.040, -0.036, 0.142 - abs(across) * 0.018)), Vector((0.013, 0.012, 0.020)), None, 8, 4)
         # ...and the ankle, up into the leg
-        b.tube([kit.upright(ankle.x, y, z, r, r * 1.08) for y, r, z in ((0.02, 0.040, 0.0), (0.06, 0.043, 0.0), (0.10, 0.045, 0.0))], 12)
+        b.tube([kit.upright(ankle.x, y, z, r, r * 1.08) for y, r, z in ((0.02, 0.033, 0.0), (0.06, 0.031, 0.0), (0.10, 0.031, 0.0))], 12)
 
 
 def hands(b):
@@ -177,6 +174,16 @@ def muzzle(b):
 
 def nose(b):
     b.ellipsoid(HEAD_CENTRE + Vector((0.0, -0.024, 0.218)), Vector((0.024, 0.018, 0.016)), None, 12, 6)
+
+
+def whiskers(b):
+    # Three to a side, out from the snout behind the nose, fanned and drooping a little (the user asked for them)
+    for side in (1.0, -1.0):
+        for k, (rise, droop) in enumerate(((0.012, 0.004), (0.0, -0.012), (-0.012, -0.03))):
+            root = HEAD_CENTRE + Vector((side * 0.034, -0.034 + rise, 0.168 - k * 0.008))
+            tip = root + Vector((side * 0.15, droop, -0.045))
+            middle = root.lerp(tip, 0.5) + Vector((0.0, 0.008, 0.0))
+            b.strand([root, middle, tip], [0.0045, 0.0035, 0.002], 5)
 
 
 def brows(b):
@@ -252,17 +259,80 @@ def mask(b):
 
 
 def tail(b):
+    # A slim core for the cones to sit on
     count = 12 if kit.LOW else 24
-    rings = [tail_ring(k / count) for k in range(count + 1)]
-    b.tube(kit.dome(rings[0], -TAIL_DIR, 0.02, 2)[::-1] + rings + kit.dome(rings[-1], TAIL_DIR, 0.03, 3), 16)
+    rings = [tail_ring(k / count, 0.55) for k in range(count + 1)]
+    b.tube(kit.dome(rings[0], -TAIL_DIR, 0.02, 2)[::-1] + rings + kit.dome(rings[-1], TAIL_DIR, 0.02, 2), 12)
 
 
-def tail_rings(b):
-    # Five dark rings and a dark tip, standing a little proud of the fur
-    for middle in (0.22, 0.38, 0.54, 0.70, 0.84):
-        b.tube([tail_ring(middle + d, g) for d, g in ((-0.035, 1.0), (-0.025, 1.045), (0.025, 1.045), (0.035, 1.0))], 16)
-    rings = [tail_ring(t, 1.045) for t in (0.93, 0.96, 1.0)]
-    b.tube([tail_ring(0.92, 1.0)] + rings + kit.dome(rings[-1], TAIL_DIR, 0.034, 3), 16)
+# The rings are spiky cones, one after another down the tail, each flaring out towards the tip in a zigzag of
+# spikes (the user, 2026-11-01: "his tail rings should be spiky cones sorta like zigzagoon"), grey and dark by turns.
+CONES = 8
+SPIKES = 9
+
+
+def cones(dark):
+    """The grey cones (or the dark ones), as a finished mesh in Blender's axes."""
+    up = TAIL_DIR.cross(X).normalized()
+    made = bmesh.new()
+
+    def ring(t, radius, spiky=False):
+        loop = []
+        count = SPIKES * 2 if spiky else SPIKES
+        for j in range(count):
+            a = math.tau * j / count
+            r = radius * (1.0 if not spiky or j % 2 == 0 else 0.68)
+            # (spike tips lean back towards the tip of the tail)
+            along = t + (0.035 if spiky and j % 2 == 0 else 0.0)
+            p = tail_point(along) + (X * math.cos(a) + up * math.sin(a)) * r
+            loop.append(made.verts.new(kit.to_blender(reshape(p))))
+        return loop
+
+    def join(a, b):
+        # (rings of different counts: each corner of the longer one fans to the nearest of the shorter)
+        for j in range(len(b)):
+            k0 = j * len(a) // len(b)
+            k1 = ((j + 1) * len(a) // len(b)) % len(a)
+            j1 = (j + 1) % len(b)
+            if k0 == k1:
+                made.faces.new((a[k0], b[j], b[j1]))
+            else:
+                made.faces.new((a[k0], a[k1], b[j1], b[j]))
+
+    step = 0.95 / CONES
+    for k in range(CONES):
+        # (the last, the tip, is dark whatever its turn)
+        if (k % 2 == 1 or k == CONES - 1) != dark:
+            continue
+        start = 0.05 + k * step - 0.04
+        end = 0.05 + (k + 1) * step
+        last = k == CONES - 1
+        base = ring(start, tail_radius(start) * 0.5)
+        rim = ring(end - 0.01, tail_radius(min(end, 0.97)) * (1.3 if not last else 1.1), True)
+        join(base, rim)
+        if last:
+            tip = made.verts.new(kit.to_blender(reshape(tail_point(1.06))))
+            for j in range(len(rim)):
+                made.faces.new((rim[j], rim[(j + 1) % len(rim)], tip))
+        else:
+            back = ring(end + 0.005, tail_radius(end) * 0.5)
+            join(back, rim)
+        made.faces.new(base[::-1])
+        if not last:
+            made.faces.new(back)
+    bmesh.ops.recalc_face_normals(made, faces=made.faces[:])
+    mesh = bpy.data.meshes.new("cones")
+    made.to_mesh(mesh)
+    made.free()
+    return mesh
+
+
+def tail_grey(_b):
+    return cones(False)
+
+
+def tail_dark(_b):
+    return cones(True)
 
 
 # --- Skin weights ---
@@ -282,11 +352,11 @@ def tail_weights(p):
 
 def weights(part, p):
     suffix = "_l" if p.x >= 0.0 else "_r"
-    if part in ("tail", "tail_rings"):
+    if part.startswith("tail"):
         return tail_weights(p)
     if part in ("eyes", "pupils"):
         return {"eye" + suffix: 1.0}
-    if part in ("muzzle", "nose", "brows", "mask", "cheeks", "ears", "ear_insides"):
+    if part in ("muzzle", "nose", "whiskers", "brows", "mask", "cheeks", "ears", "ear_insides"):
         return {"head": 1.0}
     if part == "head":
         skull = blend(HEAD.y - 0.03, HEAD.y + 0.03, p.y)
@@ -348,7 +418,6 @@ def bones():
 
 PARTS = [
     ("body", FUR, body, (0.006, 4, 6000)),
-    ("belly", LIGHT, belly, None),
     ("feet", PAW, feet, (0.004, 3, 2400)),
     ("hands", PAW, hands, (0.003, 2, 1800)),
     ("head", FUR, head, (0.005, 4, 3200)),
@@ -362,7 +431,9 @@ PARTS = [
     ("ears", FUR, ears, None),
     ("ear_insides", EAR, ear_insides, None),
     ("tail", FUR, tail, (0.006, 3, 3000)),
-    ("tail_rings", DARK, tail_rings, None),
+    ("tail_grey", FUR, tail_grey, None),
+    ("tail_dark", DARK, tail_dark, None),
+    ("whiskers", LIGHT, whiskers, None),
 ]
 
 
@@ -395,10 +466,89 @@ def look_at(folder, name):
         bpy.ops.render.render(write_still=True)
 
 
+# --- His proportions, laid over the shapes as drawn above ---
+# Everything above is drawn at the first proportions. The user (2026-11-01): "his arms and legs are a little too
+# long, and his head should be bigger". So every point (and bone) is taken through `reshape` on its way into the
+# model: the legs shorter (all of him above the hips comes down with them), the arms shorter from the shoulder
+# (the hands as they were), the head bigger about the top of the neck. `weights` is asked about points as drawn.
+
+LEG_SCALE = 0.82
+ARM_SCALE = 0.8
+HEAD_SCALE = 1.2
+HEAD_PIVOT = HEAD.y  # (as drawn)
+DROP = (HIP_Y - ANKLE_Y) * (1.0 - LEG_SCALE)
+ARM_BAND = (SHOULDER.y - 0.09, SHOULDER.y + 0.09)
+
+
+def head_grow(y):
+    """How much bigger a point at this height (as drawn) is made: none below the neck, all of it at the head."""
+    return 1.0 + (HEAD_SCALE - 1.0) * blend(NECK.y, HEAD.y + 0.03, y)
+
+
+def reshape(p):
+    p = Vector(p)
+    # The arms: shorter from the shoulder to the wrist; the hand beyond it keeps its size.
+    reach = abs(p.x)
+    if ARM_BAND[0] < p.y < ARM_BAND[1] and reach > SHOULDER.x:
+        if reach < WRIST_X:
+            reach = SHOULDER.x + (reach - SHOULDER.x) * ARM_SCALE
+        else:
+            reach = reach - (WRIST_X - SHOULDER.x) * (1.0 - ARM_SCALE)
+        p.x = math.copysign(reach, p.x)
+    # The head: bigger about the top of his neck.
+    grow = head_grow(p.y)
+    if grow > 1.0:
+        p = Vector((0.0, HEAD_PIVOT, 0.0)) + (p - Vector((0.0, HEAD_PIVOT, 0.0))) * grow
+    # The legs: shorter between the ankle and the hip, and all above coming down by as much.
+    if p.y > HIP_Y:
+        p.y -= DROP
+    elif p.y > ANKLE_Y:
+        p.y = ANKLE_Y + (p.y - ANKLE_Y) * LEG_SCALE
+    return p
+
+
+def as_drawn(p):
+    """Near enough the inverse of `reshape`, for weighing points."""
+    p = Vector(p)
+    if p.y > HIP_Y - DROP:
+        p.y += DROP
+    elif p.y > ANKLE_Y:
+        p.y = ANKLE_Y + (p.y - ANKLE_Y) / LEG_SCALE
+    # (the head's growth undone with the height it would have had: one step is close enough)
+    grow = head_grow(HEAD_PIVOT + (p.y - HEAD_PIVOT) / HEAD_SCALE if p.y > HEAD_PIVOT else p.y)
+    if grow > 1.0:
+        p = Vector((0.0, HEAD_PIVOT, 0.0)) + (p - Vector((0.0, HEAD_PIVOT, 0.0))) / grow
+    reach = abs(p.x)
+    if ARM_BAND[0] < p.y < ARM_BAND[1] and reach > SHOULDER.x:
+        new_wrist = SHOULDER.x + (WRIST_X - SHOULDER.x) * ARM_SCALE
+        reach = SHOULDER.x + (reach - SHOULDER.x) / ARM_SCALE if reach < new_wrist else reach + (WRIST_X - SHOULDER.x) * (1.0 - ARM_SCALE)
+        p.x = math.copysign(reach, p.x)
+    return p
+
+
+_made = kit.Builder.__init__
+
+
+def _reshaping(self):
+    _made(self)
+    self.place = reshape
+
+
+kit.Builder.__init__ = _reshaping
+
+
+def reshaped_bones():
+    return [(bone, reshape(at), parent) for bone, at, parent in bones()]
+
+
+def reshaped_weights(part, p):
+    return weights(part, as_drawn(p))
+
+
 folder = kit.PREVIEW_DIR
 kit.PREVIEW_DIR = None
-kit.export(NAME, bones(), PARTS, weights, MATERIALS)
+kit.export(NAME, reshaped_bones(), PARTS, reshaped_weights, MATERIALS)
 if folder:
     look_at(folder, NAME)
 kit.LOW = True
-kit.export(NAME + "_lo", bones(), [(part, material, shapes, None) for part, material, shapes, _fuse in PARTS], weights, MATERIALS)
+kit.export(NAME + "_lo", reshaped_bones(), [(part, material, shapes, None) for part, material, shapes, _fuse in PARTS], reshaped_weights, MATERIALS)

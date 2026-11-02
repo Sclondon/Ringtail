@@ -4,8 +4,8 @@ extends CharacterRig
 ## upright; on top of that, laid over the boy's pose in `_pose_extra`:
 ##
 ## - On all fours to duck-walk (ducking or crawling) and to sprint: his back pitched
-##   forward, his hands set down flat, a lateral walk when ducking and a bounding
-##   gallop at a sprint (the user: "mostly upright but he needs all 4 animations for
+##   forward, his hands set down flat, a lateral walk when ducking and a bound
+##   at a sprint (the user: "mostly upright but he needs all 4 animations for
 ##   duckwalking and sprinting").
 ## - His tail (bones tail_0..tail_5): a chain of points on springs, drawn towards a
 ##   shape for what he is doing and swinging after him, so it follows through.
@@ -15,7 +15,9 @@ extends CharacterRig
 const TAIL_BONES := 6
 ## Where each foot is in the cycle when it comes down: [hind left, hind right, fore left, fore right].
 const WALK_FEET := [0.0, 0.5, 0.25, 0.75]
-const GALLOP_FEET := [0.0, 0.1, 0.48, 0.6]
+## Sprinting he bounds: both hind feet push off nearly together, he flies stretched out, lands on both
+## fore paws, and gathers his hind feet up under him (the user: "more of a bounding leap").
+const BOUND_FEET := [0.0, 0.04, 0.5, 0.54]
 
 ## The tail's shapes, as each segment's angle below straight back (radians), in the hips' own space.
 const TAIL_STAND := [0.95, 0.55, 0.15, -0.25, -0.6, -0.85]
@@ -72,7 +74,7 @@ func _pose_extra(delta: float) -> void:
 	var wanted := 1.0 if free and (low or fast) and _air < 0.5 and busy < 0.2 else 0.0
 	_quad = _approach(_quad, wanted, 7.0, delta)
 	_gallop = _approach(_gallop, 1.0 if fast else 0.0, 6.0, delta)
-	var stride := lerpf(0.44, 1.3, _gallop)
+	var stride := lerpf(0.44, 1.9, _gallop)
 	_qphase = fposmod(_qphase + speed / stride * delta, 1.0)
 
 	var spin := 1.0
@@ -99,10 +101,13 @@ func _pose_extra(delta: float) -> void:
 func _pose_quad(w: float, speed: float, stride: float) -> void:
 	var moving := clampf(speed / 0.5, 0.0, 1.0)
 	var cycle := TAU * _qphase
-	var hips_y := lerpf(0.34, 0.36, _gallop) + sin(2.0 * cycle) * 0.01 * moving * (1.0 - _gallop) + sin(cycle - 0.6) * 0.03 * moving * _gallop
+	var bounding := moving * _gallop
+	# (bounding, he is thrown up and forward off his hind feet, and hops up a little again off his fore paws)
+	var flight := _bump(_qphase, 0.22, 0.6) * 0.15 + _bump(fposmod(_qphase - 0.72, 1.0), 0.0, 0.32) * 0.05
+	var hips_y := _hip_height * lerpf(0.72, 0.77, _gallop) + sin(2.0 * cycle) * 0.01 * moving * (1.0 - _gallop) + flight * bounding
 	# (rump up, shoulders down, as a raccoon goes: his arms are short)
-	# (galloping, his back gathers and stretches out with each bound)
-	var lean := lerpf(1.82, 1.75, _gallop) + sin(cycle + 1.4) * 0.16 * moving * _gallop
+	# (bounding, his back stretches out flat in the air and rounds as his hind feet come up under him)
+	var lean := lerpf(1.82, 1.75, _gallop) + cos(TAU * (_qphase - 0.9)) * 0.22 * bounding
 
 	# Where the boy's pose had his feet, in the rig's space, before the hips move.
 	var base_feet: Array[Transform3D] = []
@@ -118,15 +123,17 @@ func _pose_quad(w: float, speed: float, stride: float) -> void:
 		_neck.basis = _slerp(_neck.basis, Basis(Vector3.RIGHT, -lean * 0.45), w)
 	_head.basis = _slerp(_head.basis, Basis(Vector3.RIGHT, -lean * 0.55 + 0.04 + sin(cycle * 2.0) * 0.04 * moving), w)
 
-	var duty := lerpf(0.66, 0.36, _gallop)
+	var duty := lerpf(0.66, 0.3, _gallop)
 	var half := duty * stride * 0.5 * moving
-	var lift := lerpf(0.05, 0.1, _gallop) * moving
+	var lift := lerpf(0.05, 0.16, _gallop) * moving
 	var hips_inverse := _hips.transform.affine_inverse()
 	# Hind feet, under the hips
 	for i in 2:
 		var side := 1.0 if i == 0 else -1.0
-		var at := fposmod(_qphase - lerpf(WALK_FEET[i], GALLOP_FEET[i], _gallop), 1.0)
+		var at := fposmod(_qphase - lerpf(WALK_FEET[i], BOUND_FEET[i], _gallop), 1.0)
 		var step := _cycle(at, duty, half, lift)
+		# (flung out behind him as he leaves the ground)
+		step.x -= _bump(at, duty - 0.02, 0.62) * 0.16 * bounding
 		var point := Vector3(side * 0.095, ANKLE + step.y, -0.07 + step.x)
 		var pitch := step.y / maxf(lift, 0.001) * 0.6 if at >= duty else 0.0
 		var wanted := Transform3D(Basis(Vector3.RIGHT, pitch), point)
@@ -135,14 +142,21 @@ func _pose_quad(w: float, speed: float, stride: float) -> void:
 	# Fore paws, set down flat under the shoulders
 	for i in 2:
 		var side := 1.0 if i == 0 else -1.0
-		var at := fposmod(_qphase - lerpf(WALK_FEET[i + 2], GALLOP_FEET[i + 2], _gallop), 1.0)
+		var at := fposmod(_qphase - lerpf(WALK_FEET[i + 2], BOUND_FEET[i + 2], _gallop), 1.0)
 		var step := _cycle(at, duty, half, lift * 0.9)
+		# (reaching out ahead for the ground, and swept back as he gathers)
+		step.x += (_bump(at, 0.68, 1.0) * 0.14 - _bump(at, duty - 0.02, 0.55) * 0.08) * bounding
 		var shoulder := to_local(_shoulders[i].global_position)
 		var fingers := (global_basis * Vector3(-side * 0.12, 0.0, 1.0)).normalized()
 		var point := Vector3(side * 0.13, 0.03 + step.y, shoulder.z + 0.05 + step.x)
 		var pole := (global_basis * Vector3(side * 0.3, 0.0, -1.0)).normalized()
 		_solve_arm(i, side, to_global(point) - fingers * 0.03, _forearm, w, pole)
 		_lay_hand(i, side, Vector3.UP, fingers, w * (1.0 - 0.6 * clampf(step.y / maxf(lift, 0.001), 0.0, 1.0)))
+
+
+## 0 outside a..b, rising to 1 halfway between and back down.
+static func _bump(x: float, a: float, b: float) -> float:
+	return sin(PI * clampf((x - a) / (b - a), 0.0, 1.0))
 
 
 ## Where a foot is through one cycle: (how far ahead of its middle, how high).
