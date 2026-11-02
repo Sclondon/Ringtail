@@ -545,3 +545,19 @@ Read README.md first. Started 2026-11-01.
   Not done: the opossum hanging by its tail, a chirp sound for the prairie dog.
 - Checks: `tests/grove_animal_shots.gd -- --out=<dir> [lineup] [grove]` (every kind beside him front and side; the
   grove from above and close by; prints counts, what each is doing, and any that fell through).
+
+## Fishing in the grove pond (2026-11-02)
+
+- The user: "there should be a pond in the grove and a fishing minigame (we have assets for that)". The assets were
+  Gloaming's Fishing; they are now GameCommon's `godot/fishing` (FishingSpot, FishingRod, FishingHud, FishingButton,
+  fishing.glb from tools/build_fishing.py), installed here with kit.sh under `fishing/`. Gloaming keeps its own copy.
+- `scripts/pond_fishing.gd` (PondFishing.place(world), after the HUD): the spot is the `fishing_spot` marker facing
+  `fishing_water` if they exist, else the pond's west bank facing east. Walking up to it (1.6 m) a round button comes
+  up at the bottom middle (F, or LB on a pad); then the fishing panel and buttons (hold to cast, hook, reel; the cross,
+  or duck, puts the rod away; F/LB/Space/A press the main button). The HUD's own buttons hide while fishing.
+- Claude's picks: the pond's fish (koi, carp, bluegill, catfish, a rare golden koi), the button rather than a raccoon
+  to talk to, the west bank, a rod about 1 m (rod_size 0.32), hands at 0.55 of the boy's reach, the catch held out at
+  his eyes (land_point). Bests are kept in user://fishing.cfg ("grove_pond").
+- Check: `tests/fishing_test.gd` (walks up, button, rod, cast into the pond, a forced bite, reels, lands, the best
+  kept, puts it away; measures the rod's gap to his head in each move); with `-- --out=<dir>` in a window it shoots
+  the cast, fight and catch, and him with the rod from four sides, above and close.

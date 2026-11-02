@@ -251,8 +251,10 @@ func _process(delta: float) -> void:
 			icon.kind = wanted
 			icon.queue_redraw()
 	var touch := TouchControls.wanted()
-	_buttons.visible = not touch
-	_tail_touch.visible = touch
+	# (fishing has buttons of its own there)
+	var fishing := PondFishing.busy(world)
+	_buttons.visible = not touch and not fishing
+	_tail_touch.visible = touch and not fishing
 	var racing := world.race != null and world.race.running
 	_clock_row.visible = racing
 	if racing:
