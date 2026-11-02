@@ -3,7 +3,7 @@ extends Control
 ## A small symbol drawn in code (no font has them all, and none on the web):
 ## for the HUD's counts and the buttons.
 
-enum Kind { HEART, HEART_EMPTY, CRUMB, CAP, JUMP, DUCK, SPRINT, TAIL, CLOCK, SCURRY, PAUSE, PLAY, COMB, CHECK, UNDO, LEFT, RIGHT }
+enum Kind { HEART, HEART_EMPTY, CRUMB, CAP, JUMP, DUCK, SPRINT, TAIL, CLOCK, SCURRY, PAUSE, PLAY, COMB, CHECK, UNDO, LEFT, RIGHT, KIT }
 
 var kind := Kind.HEART
 var colour := Color.WHITE
@@ -48,6 +48,21 @@ func _draw() -> void:
 			var leaf := PackedVector2Array([c + Vector2(s * 0.04, -s * 0.3), c + Vector2(s * 0.2, -s * 0.42),
 				c + Vector2(s * 0.3, -s * 0.34), c + Vector2(s * 0.16, -s * 0.26)])
 			draw_colored_polygon(leaf, Color(0.36, 0.72, 0.2))
+		Kind.KIT:
+			# A kit's face (the lost kits: LostKits): round grey head, ears, the black mask, a pale muzzle and nose
+			var grey := Color(0.62, 0.58, 0.56)
+			for side in [-1.0, 1.0]:
+				draw_circle(c + Vector2(side * s * 0.27, -s * 0.27), s * 0.13, ink)
+				draw_circle(c + Vector2(side * s * 0.27, -s * 0.27), s * 0.09, grey)
+			draw_circle(c + Vector2(0.0, s * 0.03), s * 0.38, ink)
+			draw_circle(c + Vector2(0.0, s * 0.03), s * 0.33, grey)
+			var mask := PackedVector2Array([c + Vector2(-s * 0.33, -s * 0.02), c + Vector2(-s * 0.1, -s * 0.1), c + Vector2(s * 0.1, -s * 0.1),
+				c + Vector2(s * 0.33, -s * 0.02), c + Vector2(s * 0.2, s * 0.1), c + Vector2(-s * 0.2, s * 0.1)])
+			draw_colored_polygon(mask, Color(0.08, 0.07, 0.08))
+			for side in [-1.0, 1.0]:
+				draw_circle(c + Vector2(side * s * 0.14, -s * 0.01), s * 0.045, Color.WHITE)
+			draw_circle(c + Vector2(0.0, s * 0.2), s * 0.12, Color(0.92, 0.9, 0.86))
+			draw_circle(c + Vector2(0.0, s * 0.15), s * 0.05, Color(0.08, 0.07, 0.08))
 		Kind.CAP:
 			var rim := PackedVector2Array()
 			for k in 28:

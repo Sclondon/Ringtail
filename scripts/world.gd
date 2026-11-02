@@ -48,6 +48,8 @@ const TEXTURES := {
 var player: Player
 var camera: FollowCamera
 var hud: Hud
+## The lost kits (LostKits).
+var lost_kits: LostKits
 var race: Race
 var crumbs := 0
 var crumbs_total := 0
@@ -101,6 +103,8 @@ func _ready() -> void:
 	PuffClouds.add_to(self, _sun)
 	Squad.place(self, player)
 	Villagers.place(self, markers, player)
+	# The kits lost about the hill, to find and send home to the grove
+	lost_kits = LostKits.place(self, markers, get_node(^"Villagers") as Villagers, player)
 	_grow_lawn()
 	add_child(N64Filter.new())
 	hud = Hud.new()

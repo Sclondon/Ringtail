@@ -33,6 +33,8 @@ var rub_progress := 1.0
 var villagers: Villagers
 var rig: RaccoonRig
 var kit := false
+## Lost (LostKits): it stays on its spot until found.
+var stays := false
 var dead := false
 ## Its name, and what it says, a line at a time in a bubble over its head (empty: it has nothing to say).
 var display_name := ""
@@ -283,6 +285,11 @@ func _choose() -> void:
 				_next_haunt()
 			return
 		_next_haunt()
+		return
+	# Lost (LostKits): it keeps to its spot, a roof or a limb as it may be: no strolling or playing off it
+	if stays:
+		var pick := randf()
+		_go(Doing.SIT if pick < 0.4 else (Doing.SNIFF if pick < 0.65 else (Doing.GROOM if pick < 0.8 else Doing.STAND)), randf_range(2.5, 6.0))
 		return
 	# At the grove
 	if kit and playmate and not playmate.dead and randf() < 0.7:

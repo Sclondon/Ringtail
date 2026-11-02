@@ -10,6 +10,7 @@ var world: World
 var _hearts: HBoxContainer
 var _crumbs: Label
 var _caps: Label
+var _kits: Label
 var _clock_row: HBoxContainer
 var _clock: Label
 var _message: Label
@@ -35,6 +36,13 @@ func _ready() -> void:
 	_hearts.add_theme_constant_override(&"separation", 6)
 	top_left.add_child(_hearts)
 	_crumbs = _counter(top_left, Icon.Kind.CRUMB, Color(0.85, 0.6, 0.33))
+	# (the lost kits sent home, when there are any to find)
+	_kits = _counter(top_left, Icon.Kind.KIT, Color(0.9, 0.88, 0.84))
+	if world.lost_kits and world.lost_kits.total > 0:
+		_kits.text = "0 / %d" % world.lost_kits.total
+		world.lost_kits.changed.connect(func(home: int, total: int) -> void: _kits.text = "%d / %d" % [home, total])
+	else:
+		_kits.get_parent().visible = false
 
 	var top_right := HBoxContainer.new()
 	top_right.set_anchors_preset(Control.PRESET_TOP_RIGHT)
