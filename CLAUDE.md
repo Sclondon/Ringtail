@@ -760,3 +760,22 @@ Read README.md first. Started 2026-11-01.
   unit and mast on the hut; the culvert a vent stack; the site a floodlight mast. Masts and flues have an unseen
   climbable column named `climb_<name>_pole_hidden`, so PointPerches finds their tips (and the chimneys') for the
   handstand (building_routes.gd counts them). Routes all pass for seeds 1 to 6.
+
+## Cats that climb and walk wires (2026-11-02)
+
+- The user: "the cats should have more complex behaviour, stalking around climbing houses and walking along wires (so
+  they are better at chasing)". YardCat (scripts/yard_cat.gd) now: about its patch it wanders, sits and washes
+  (CatRig.groom: head round to its flank), and leaps up onto a wall or low roof by home to sit there; seeing him it
+  stalks low with stops, crouches, wiggles and pounces; missed, or when he runs or goes up, it chases (run 3.3 m/s,
+  slower than his run): leaps up anything up to CAT_JUMP 2.3 m, leaps gaps between roofs (CAT_GAP 3.6 m), climbs
+  whatever is `climbable` (drainpipes, trees, poles; rig.climbing_npc), over the top onto a roof, or onto a wire strung
+  there, and walks wires (Tightrope; it jumps onto one from a roof, the rig balancing on `tightrope`) to get at him.
+  It gives up after CHASE_FOR 14 s, past TERRITORY 20 m from home, or once it has lost him LOST_FOR 2.5 s (it goes
+  to where it saw him last first), then goes home and ignores him COOL_FOR 6 s. Unseen (grove, tall grass, perched)
+  ends a chase; his tail spin still sends it flying, off a pipe or a wire too. All the numbers are Claude's picks.
+- Pathing is simple on purpose: rays for ledges and gaps ahead, a fan of rays for the nearest climbable (scored by how
+  near it is to him), the wire he is on (Player.tightrope_on). No navmesh.
+- Check: `tests/cat_chase_test.gd` (headless: stalk and pounce, leap a 2.1 m wall, climb a drainpipe onto a 3.2 m
+  roof, climb a pole and walk the wire to him, give up and go home; `-- --out=<dir>` in a window shoots the stalk,
+  the climb, the wire and a cat washing). The playground needs `Hazards.haven` moved off: its default sits under the
+  playground's middle and makes the whole yard the grove (cat_shots.gd does the same now).

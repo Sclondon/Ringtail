@@ -7,6 +7,8 @@ extends RaccoonRig
 var wiggle := 0.0
 ## How far over it is tumbling (radians), knocked flying by his tail; set by YardCat.
 var tumble := 0.0
+## How far into washing itself (0..1), sat: its head turned round and down to its flank, licking; set by YardCat.
+var groom := 0.0
 
 ## How far down its upper lids sit beyond his at rest (radians, about each eye).
 const LID_REST := 0.6
@@ -67,6 +69,10 @@ func _pose_extra(delta: float) -> void:
 	if wiggle > 0.001:
 		# (its rump sways side to side, quick, and the tip of its tail flicks)
 		_hips.basis = Basis(Vector3.UP, sin(_time * 24.0) * 0.16 * wiggle) * _hips.basis
+	if groom > 0.001:
+		# (its head round to its flank and down, licking in little strokes)
+		var lick := sin(_time * 9.0) * 0.12
+		_head.basis = _slerp(_head.basis, Basis(Vector3.UP, 1.15) * Basis(Vector3.RIGHT, 0.55 + lick) * _head.basis, groom)
 	if absf(tumble) > 0.001:
 		_hips.basis = Basis(Vector3.RIGHT, tumble) * _hips.basis
 		_hips.position.y += 0.15 * absf(sin(tumble))

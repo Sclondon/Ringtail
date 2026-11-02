@@ -39,6 +39,8 @@ func _frames(count: int) -> void:
 func _run(level: Node3D) -> void:
 	await process_frame
 	player = level.player
+	# (no grove here: Hazards.haven's default sits under the playground's middle, which would make it all safe)
+	Hazards.haven = Vector3(1.0e6, 0.0, 1.0e6)
 	player.global_position = Vector3(12.0, 0.05, -7.0)
 	cat = YardCat.make()
 	cat.position = Vector3(12.0, 0.05, -2.0)
