@@ -177,3 +177,9 @@ Read README.md first. Started 2026-11-01.
 - Checks: `tests/bird_shots.gd -- --out=<dir>` (each pose from four sides, close up, beat filmstrips side/front/
   above, glide, landing), `tests/bird_clip.gd` (folded wing points no more than 4 mm into the body; each wing's
   shoulder excepted), `tests/owl_test.gd` (owl and crows on a flat yard), `tests/bird_world_shots.gd` (in the town).
+- Trees (the user, 2026-11-02: "the trees need bark textures and the branches need work, especially with how the
+  leaves connect. The trunks should be bigger, some much bigger and taller trees as well"): GameCommon tree, new
+  `bark_style` (painted bark tile, oak/maple/camphor) and `joined` (collars, pointed ends, no bare twigs, leaf clumps
+  drawn along their twigs); "Climbing oak"/"Climbing maple" trunks about 1.5x thicker; a new "Great camphor" (my pick
+  of species, after the shrine trees in the Ghibli stills). A tree marker of 150% or more grows a Great camphor at its
+  own size (world.gd), so its limbs stay a jump apart. tests/tree_climb.gd climbs all three; tree_shots.gd shoots them.

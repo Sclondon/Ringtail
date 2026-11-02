@@ -20,6 +20,8 @@ extends Resource
 enum Leaves { BLOBS, FLUFFY, NEEDLES, PAINTED, NONE }
 ## How long the trunk's branches are up the crown (after Weber and Penn's shapes).
 enum Crown { CONICAL, SPHERICAL, HEMISPHERICAL, CYLINDRICAL, TAPERED, FLAME, INVERSE, TEND_FLAME }
+## The bark's texture (PLAIN: none, the vertex colour only).
+enum Bark { PLAIN, OAK, MAPLE, CAMPHOR }
 
 const SOLID_SHADER := preload("res://tree/tree_solid.gdshader")
 const FLUFFY_SHADER := preload("res://tree/tree_fluffy.gdshader")
@@ -44,6 +46,15 @@ const GOLDEN := 2.39996
 @export_range(0.0, 2.0) var root_flare := 0.4
 @export_range(0, 12) var roots := 0
 @export var bark := Color(0.36, 0.27, 0.2)
+## A painted bark texture over `bark` (PLAIN none; Ringtail, 2026-11-02: "the trees need bark textures"): furrowed oak,
+## a maple's shallow strips, a great camphor's deep blocky fissures. One tile is `bark_tile` metres each way, laid
+## round each trunk and branch and along it, so it does not stretch.
+@export var bark_style := Bark.PLAIN
+@export_range(0.2, 3.0) var bark_tile := 0.8
+## Branches grown into their parents (a swelling collar where each leaves the one it grows from) and drawn out to a
+## point at their ends, and no bare twigs: a twig without leaves (kept off a climbable tree's walks) is not drawn.
+## Leaf clumps then sit on their twigs, drawn out along them, so the leaves are seen to grow from the wood.
+@export var joined := false
 
 @export_group("Branching")
 ## Levels of branches (1: only off the trunk, as a pine's; 3 or 4: twigs on twigs).
@@ -246,19 +257,30 @@ const PRESETS := {
 		fill = 0.0, painted_leaf = 3, leaves_inner = Color(0.5, 0.32, 0.06), leaves_outer = Color(0.92, 0.66, 0.16),
 		leaves_tips = Color(1.0, 0.86, 0.36), rim = 0.4},
 	# Trees to climb (see `climbable`): limbs to stand and walk on, a jump apart.
-	"Climbing oak": {climbable = true, height = 12.0, trunk_radius = 0.5, trunk_base = 0.3, children = 6, lean = 0.02, bend = 0.1, root_flare = 0.6, roots = 5,
-		bark = Color(0.4, 0.3, 0.23), levels = 3, twigs = 4, twig_angle = 42.0, angle_random = 14.0, length = 0.42,
+	# (bark textures, bigger trunks, branches joined and leaves on their twigs: Ringtail, 2026-11-02, "the trees need bark
+	# textures and the branches need work, especially with how the leaves connect. The trunks should be bigger")
+	"Climbing oak": {climbable = true, height = 12.0, trunk_radius = 0.75, trunk_base = 0.3, children = 6, lean = 0.02, bend = 0.1, root_flare = 0.6, roots = 6,
+		bark = Color(0.5, 0.42, 0.34), bark_style = Bark.OAK, joined = true, levels = 3, twigs = 5, twig_angle = 42.0, angle_random = 14.0, length = 0.42,
 		twig_length = 0.45, radius_ratio = 0.42, start = 0.82, end = 0.95, crown_shape = Crown.SPHERICAL, apical = 0.15,
-		gravitropism = 0.25, droop = 0.05, curl = 0.2, wildness = 0.35, leaf_style = Leaves.FLUFFY, clump_size = 1.05,
-		leaf_density = 0.9, leaf_reach = 0.6, fill = 0.0, limbs = 7, first_limb = 1.35, limb_step = 1.25, limb_turn = 0.8,
-		limb_length = 4.4, limb_radius = 0.26, limb_rise = 0.1},
-	"Climbing maple": {climbable = true, height = 8.6, trunk_radius = 0.38, trunk_base = 0.3, children = 5, lean = 0.03, bend = 0.12, root_flare = 0.5, roots = 4,
-		bark = Color(0.34, 0.27, 0.22), levels = 3, twigs = 4, twig_angle = 40.0, angle_random = 12.0, length = 0.4,
+		gravitropism = 0.25, droop = 0.05, curl = 0.2, wildness = 0.35, leaf_style = Leaves.FLUFFY, clump_size = 0.62,
+		leaf_density = 2.2, leaf_reach = 0.85, fill = 0.0, limbs = 7, first_limb = 1.3, limb_step = 1.25, limb_turn = 0.8,
+		limb_length = 4.6, limb_radius = 0.3, limb_rise = 0.1},
+	"Climbing maple": {climbable = true, height = 9.4, trunk_radius = 0.55, trunk_base = 0.3, children = 5, lean = 0.03, bend = 0.12, root_flare = 0.5, roots = 5,
+		bark = Color(0.46, 0.4, 0.36), bark_style = Bark.MAPLE, joined = true, levels = 3, twigs = 5, twig_angle = 40.0, angle_random = 12.0, length = 0.4,
 		twig_length = 0.45, radius_ratio = 0.42, start = 0.82, end = 0.95, crown_shape = Crown.SPHERICAL, apical = 0.2,
-		gravitropism = 0.22, droop = 0.08, curl = 0.15, wildness = 0.35, leaf_style = Leaves.FLUFFY, clump_size = 0.9,
-		leaf_density = 1.0, leaf_reach = 0.5, fill = 0.0, leaves_inner = Color(0.36, 0.06, 0.04),
+		gravitropism = 0.22, droop = 0.08, curl = 0.15, wildness = 0.35, leaf_style = Leaves.FLUFFY, clump_size = 0.58,
+		leaf_density = 2.2, leaf_reach = 0.85, fill = 0.0, leaves_inner = Color(0.36, 0.06, 0.04),
 		leaves_outer = Color(0.78, 0.2, 0.08), leaves_tips = Color(1.0, 0.55, 0.18), accent = Color(0.95, 0.75, 0.2, 0.15),
-		limbs = 5, first_limb = 1.3, limb_step = 1.2, limb_turn = 0.9, limb_length = 3.4, limb_radius = 0.22, limb_rise = 0.12},
+		limbs = 5, first_limb = 1.3, limb_step = 1.2, limb_turn = 0.9, limb_length = 3.6, limb_radius = 0.26, limb_rise = 0.12},
+	# A great old tree, as the shrine trees in Whisper of the Heart and Pom Poko (Ringtail, 2026-11-02: "some much bigger
+	# and taller trees"): a huge flared trunk, long broad limbs a jump apart all the way up, a wide evergreen crown.
+	"Great camphor": {climbable = true, height = 16.0, trunk_radius = 1.4, trunk_base = 0.3, children = 12, lean = 0.03, bend = 0.12, root_flare = 0.8, roots = 9,
+		bark = Color(0.48, 0.42, 0.35), bark_style = Bark.CAMPHOR, bark_tile = 1.4, joined = true, levels = 3, twigs = 7, twig_angle = 40.0, angle_random = 14.0,
+		length = 0.75, twig_length = 0.42, radius_ratio = 0.42, start = 0.6, end = 0.95, crown_shape = Crown.HEMISPHERICAL, apical = 0.15,
+		gravitropism = 0.2, droop = 0.08, curl = 0.25, wildness = 0.4, leaf_style = Leaves.FLUFFY, clump_size = 0.75,
+		leaf_density = 1.8, cards = 0.75, leaf_reach = 0.85, fill = 0.0, leaves_inner = Color(0.06, 0.16, 0.07), leaves_outer = Color(0.16, 0.36, 0.14),
+		leaves_tips = Color(0.42, 0.6, 0.22), limbs = 11, first_limb = 1.2, limb_step = 1.2, limb_turn = 0.85, limb_length = 9.0,
+		limb_radius = 0.34, limb_rise = 0.06, walk_width = 0.6},
 }
 
 static var _cache := {}
@@ -436,7 +458,7 @@ func simple() -> TreeGen:
 # ------------------------------------------------------------------ materials
 
 func _look_key(kind: String) -> String:
-	return var_to_str([kind, toon, rim, billboard, normal_bend, alpha_cut, fluffy_leaf, needle_density, painted_leaf])
+	return var_to_str([kind, toon, rim, billboard, normal_bend, alpha_cut, fluffy_leaf, needle_density, painted_leaf, bark_style])
 
 
 func _solid_material() -> ShaderMaterial:
@@ -446,6 +468,9 @@ func _solid_material() -> ShaderMaterial:
 		m.shader = SOLID_SHADER
 		m.set_shader_parameter("toon", toon)
 		m.set_shader_parameter("rim", rim)
+		if bark_style != Bark.PLAIN:
+			m.set_shader_parameter("bark_tex", bark_texture(bark_style))
+			m.set_shader_parameter("use_bark", true)
 		_materials[key] = m
 	return _materials[key]
 
@@ -482,6 +507,88 @@ func _card_material() -> ShaderMaterial:
 	m.set_shader_parameter("rim", rim)
 	_materials[key] = m
 	return m
+
+
+## A bark texture (see `bark_style`), painted in code once and kept: a tile that repeats every way. Greys about a
+## middle of 0.5 (the solid shader doubles it over the bark colour, so the furrows darken it and the ridges lighten
+## it), warmer on the ridges and cooler in the furrows.
+static func bark_texture(style: Bark) -> ImageTexture:
+	if _barks.has(style):
+		return _barks[style]
+	var size := 128
+	var image := Image.create(size, size, true, Image.FORMAT_RGB8)
+	for y in size:
+		for x in size:
+			var u := float(x) / size
+			var v := float(y) / size
+			var fine := _wrap_noise(u, v, 32, 32, 7) - 0.5
+			var lit := 0.5
+			match style:
+				Bark.OAK:
+					# deep wavy furrows between thick uneven ridges that split and join, broken across here and there
+					var warp := (_wrap_noise(u, v, 4, 3, 1) - 0.5) * 0.9 + (_wrap_noise(u, v, 9, 7, 5) - 0.5) * 0.3
+					var ridge := fposmod(u * 4.0 + warp, 1.0)
+					var tall := 1.0 - absf(ridge * 2.0 - 1.0)
+					var column := fposmod(floorf(u * 4.0 + warp), 4.0)
+					var furrow := 0.1 + 0.3 * _wrap_noise(u, v, 6, 8, 6)
+					var crack := fposmod(v * 3.0 + _hash1(column) * 3.0 + (_wrap_noise(u, v, 8, 4, 3) - 0.5) * 0.5, 1.0)
+					var broken := crack < 0.035 and _wrap_noise(u, v, 4, 6, 8) > 0.45
+					lit = smoothstep(furrow, furrow + 0.4, tall) * (0.55 if broken else 1.0) * (0.85 + 0.25 * _hash1(column + 3.0))
+				Bark.MAPLE:
+					# shallow strips peeling at their edges, long plates
+					var warp := (_wrap_noise(u, v, 3, 2, 2) - 0.5) * 0.5
+					var ridge := fposmod(u * 8.0 + warp, 1.0)
+					var column := fposmod(floorf(u * 8.0 + warp), 8.0)
+					var plate := fposmod(v * 2.0 + _hash1(column + 11.0) * 2.0, 1.0)
+					lit = 0.55 + 0.45 * smoothstep(0.05, 0.3, minf(ridge, 1.0 - ridge))
+					if plate < 0.05:
+						lit *= 0.6
+				Bark.CAMPHOR:
+					# an old tree's deep fissures and square checks, rough all over
+					var warp := (_wrap_noise(u, v, 5, 3, 4) - 0.5) * 0.7
+					var ridge := fposmod(u * 6.0 + warp, 1.0)
+					var tall := 1.0 - absf(ridge * 2.0 - 1.0)
+					var column := fposmod(floorf(u * 6.0 + warp), 6.0)
+					var check := fposmod(v * 2.0 + _hash1(column + 5.0) * 4.0 + (_wrap_noise(u, v, 6, 4, 2) - 0.5) * 0.6, 1.0)
+					var split := check < 0.05 and _wrap_noise(u, v, 5, 4, 10) > 0.4
+					lit = smoothstep(0.08, 0.5, tall) * (0.45 if split else 1.0) * (0.8 + 0.35 * _wrap_noise(u, v, 12, 12, 9))
+			lit = clampf(lit + fine * 0.25, 0.0, 1.0)
+			# (in a few painted steps, as a hand-painted tile)
+			lit = roundf(lit * 6.0) / 6.0
+			var m := lerpf(0.42, 1.3, lit) * 0.5
+			image.set_pixel(x, y, Color(m * lerpf(0.94, 1.05, lit), m, m * lerpf(1.06, 0.9, lit)))
+	image.generate_mipmaps()
+	var texture := ImageTexture.create_from_image(image)
+	_barks[style] = texture
+	return texture
+
+
+static var _barks := {}
+
+
+## Value noise that repeats every `cells_u` across and `cells_v` down the unit square.
+static func _wrap_noise(u: float, v: float, cells_u: int, cells_v: int, salt: int) -> float:
+	var x := u * cells_u
+	var y := v * cells_v
+	var x0 := floori(x)
+	var y0 := floori(y)
+	var fx := x - x0
+	var fy := y - y0
+	fx = fx * fx * (3.0 - 2.0 * fx)
+	fy = fy * fy * (3.0 - 2.0 * fy)
+	var a := _hash2(posmod(x0, cells_u), posmod(y0, cells_v), salt)
+	var b := _hash2(posmod(x0 + 1, cells_u), posmod(y0, cells_v), salt)
+	var c := _hash2(posmod(x0, cells_u), posmod(y0 + 1, cells_v), salt)
+	var d := _hash2(posmod(x0 + 1, cells_u), posmod(y0 + 1, cells_v), salt)
+	return lerpf(lerpf(a, b, fx), lerpf(c, d, fx), fy)
+
+
+static func _hash2(x: int, y: int, salt: int) -> float:
+	return fposmod(sin(x * 127.1 + y * 311.7 + salt * 74.7) * 43758.5453, 1.0)
+
+
+static func _hash1(x: float) -> float:
+	return fposmod(sin(x * 91.3) * 43758.5453, 1.0)
 
 
 ## The fluffy leaves' texture, drawn as SVG at start-up: four clusters of broad leaves in a row over
@@ -536,6 +643,10 @@ class _Branch:
 	var leafy := false
 	## (a climbable tree's trunk, limbs and forks: given collision to stand on)
 	var walk := false
+	## (what it grows from; how many leaf clumps are on it; whether it or anything off it has leaves)
+	var parent: _Branch
+	var leaves := 0
+	var clothed := false
 
 
 ## A surface's arrays as they are built.
@@ -622,6 +733,13 @@ func _build(variant_seed: int) -> ArrayMesh:
 	var draw := RandomNumberGenerator.new()
 	draw.seed = variant_seed + 17
 	var leaf_spots := _leaf_spots(draw)
+	# (joined: what carries leaves, and everything it grows from, is clothed; bare twigs are not drawn)
+	if joined:
+		for b in _branches:
+			var up := b if b.leaves > 0 else null
+			while up and not up.clothed:
+				up.clothed = true
+				up = up.parent
 	_measure(leaf_spots)
 	_card_cap = MAX_CARDS / maxi(leaf_spots.size(), 1)
 	var solid := _Buf.new()
@@ -638,7 +756,7 @@ func _build(variant_seed: int) -> ArrayMesh:
 					_blob(solid, s[0], s[1], draw)
 			Leaves.FLUFFY:
 				for s: Array in leaf_spots:
-					_fluffy(leaves, s[0], s[1], draw)
+					_fluffy(leaves, s[0], s[1], draw, s[3] if joined and s.size() > 3 else Vector3.ZERO)
 			Leaves.PAINTED:
 				for s: Array in leaf_spots:
 					_painted(leaves, s[0], s[1], draw)
@@ -706,7 +824,8 @@ func _grow_climbable() -> void:
 	t.level = 0
 	t.walk = true
 	var top_limb := first_limb + limb_step * (limbs - 1)
-	t.length = maxf(height, top_limb + 1.0)
+	# (joined: the trunk stops inside the crown and its top limbs spread out to fill it, not on up in a tuft)
+	t.length = maxf(height * (0.72 if joined else 1.0), top_limb + 1.0)
 	var steps := 14
 	var p := Vector3.ZERO
 	var dir := (Vector3(_rng.randf_range(-1, 1), 0, _rng.randf_range(-1, 1)).normalized() * lean + Vector3.UP).normalized()
@@ -722,7 +841,7 @@ func _grow_climbable() -> void:
 	_trunk = t
 	_branches.append(t)
 	_base_y = first_limb
-	_top_y = t.length
+	_top_y = maxf(t.length, height)
 	# The limbs, spiralling up
 	var turn := _rng.randf() * TAU
 	for i in limbs:
@@ -733,22 +852,25 @@ func _grow_climbable() -> void:
 		var up_tree := float(i) / maxf(limbs - 1, 1)
 		var long := limb_length * lerpf(1.0, 0.55, up_tree) * _rng.randf_range(0.9, 1.1)
 		var limb := _limb_from(_trunk_at(y) + out * _trunk_radius_at(y) * 0.3, out, long, limb_radius * lerpf(1.0, 0.8, up_tree), 1)
+		limb.parent = t
 		_branches.append(limb)
 		# A fork off its side, from about half way, level with it and a little apart, to hop to
 		var at := 0.45 + _rng.randf_range(-0.05, 0.1)
 		var side := 1.0 if _rng.randf() < 0.5 else -1.0
 		var fork := _limb_from(_along(limb.pts, at), out.rotated(Vector3.UP, side * _rng.randf_range(0.5, 0.75)), long * 0.5,
 			_radius_along(limb, at) * 0.8, 2)
+		fork.parent = limb
 		_branches.append(fork)
 		_sprays(limb)
 		_sprays(fork)
 	# The rest of the crown, grown as any tree's is, so it reads as one tree: `children` branches off the
 	# trunk from `trunk_base` up (not walked on; leaves kept off the walks, see _over_walk), and limbs
 	# going on up from the trunk's top
+	# (joined: the limbs at its top spread out wide and round, not up in a tuft over a bare stretch of trunk)
 	_children(t)
 	var forks := clampi(roundi(lerpf(4.0, 2.0, apical)), 2, 4)
 	for k in forks:
-		_spawn(t, 1.0, turn + k * TAU / forks + _rng.randf_range(-0.4, 0.4) * wildness, 0.55)
+		_spawn(t, 1.0, turn + k * TAU / forks + _rng.randf_range(-0.4, 0.4) * wildness, 1.0 if joined else 0.55)
 
 
 ## Whether a clump of leaves at `p`, `size` across, would sit over (or on) the inner part of a walkable
@@ -791,6 +913,7 @@ func _sprays(limb: _Branch) -> void:
 		dir = (dir + Vector3.UP * 0.35).normalized()
 		var long := limb.length * twig_length * _rng.randf_range(0.7, 1.1)
 		var spray := _grow_branch(at, dir, long, _radius_along(limb, t) * radius_ratio, limb.level + 1)
+		spray.parent = limb
 		_branches.append(spray)
 		_children(spray)
 
@@ -983,6 +1106,7 @@ func _spawn(parent: _Branch, t: float, roll: float, steer: float) -> void:
 	if steer < 1.0:
 		radius = pr * 0.85
 	var b := _grow_branch(at, dir, long, radius, level)
+	b.parent = parent
 	_branches.append(b)
 	_children(b)
 
@@ -1087,14 +1211,19 @@ func _leaf_spots(rng: RandomNumberGenerator) -> Array:
 		var count := maxi(1, roundi(span * leaf_density / maxf(clump_size, 0.05)))
 		for k in count:
 			var t := 1.0 - (float(k) / count) * (1.0 - from)
-			var p := _along(b.pts, t) + Vector3(rng.randf_range(-1, 1), rng.randf_range(-0.5, 1) * (1.0 - pads), rng.randf_range(-1, 1)) * clump_size * 0.3
+			# (joined: on the twig itself, not hovering off it)
+			var p := _along(b.pts, t) + Vector3(rng.randf_range(-1, 1), rng.randf_range(-0.5, 1) * (1.0 - pads), rng.randf_range(-1, 1)) * clump_size * (0.1 if joined else 0.3)
 			# (the end of a branch that has twigs of its own is thicker: a bigger clump hides it)
 			var big := 1.0 if b.leafy else maxf(1.5, b.radii[-1] * 6.0 / maxf(clump_size, 0.05))
+			if joined:
+				# (joined: the end grows to a point among its leaves; no big ball hiding it)
+				big = minf(big, 1.15)
 			var size := clump_size * big * rng.randf_range(0.8, 1.15) * lerpf(1.0, 0.8, float(k) / count)
 			# (a climbable tree keeps its walks clear: no leaves over the inner part of a limb, where he walks)
 			if climbable and _over_walk(p, size):
 				continue
-			out.append([p, size, inside])
+			out.append([p, size, inside, _dir_along(b.pts, t)])
+			b.leaves += 1
 		if out.size() >= MAX_CLUMPS:
 			break
 	# a strong leader's tip
@@ -1160,8 +1289,9 @@ func _sway(p: Vector3) -> float:
 	return clampf(pow(h, 1.5) * 0.7 + out * h * 0.4, 0.0, 1.0)
 
 
-## A clump of fluffy cards: quads over a lumpy ball, each with the crown's normal.
-func _fluffy(buf: _Buf, at: Vector3, size: float, rng: RandomNumberGenerator) -> void:
+## A clump of fluffy cards: quads over a lumpy ball, each with the crown's normal. Given the way its twig runs
+## (`along`), the ball is drawn out along the twig and slimmer across it, so the leaves follow the wood.
+func _fluffy(buf: _Buf, at: Vector3, size: float, rng: RandomNumberGenerator, along := Vector3.ZERO) -> void:
 	var count := clampi(roundi(22.0 * cards * (1.0 if _lod > 0 else 0.4)), 3, clampi(_card_cap, 3, 80))
 	var grow := 1.0 if _lod > 0 else 1.35
 	var odd := accent.a > 0.0 and rng.randf() < accent.a
@@ -1174,6 +1304,8 @@ func _fluffy(buf: _Buf, at: Vector3, size: float, rng: RandomNumberGenerator) ->
 		var r := sqrt(1.0 - y * y)
 		var a := i * GOLDEN
 		var d := spin * Vector3(cos(a) * r, y, sin(a) * r)
+		if along != Vector3.ZERO:
+			d = d * 0.8 + along * d.dot(along) * 0.7
 		var lump := 1.0 + lumpiness * 0.3 * sin(d.x * 3.0 + phase.x) * sin(d.y * 3.0 + phase.y) * sin(d.z * 3.0 + phase.z) * 2.0
 		var centre := at + d * size * rng.randf_range(0.55, 0.9) * lump * Vector3(1.0 + 0.5 * pads, 0.85 * (1.0 - 0.7 * pads), 1.0 + 0.5 * pads)
 		var half := size * card_size * 0.6 * rng.randf_range(0.8, 1.2) * grow
@@ -1408,13 +1540,30 @@ func _wood(buf: _Buf, b: _Branch) -> void:
 	if b.radii[0] < thin:
 		return
 	var sides: int = ([8, 6, 4, 3, 3] if _lod > 0 else [6, 4, 3, 3, 3])[mini(b.level, 4)]
-	_tube(buf, b.pts, b.radii, sides)
+	if not joined:
+		_tube(buf, b.pts, b.radii, sides)
+		return
+	# Joined: a bare twig is not drawn; a branch swells into a collar where it leaves its parent (its foot is inside
+	# the parent), and ends in a point
+	if leaf_style != Leaves.NONE and b != _trunk and not b.walk and not b.clothed:
+		return
+	var pts: Array[Vector3] = b.pts.duplicate()
+	var radii: Array[float] = b.radii.duplicate()
+	if b.parent:
+		radii[0] *= 1.6
+	var ahead := (pts[-1] - pts[-2]).normalized()
+	pts.append(pts[-1] + ahead * radii[-1] * 2.5)
+	radii.append(radii[-1] * 0.03)
+	_tube(buf, pts, radii, sides + (2 if b == _trunk else 0))
 
 
 func _tube(buf: _Buf, pts: Array[Vector3], radii: Array[float], sides: int) -> void:
 	var side := Vector3.ZERO
 	var rings: Array = []
 	var v := 0.0
+	# (with a bark texture: tiles round it, a whole number of them, and along it, `bark_tile` metres each)
+	var barked := bark_style != Bark.PLAIN
+	var round_tiles := maxf(1.0, roundf(TAU * radii[0] / bark_tile))
 	for i in pts.size():
 		var fwd: Vector3
 		if i == 0:
@@ -1435,7 +1584,8 @@ func _tube(buf: _Buf, pts: Array[Vector3], radii: Array[float], sides: int) -> v
 		for j in sides + 1:
 			var a := j * TAU / sides
 			var radial := side * cos(a) + other * sin(a)
-			ring.append(buf.add(pts[i] + radial * radii[i], radial, shade, Vector2(float(j) / sides, v), Vector2(0.0, sway)))
+			var uv := Vector2(float(j) / sides * round_tiles, v / bark_tile) if barked else Vector2(float(j) / sides, v)
+			ring.append(buf.add(pts[i] + radial * radii[i], radial, shade, uv, Vector2(1.0 if barked else 0.0, sway)))
 		rings.append(ring)
 	for i in rings.size() - 1:
 		for j in sides:

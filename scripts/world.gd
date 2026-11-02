@@ -220,12 +220,15 @@ func _place_things() -> void:
 		elif name.begins_with("tree_"):
 			# (tree_<n>_<seed>_<size%>: a climbable tree of the grove, GameCommon's TreeGen, its limbs to stand on)
 			var parts := name.split("_")
-			var tree := TreeGen.preset("Climbing oak" if int(parts[1]) % 3 != 1 else "Climbing maple")
+			# (150% and up: a great old tree, the shrine tree, grown at its own size so its limbs stay a jump apart;
+			# the user, 2026-11-02, "some much bigger and taller trees as well")
+			var great := float(parts[3]) >= 150.0
+			var tree := TreeGen.preset("Great camphor" if great else "Climbing oak" if int(parts[1]) % 3 != 1 else "Climbing maple")
 			tree.seed = int(parts[2])
 			var body := tree.body()
 			body.position = at
 			body.rotation.y = float(parts[2]) * 0.7
-			body.scale = Vector3.ONE * float(parts[3]) / 100.0
+			body.scale = Vector3.ONE * (1.0 if great else float(parts[3]) / 100.0)
 			body.add_to_group(&"climbable")
 			add_child(body)
 		elif name.begins_with("check_"):

@@ -120,7 +120,8 @@ func _climb(tree: TreeGen) -> void:
 	failed = failed or not ok
 	# Limb to limb
 	for i in limbs.size() - 1:
-		var pair := _pair(limbs[i], limbs[i + 1], 1.3)
+		# (from out past the trunk: a great tree's is well over a metre round its middle)
+		var pair := _pair(limbs[i], limbs[i + 1], tree.trunk_radius * 1.1 + 0.8)
 		var from: Vector3 = pair[0]
 		var to: Vector3 = pair[1]
 		# (put down on it as if he had walked there: let go of anything first)

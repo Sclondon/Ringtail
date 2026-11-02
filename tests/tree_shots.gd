@@ -68,7 +68,11 @@ func _run() -> void:
 	var maple_body := maple.body()
 	maple_body.position = Vector3(12.0, 0.0, 0.0)
 	world.add_child(maple_body)
-	for named: Array in [["Climbing oak", oak], ["Climbing maple", maple]]:
+	var great := TreeGen.preset("Great camphor")
+	var great_body := great.body()
+	great_body.position = Vector3(-30.0, 0.0, 0.0)
+	world.add_child(great_body)
+	for named: Array in [["Climbing oak", oak], ["Climbing maple", maple], ["Great camphor", great]]:
 		var tree: TreeGen = named[1]
 		var tris := 0
 		var made := tree.mesh()
@@ -100,5 +104,17 @@ func _run() -> void:
 	await _shot("on_limb_side", on + across * 3.2 + Vector3.UP * 0.8, on, eye)
 	await _shot("on_limb_out", on + Vector3(stand.x, 0.0, stand.z).normalized() * 3.5 + Vector3.UP * 1.0, on, eye)
 	await _shot("under_canopy", Vector3(4.0, 1.4, 5.0), Vector3(0.0, 5.0, 0.0), eye)
+	# Close: where a limb leaves the trunk, where twigs carry their leaves, the bark
+	var limb: PackedVector3Array = oak.walks()[2]
+	var foot := limb[1]
+	var out_way := Vector3(limb[3].x - limb[0].x, 0.0, limb[3].z - limb[0].z).normalized()
+	await _shot("joint_close", foot + out_way.cross(Vector3.UP) * 2.2 + Vector3.UP * 0.6 + out_way * 0.8, foot, eye)
+	var tip := limb[limb.size() - 1]
+	await _shot("leaves_close", tip + out_way.cross(Vector3.UP) * 3.0 + Vector3.UP * 0.4, tip + Vector3.UP * 0.8, eye)
+	await _shot("bark_close", Vector3(0.0, 0.9, 2.6), Vector3(0.0, 0.9, 0.0), eye)
+	var great_mid := Vector3(-30.0, 9.0, 0.0)
+	for side: Array in [["front", Vector3(0, 2, 36)], ["right", Vector3(36, 2, 0)], ["back", Vector3(0, 2, -36)], ["left", Vector3(-6, 2, 30)]]:
+		await _shot("great_" + side[0], great_mid + side[1], great_mid, eye)
+	await _shot("great_foot", Vector3(-30.0, 1.6, 7.0), Vector3(-30.0, 3.0, 0.0), eye)
 	print("TREE SHOTS DONE ", out)
 	quit()
