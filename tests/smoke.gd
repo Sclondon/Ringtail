@@ -190,7 +190,12 @@ func _run() -> void:
 		player.velocity = Vector3.ZERO
 		wire.bodies_now()
 		await _frames(60)
-		_check(player.tightrope > 0.0 and wire.distance_to(player.global_position) < 0.3, "lands on a wire and walks it")
+		# (whichever wire he comes down on: the power lines above the phone line are wires too, and sag near it)
+		var on_one := false
+		for node in world.get_children():
+			if node is Tightrope and (node as Tightrope).distance_to(player.global_position) < 0.3:
+				on_one = true
+		_check(player.tightrope > 0.0 and on_one, "lands on a wire and walks it")
 		Input.action_press(&"duck")
 		await _frames(4)
 		Input.action_release(&"duck")

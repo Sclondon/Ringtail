@@ -19,6 +19,20 @@ func _initialize() -> void:
 func _run(world: World) -> void:
 	for _i in 60:
 		await physics_frame
+	# (about 9 m off the nearest climbable thing, facing it)
+	var near: Node3D
+	for node in get_nodes_in_group(&"climbable"):
+		# (a tree has its own place; a mesh of many poles sits at the middle of the world)
+		if node is Node3D and (node as Node3D).global_position.length() > 2.0 and (near == null or (node as Node3D).global_position.distance_to(world.player.global_position) < near.global_position.distance_to(world.player.global_position)):
+			near = node
+	if near:
+		var away := world.player.global_position - near.global_position
+		away.y = 0.0
+		world.player.global_position = near.global_position + away.normalized() * 9.0 + Vector3.UP * 0.5
+		world.player.facing_yaw = atan2(-away.x, -away.z)
+		world.camera.snap()
+		for _i in 30:
+			await physics_frame
 	(world.player.get_node(^"Scurry") as Scurry).button = true
 	for k in 3:
 		for _i in 12:

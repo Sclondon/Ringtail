@@ -7,8 +7,8 @@ extends Node3D
 ## of Scurry (it makes one).
 
 ## How far round him climbables sparkle, how many glints there are at most, and how often new ones come up.
-@export var reach := 8.0
-const GLINTS := 48
+@export var reach := 14.0
+const GLINTS := 64
 const EVERY := 0.035
 const LIFE := 0.5
 
@@ -26,10 +26,14 @@ var _look_in := 0.0
 func _ready() -> void:
 	top_level = true
 	var shader := Shader.new()
-	shader.code = Pickup.STAR_SHADER
+	# (the pickups' star, but painted on, not added to the light behind it: a dark blue can show then; the user,
+	# 2026-11-02, "the climbing sparkles need to appear from farther away and be a darker blue")
+	shader.code = Pickup.STAR_SHADER.replace("blend_add", "blend_mix").replace(
+			"ALBEDO = colour * (arms + core) * COLOR.a;", "ALBEDO = colour;
+	ALPHA = clamp((arms + core) * COLOR.a * 1.6, 0.0, 1.0);")
 	var material := ShaderMaterial.new()
 	material.shader = shader
-	material.set_shader_parameter(&"colour", Vector3(0.25, 0.55, 1.0))
+	material.set_shader_parameter(&"colour", Vector3(0.08, 0.22, 0.85))
 	var star := QuadMesh.new()
 	star.size = Vector2.ONE
 	star.material = material
@@ -82,8 +86,8 @@ func _find(player: Player) -> void:
 	var space := player.get_world_3d().direct_space_state
 	for high: float in [0.3, 1.0, 1.8]:
 		var from := player.global_position + Vector3.UP * high
-		for k in 32:
-			var a := TAU * k / 32.0
+		for k in 48:
+			var a := TAU * k / 48.0
 			var query := PhysicsRayQueryParameters3D.create(from, from + Vector3(cos(a), 0.0, sin(a)) * reach, 1)
 			query.exclude = [player.get_rid()]
 			var hit := space.intersect_ray(query)

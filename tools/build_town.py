@@ -750,7 +750,7 @@ def buildings():
 
 def poles_and_wires(frames):
     """Concrete power poles round the outer pavement with crossarms and transformers, the phone line strung from each
-    to the next (the wires he walks), and the power lines above it and across to the houses (only to look at)."""
+    to the next (the wires he walks), the power lines above it (wires too), and lines across to the houses (only to look at)."""
     poles = w1.Piece("climb_poles")
     things = w1.Piece("pole_things")
     lines = w1.Piece("nocol_lines")
@@ -774,15 +774,11 @@ def poles_and_wires(frames):
         arms.append((frame.p(-0.8, 7.78, 0.0), frame.p(0.8, 7.78, 0.0)))
     for k in range(count):
         w1.wire(tops[k], tops[(k + 1) % count], 4)
-        # the two power lines above, sagging (each from one crossarm end to the next pole's)
+        # the two power lines above, from one crossarm end to the next pole's: wires he walks too (they were only to
+        # look at, and he went through them: the user, 2026-11-02, "you phase through half the wires on the telephone
+        # poles (the top ones)")
         for side in (0, 1):
-            a_end, b_end = arms[k][side], arms[(k + 1) % count][side]
-            prev = a_end
-            for s in range(1, 7):
-                t = s / 6
-                p = w1.wire_point(a_end, b_end, t)
-                _bar(lines, prev, p, 0.035, "wire_dark")
-                prev = p
+            w1.wire(arms[k][side], arms[(k + 1) % count][side])
     # a line to each house from the pole before it
     for k, frame in frames.items():
         pole = arms[k][1]
@@ -1444,7 +1440,7 @@ def station():
 
 def hill_wires():
     """Poles down the downhill side of each run of the road, a phone line from each to the next (wires he walks),
-    power lines above (only to look at)."""
+    and the power lines above (wires too)."""
     poles = w1.Piece("climb_hill_poles")
     things = w1.Piece("hill_pole_things")
     lines = w1.Piece("nocol_hill_lines")
@@ -1461,13 +1457,9 @@ def hill_wires():
             arms.append(((x, y + 7.78, z - 0.8), (x, y + 7.78, z + 0.8)))
         for k in range(len(tops) - 1):
             w1.wire(tops[k], tops[k + 1], 3)
+            # (the power lines above are wires he walks too)
             for side in (0, 1):
-                a_end, b_end = arms[k][side], arms[k + 1][side]
-                prev = a_end
-                for s in range(1, 7):
-                    p = w1.wire_point(a_end, b_end, s / 6)
-                    _bar(lines, prev, p, 0.035, "wire_dark")
-                    prev = p
+                w1.wire(arms[k][side], arms[k + 1][side])
     poles.done()
     things.done()
     lines.done()
