@@ -40,7 +40,7 @@ var always_on_fours := false
 ## Where the rotor starts: the segments before it go up his back, the rest whirl over his head.
 const ROTOR_FROM := 4
 ## How much longer his tail is drawn out as he twirls it.
-const ROTOR_STRETCH := 1.9
+const ROTOR_STRETCH := 1.2
 ## How much longer it is drawn out, held stiff, as he spins.
 const SPIN_STRETCH := 1.35
 ## The fur's springs (see _spring_fur), and which region his head is.
@@ -96,6 +96,8 @@ var _speeds := PackedVector3Array()
 var _moves: Node
 var _scurry: Node
 var _climb_w := 0.0
+var _leg_swing := 0.0
+var _leg_swing_speed := 0.0
 var _spin_jump: Node
 var _tj_w := 0.0
 var _tj_turn := 0.0
@@ -185,13 +187,15 @@ func _pose_extra(delta: float) -> void:
 		spin = _moves.spin
 		gliding = _moves.gliding
 	_glide = _approach(_glide, 1.0 if gliding else 0.0, 10.0, delta)
-	_twirl = fposmod(_twirl + delta * TAU * 2.4 * _glide, TAU)
+	_twirl = fposmod(_twirl + delta * TAU * 3.5 * _glide, TAU)
 	_spin_w = _approach(_spin_w, 1.0 if spin < 1.0 else 0.0, 30.0, delta)
 
 	if _quad > 0.002:
 		_pose_quad(smoothstep(0.0, 1.0, _quad), speed, stride)
 	if _climb_w > 0.002:
 		_pose_climb(_climb_w)
+	if _hang > 0.3:
+		_pose_hang_swing(delta)
 	if _glide > 0.002:
 		_pose_glide(_glide)
 	if _spin_w > 0.002:
@@ -209,7 +213,6 @@ func _pose_extra(delta: float) -> void:
 	_pose_face(delta, speed)
 	_pose_tail(delta, speed, spin)
 	_spring_fur(delta)
-	_rotor(delta)
 	_swoosh(spin)
 
 
@@ -296,6 +299,21 @@ func _pose_face(delta: float, speed: float) -> void:
 		# (a flick now and then)
 		var flick := sin(_time * 23.0) * 0.25 if fmod(_time + i * 1.7, 6.3) < 0.18 else 0.0
 		_ears[i].basis = Basis(Vector3.BACK, -side * (_face[5] + flick)) * Basis(Vector3.RIGHT, _face[4])
+
+
+## Hanging from a ledge his legs swing under him: a slow idle pendulum, and swung out the way he shimmies, trailing
+## behind it and swinging back as he stops (the user: "he should swing his legs when hanging and shimmying").
+func _pose_hang_swing(delta: float) -> void:
+	_leg_swing_speed += (-_leg_swing * 30.0 - _leg_swing_speed * 2.6 - _shimmy * 9.0) * delta
+	_leg_swing += _leg_swing_speed * delta
+	var idle := sin(_time * 2.3) * 0.05
+	var w := smoothstep(0.3, 1.0, _hang)
+	for i in 2:
+		var side := 1.0 if i == 0 else -1.0
+		var foot := _feet[i].position
+		# (about the hip: sideways with the shimmy, back and forth a little, the trailing leg further)
+		var out := Vector3(clampf(_leg_swing * 0.22 + _shimmy * side * 0.04, -0.3, 0.3), absf(_leg_swing) * 0.08, idle + sin(_time * 3.1 + side) * 0.03 * absf(_shimmy))
+		_solve_leg(i, side, foot + out * w, _feet[i].basis)
 
 
 ## Climbing (Scurry): his all-fours pose turned up onto the surface ahead of him, belly to it, head up, paws
@@ -430,7 +448,7 @@ func _swoosh(spin: float) -> void:
 		puff.material = look
 		_swoosh_puffs.mesh = puff
 		add_child(_swoosh_puffs)
-	var sweeping := spin > SPIN_WIND and spin < SPIN_TURNED
+	var sweeping := (spin > SPIN_WIND and spin < SPIN_TURNED) or _glide > 0.5
 	_swoosh_puffs.emitting = sweeping
 	if _points.size() > TAIL_BONES:
 		_swoosh_puffs.global_position = _points[TAIL_BONES]
@@ -626,16 +644,22 @@ static func _cycle(at: float, duty: float, half: float, lift: float) -> Vector2:
 
 ## Twirling his tail over his head to come down slowly: arms out, legs hanging.
 func _pose_glide(w: float) -> void:
-	# Hanging from the rotor: straight down under it, swaying a little, arms loose and out, legs dangling
-	var sway := sin(_time * 4.2) * 0.06
-	_hips.basis = _slerp(_hips.basis, Basis(Vector3.RIGHT, 0.05 + sway) * Basis(Vector3.FORWARD, sin(_time * 3.1) * 0.05), w)
+	# Hanging by his rump under his whirling tail (the user: "his helicopter tail needs to spin from the base of his
+	# tail ... he should be pinned by his butt"): the whole of him turned about the root of his tail, so that his
+	# rump is the top of him and the rest hangs below it, swaying, arms and legs dangling.
+	var pivot := _hips.transform * _tail[0].position if not _tail.is_empty() else _hips.position
+	var sway := sin(_time * 4.2) * 0.08
+	var hang := Basis(Vector3.RIGHT, (1.15 + sway) * w) * Basis(Vector3.BACK, sin(_time * 3.1) * 0.08 * w)
+	_hips.transform = Transform3D(hang, pivot) * Transform3D(Basis.IDENTITY, -pivot) * _hips.transform
+	var hips_inverse := _hips.transform.affine_inverse()
 	for i in 2:
 		var side := 1.0 if i == 0 else -1.0
-		_solve_arm(i, side, to_global(Vector3(side * 0.34, 0.42 + sin(_time * 5.0 + side) * 0.03, 0.08)), _forearm, w)
-		var hips_inverse := _hips.transform.affine_inverse()
-		var foot := Vector3(side * 0.07, ANKLE - 0.08 + sin(_time * 4.2 + side * 1.3) * 0.04, 0.02 - sway * 0.3)
-		_solve_leg(i, side, hips_inverse * foot, _hips.basis.inverse() * Basis(Vector3.RIGHT, 0.5))
-	_head.basis = _slerp(_head.basis, Basis(Vector3.RIGHT, 0.12), w * 0.6)
+		var shoulder := to_local(_shoulders[i].global_position)
+		_solve_arm(i, side, to_global(shoulder + Vector3(side * 0.06, -0.34, 0.05 + sin(_time * 5.0 + side) * 0.05)), _forearm, w)
+		var hip := _hips.transform * Vector3(side * _hip_width, _hip_drop, 0.0)
+		var foot := hip + Vector3(side * 0.03, -0.36, sin(_time * 4.2 + side * 1.3) * 0.06)
+		_solve_leg(i, side, hips_inverse * foot, _hips.basis.inverse() * Basis(Vector3.RIGHT, 0.7))
+	_head.basis = _slerp(_head.basis, Basis(Vector3.RIGHT, -0.9), w)
 
 
 ## The tail's shape for now, in the hips' space, as a direction for each segment.
@@ -654,14 +678,12 @@ func _tail_shape(speed: float, spin: float) -> Array[Vector3]:
 		# The rotor he hangs from (the user: "spin faster, and he should be hanging from it"): up his back and over
 		# his head, leaning back clear of it, and the end of it whirling round flat above him, each segment a
 		# little behind the one before.
+		# The whole tail is the rotor, whirled round flat from its root (its blade a little swept back, the tip
+		# trailing), in his own level space whatever way his hips hang.
+		var level := _hips.basis.orthonormalized().inverse()
 		for k in TAIL_BONES:
-			var rotor: Vector3
-			if k < ROTOR_FROM:
-				rotor = Vector3(0.0, 1.0, -0.2 + 0.06 * k).normalized()
-			else:
-				var angle := _twirl - (k - ROTOR_FROM) * 0.3
-				rotor = Vector3(sin(angle), 0.06, cos(angle)).normalized()
-			dirs[k] = dirs[k].slerp(rotor, _glide)
+			var angle := _twirl - k * 0.12
+			dirs[k] = dirs[k].slerp((level * Vector3(sin(angle), 0.1, cos(angle))).normalized(), _glide)
 	if _tj_w > 0.001:
 		for k in TAIL_BONES:
 			dirs[k] = dirs[k].slerp(Vector3(0.0, 0.05, -1.0), _tj_w)

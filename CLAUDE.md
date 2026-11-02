@@ -64,3 +64,32 @@ Read README.md first. Started 2026-11-01.
   alley), HUD, smoke test passing (20 checks).
 - Not done: re-walking the alley's routes (chimney, billboard glide, porch crawl) headless; the animals' role; phone
   layout; sounds; a title; a web build; a GitHub repo; an arcade cart. The trampoline bed doesn't sag.
+
+## Later on 2026-11-01 (the user's calls, in their words where quoted)
+
+- Fur: "shouldnt all be the same length and not in perfect rings"; tail "a thicker and a little longer", "not as
+  different a shade"; "gritty gradients on his body" (baked into a vertex colour layer: build_raccoon.py
+  paint_grit; the fur shader multiplies by COLOR when its alpha is 1); "small fur on his head"; "more accurate
+  animal legs like Fantastic Mr Fox" (a raised hock behind the ankle, a long paw: HOCK); "fingers need to be
+  longer"; whiskers "longer and thinner", "not all the same length"; "his eyes need to be animated and he needs a
+  few expressions" (lids, brows, ears on bones of their own; RaccoonRig.FACES, express(), blinks).
+- Spin: "the tail should be the focus and it doesnt even spin at the rate he does", "it needs to become stiff when
+  spinning" (held straight out, stretched 1.35, a swoosh of puffs). Stick-twirl spin faster (spin_rate 28) and
+  "if you jump in this mode you should do a spin jump like in mario sunshine" (SpinJump).
+- Twirl: "spin from the base of his tail", no "circular sprite", "pinned by his butt" (the whole tail whirls flat
+  from its root; he hangs by his rump below it).
+- Run: "higher quality a little bouncier and more raccoonie" (lope: rump thrown high, humped back, waddle, hind feet
+  reaching to the fore paws). Dust "exactly on every step ... a few puffs" (RaccoonRig.stepped; CloudDust).
+- Controls: Scurry on the left trigger (and Shift; an on-screen paw button): all fours, climbs anything climbable
+  (poles: meshes named climb_; the grove's trees). "y remains duck" (duck on X and Y: X was the user's earlier
+  call; ask if X should change). Superhero landing "only from tall height" (landing_speeds 15/17/19/21).
+- Hanging from ledges: "swing his legs when hanging and shimmying" (_pose_hang_swing).
+- World: "a little grove on a hill in the center of town" with "birds and other predators to avoid, and people as
+  well and cars" (tools/build_town.py writes models/world1.glb; Hazards.place; markers road_/walk_/hawk_/crows_/
+  den_/tree_); "climbable trees with big branches to stand on" (GameCommon tree: TreeGen "Climbing oak"/"Climbing
+  maple", tree.body()); wires "identical to Warren" (GameCommon tightrope); pickups as food (apples, acorns, pizza,
+  rubbish); "a squad of raccoons that boid around you" (Squad); "clouds like daughter of the wind" (GameCommon
+  puff-clouds); "the world vibrates" (vertex snap off; POSITION must still be written: shaders/world.gdshader).
+- Built by forked agents this day: cats (build_cat.py, CatRig), fox/skunk/badger/rabbit (build_critters.py,
+  CritterRig: built, role not decided), hazards, food, squad, tightrope, trees, clouds. Their reports are in the
+  commit messages.

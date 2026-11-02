@@ -17,6 +17,7 @@ sprint_delay = 0.05
 slide_min_speed = 5.0
 sleep_after = 75.0
 spin_rate = 28.0
+landing_speeds = Vector4(15, 17, 19, 21)
 
 [node name="Rig" parent="." index="1"]
 script = ExtResource("2")
