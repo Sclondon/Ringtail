@@ -208,21 +208,12 @@ func _process(delta: float) -> void:
 		_clock.text = "%.1f   ·   %d left" % [maxf(world.race.left, 0.0), world.race.remaining()]
 
 
-## For testing (in the editor, with --dev, or ?dev on the web): the N64 filter on and
-## off, and a jump to each Bottlecap.
+## For testing (in the editor, with --dev, or ?dev on the web): a jump to each Bottlecap. (The pixel filter is the
+## pause screen's Pixels dial.)
 func _dev_panel(root: Control) -> void:
 	_dev = VBoxContainer.new()
 	_dev.position = Vector2(22, 150)
 	root.add_child(_dev)
-	var filter := CheckButton.new()
-	filter.text = "N64 filter"
-	filter.button_pressed = true
-	filter.focus_mode = Control.FOCUS_NONE
-	filter.toggled.connect(func(on: bool) -> void:
-		for node in world.get_children():
-			if node is N64Filter:
-				node.visible = on)
-	_dev.add_child(filter)
 	for name: String in World.CAP_NAMES:
 		var go := Button.new()
 		go.text = "Go: " + name

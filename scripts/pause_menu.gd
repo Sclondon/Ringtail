@@ -48,6 +48,25 @@ func _ready() -> void:
 	middle.add_child(row)
 	_big(row, Icon.Kind.PLAY, "Go on", close)
 	_big(row, Icon.Kind.COMB, "Fur & looks", _edit)
+	# The pixel filter's dial: off at the left, chunkiest at the right (the user, 2026-11-02, "it should be in the
+	# pause screen with a dial"; it was a switch on the testing panel)
+	var dial := HBoxContainer.new()
+	dial.alignment = BoxContainer.ALIGNMENT_CENTER
+	dial.add_theme_constant_override(&"separation", 18)
+	middle.add_child(dial)
+	var named := Label.new()
+	named.text = "Pixels"
+	named.add_theme_font_size_override(&"font_size", 24)
+	dial.add_child(named)
+	var slider := HSlider.new()
+	slider.min_value = 0.0
+	slider.max_value = 1.0
+	slider.step = 0.01
+	slider.value = N64Filter.strength
+	slider.custom_minimum_size = Vector2(320, 40)
+	slider.focus_mode = Control.FOCUS_NONE
+	slider.value_changed.connect(N64Filter.set_strength)
+	dial.add_child(slider)
 	_veil.visible = false
 
 
