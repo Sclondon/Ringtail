@@ -543,64 +543,6 @@ Read README.md first. Started 2026-11-01.
 - The trampoline and the ring's race are gone; the ring bath house keeps a chimney (`climb_chimney_ring`, no cap).
 - tests/cap_routes.gd walks the chimney, the glide and the log.
 
-## The one-hand handstand on points (2026-11-02)
-
-- The user: "you need to be able to handstand on one hand on the top of pointy things like trees and telephone poles".
-- PointPerches.find (from World._grow_lawn, once the physics has the world) collects the points: the tops of the
-  climb_ meshes named for poles or a chimney (each top's middle, from the mesh's highest ring of points) and every tree
-  body's tip (over its trunk, at the top of its drawn bounds).
-- PointStand (a child of the Player, priority -5): coming down within 0.6 m of a point, from above it, he catches it;
-  scurrying up a pole to within 1.8 m of its top (under the crossarm) he springs up onto it. On it the Player takes no
-  input of its own (`takes_input` off): the stick turns him, jump throws him up (`lift` 1.3), duck or scurry drops him
-  off. Hazards.unseen counts him out of reach there (PointStand.perched).
-- The pose (RaccoonRig._pose_handstand): turned over end to end, his left shoulder over the paw on the tip. That arm is
-  drawn out 1.6x along itself (HS_ARM), cartoon-fashion: his arms are short (0.26 m), and at their own length his head
-  came down onto the tip. The other arm is out, the legs together pointing up, a wobble, and the tail curled over.
-- Checks: tests/point_stand_test.gd (drop onto a pole top, out of reach, the pose, jump off, scurry up a pole to the
-  top), tests/handstand_shots.gd (four sides and above).
-- Not checked in play: a tree tip (in its leaves), the chimney, turning on the point with the stick.
-
-## Playing as the crow or the owl (2026-11-02)
-
-- The user: "and add a mode where you can be the crow or owl". The pause screen's "Play as" row (raccoon, crow, owl
-  faces) swaps who is played (`BirdPlayer.play_as(world, &"crow" | &"owl" | &"raccoon")`).
-- `scripts/bird_player.gd` (BirdPlayer): the bird as a controller of its own, on the BIRDS fork's model and BirdBody
-  poser, with `scripts/bird_camera.gd` (BirdCamera) following it. The raccoon is put away meanwhile (hidden, still, no
-  collision, his FollowCamera off) and comes back on the ground under the bird (Claude's pick: under the bird, not
-  where he was). Hops on the ground; jump takes off and each press in the air flaps (held: glides); the stick steers
-  (banking); duck dives (the owl swoops faster); scurry settles on the nearest wire or pole/tree top (PointPerches)
-  within 5 m; tail pecks (knocks what his tail knocks, never a cage: cages are his). Lands on anything it comes down on.
-- Claude's picks: both birds take Crumbs (they count as his; not Bottlecaps); the hunters leave a bird be and nothing
-  hurts the put-away raccoon (World.hurt, Hazards.unseen); the crow agile with quick flaps, the owl slow deep flaps,
-  long glides, a faster swoop, its head following the camera; a ceiling 40 m over where it took over.
-- The HUD's Scurry and Tail buttons show Perch and Peck while a bird is played (same buttons, same keys).
-- Unchecked: the HUD's zone/counts still follow the put-away raccoon's place, not the bird's; touch flying on a phone.
-- Tests: `tests/bird_mode_test.gd` (flap up, glide, settle on a wire, land on a roof, take a Crumb, owl, back),
-  `tests/bird_mode_shots.gd -- --out=<dir>`.
-
-## The grove's animals (2026-11-02)
-
-- The user: "there should be the other animals in the grove too for me to see - skunk and beavers and rats and mice
-  and rabbits and weasels and martens and otters", "gophers, prairie dogs", then "opossums" and "squirrels",
-  "porcupine", "chipmunk" (with what each does: the opossum hangs by its tail or plays dead startled; the squirrel
-  climbs the trees and sits nibbling; the porcupine waddles, raises its quills when he comes too close and climbs
-  slowly; the chipmunk darts about the food pile and up the trees).
-- Models: `tools/build_grove_animals.py` (Blender, on build_critters.py's pipeline; `-- <dir|-> <animal>`, or
-  `burrow` for models/burrow.glb) writes models/<animal>.glb and _lo for beaver, rat, mouse, weasel, marten, otter,
-  gopher, prairie_dog, opossum, squirrel, porcupine, chipmunk (.blends in tools/). The critter builders now paint the
-  raccoon's grit (racc.paint_grit) after export: without it the kit's Paint colours made every body draw black.
-  Porcupine quills ride a `quills` bone the rig grows (CritterRig.bristle). Sizes: Critter.SIZES.
-- `GroveAnimals.place(world, markers, player)` (scripts/grove_animals.gd, from World._grow_lawn): 28 animals round
-  the clearing (beyond 7 m of grove_heart): otters and the beaver swim in the pond and come out on its bank; prairie
-  dogs and gophers by four burrow mounds, the prairie dogs sitting up as sentries; mice, rats and chipmunks nibbling
-  round the FoodPile; skunks, rabbits, weasel, opossum on the rim; squirrels, chipmunks, the marten and the porcupine
-  go up a nearby trunk, sit, and come down. Near him (3.5 m) they turn to look, within 1.6 m back off; prairie dogs
-  and gophers sit up and stare; the porcupine turns its back, quills up; the opossum may flop (ragdoll) and lie still
-  till he goes. Past 38 m they stand still, their rigs off. Counts, places and every look are Claude's picks.
-  Not done: the opossum hanging by its tail, a chirp sound for the prairie dog.
-- Checks: `tests/grove_animal_shots.gd -- --out=<dir> [lineup] [grove]` (every kind beside him front and side; the
-  grove from above and close by; prints counts, what each is doing, and any that fell through).
-
 ## Fishing in the grove pond (2026-11-02)
 
 - The user: "there should be a pond in the grove and a fishing minigame (we have assets for that)". The assets were
@@ -944,3 +886,40 @@ Read README.md first. Started 2026-11-01.
   - street_light_test: headless, the dummy renderer keeps no MultiMesh transforms, so the pools-on-the-ground check
     runs only in a window (it passes there, 0.04 m), and it looks for the ground from under each lens (from over it
     the ray met the lamp's own head).
+
+## Mushrooms (2026-11-02)
+
+- The user: "we also need a mushroom generator". GameCommon's `godot/mushrooms` (installed under `creatures/mushrooms/`)
+  now has `MushroomGen` (presets + seed + settings, after TreeGen; see its README). `GroveMushrooms`
+  (scripts/grove_mushrooms.gd, from World._grow_lawn) scatters clusters on grass only (TownGrass.mask): the wood ring,
+  round tree roots in the grove, the grass ridges between the faces, the Shrine face's cedars (where, which kinds and
+  SIZE 2.2x real are Claude's picks). Patches of 16 m, each drawn within 40 m and shown only while he is in its zone
+  or one next to it; the foxfire bonnets glow by DayNight's `night`.
+- Checks: `tests/mushroom_shots.gd -- --out=<dir>` (every preset, three seeds, close from four sides, triangle counts),
+  `tests/mushroom_world.gd` (headless: count, zones, far patches hidden; `-- --out=<dir>` in a window shoots them in the grove).
+
+## 2026-11-02: the main session's later round (the user's calls, in their words)
+
+- "there should be dumpsters to jump into and trash cans to knock over" / "by scurrying or tail swipe": Dumpster
+  (scripts/dumpster.gd, tools/build_dumpster.py -> models/dumpster.glb) at `dumpster_<n>` markers, one lid shut to
+  stand on, one flung down the back, four Crumbs on its floor; TrashCan tips when he scurries into it (its shut lid
+  had pinned it: collision exception). tests/dumpster_test.gd.
+- "instead of just poofing, the food you collect should spin over your head for a second and sparkle and then fly
+  into you and poof": Pickup.take(by) (SHOW_OFF 0.9 s over the taker, DIVE 0.22 s in, then the burst).
+- "the totoro raccoon fur freaks out": RaccoonRig._spring_fur measures motion in the figure's own size.
+- "we should be slightly smaller I think": his Rig at 0.9 (raccoon.tscn). The wire test hangs its own wire.
+- "all animals that can should walk around on 2 feet sometimes too if people aren't around": CatRig._choose_upright
+  (every critter and cat; not frogs or turtles; only walking; no `people` within 25 m).
+- The great oak: "a bigger trunk and the branches shouldn't start until higher up, and it should reach much wider",
+  "the giant tree not big enough", "there's still low branches", "its upper layer should be wide enough to cover like
+  half the clearing", "the giant tree should have leaf platforms in its branches": TreeGen "Great oak" (trunk ~6 m
+  across, bare for 7 m, limbs to 18 m) with `leaf_pads` (flat cushions of the tree's own leaves, solid; pad_tops()).
+  "the firs don't fit in with the other trees at all": TreeGen "Giant fir" at `giantfir_<n>_<seed>` markers, needle
+  pads (_pad_needles). World adds every pad top as an `npc_perch_<n>` for the villagers. Both presets are in GameCommon's
+  tree too. tests/oak_pads_test.gd, tests/giant_fir_shots.gd.
+- "holding down on the dpad should be a piss button", "he should pee like a dude at a urinal and you should be able to
+  aim it", "it shouldn't have an onscreen button" (the user's word over the every-control-on-screen rule, for this
+  one), "aiming shouldn't move the puddle", "it needs a tiny splashy particle" / "when it hits the ground": Pee
+  (scripts/pee.gd, a child of the Player: D-pad down or V; the stick aims, he stays put; puddles stay where they form,
+  at most 40, soaking away in 25 s; a splash where it lands); RaccoonRig.peeing / pee_aim / _pose_pee.
+  tests/pee_test.gd.
