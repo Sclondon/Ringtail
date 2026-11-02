@@ -188,7 +188,8 @@ def coat(breed):
             b.ellipsoid(paw + V(0.0, -0.006, length * 0.5), V(width, 0.026, length), None, 10, 6)
             for toe in (() if low else (-1.5, -0.5, 0.5, 1.5)):
                 b.ellipsoid(paw + V(toe * width * 0.42, -0.012, length * 1.2 - abs(toe) * length * 0.16), V(width * 0.28, 0.018, 0.022), None, 8, 5)
-        return dogs.furred(breed, b, (0.0038, 4, 13000))
+        # (a Twilight Princess budget, the user, 2026-11-02: "decently low poly twilight princess esque level of detail")
+        return dogs.furred(breed, b, (0.0038, 4, 2800))
     return shapes
 
 

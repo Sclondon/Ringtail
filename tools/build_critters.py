@@ -150,6 +150,9 @@ def skull_band(region):
     weld = objects[1].modifiers.new("weld", "REMESH")
     weld.mode = "VOXEL"
     weld.voxel_size = 0.006
+    # (thinned: the inside of the band is hidden in the head, only its edge shows; a Twilight Princess budget)
+    thin = objects[1].modifiers.new("thin", "DECIMATE")
+    thin.ratio = 0.08
     bpy.context.view_layer.update()
     solid = bpy.data.meshes.new_from_object(objects[1].evaluated_get(bpy.context.evaluated_depsgraph_get()))
     objects[1].modifiers.clear()
@@ -559,7 +562,11 @@ def rabbit():
 ANIMALS = {"fox": fox, "skunk": skunk, "badger": badger, "rabbit": rabbit}
 
 if __name__ == "__main__":
+    # (a Twilight Princess budget: tools/lowpoly.py)
+    import lowpoly
+    lowpoly.sides(ANIMAL)
     materials, parts = ANIMALS[ANIMAL]()
+    parts = lowpoly.thrifty(parts, ANIMAL)
     racc.reshaping()
     kit.export(ANIMAL, reshaped_bones(), parts, reshaped_weights, materials)
     racc.paint_grit(ANIMAL)

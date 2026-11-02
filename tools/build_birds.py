@@ -59,6 +59,14 @@ COLOURS = {
     "eyewhite": (0.95, 0.95, 0.92),
 }
 
+# (a Twilight Princess budget, the user, 2026-11-02: "decently low poly twilight princess esque level of detail":
+# every round part with this share of its sides and rings, a feather in four steps)
+THRIFT = 0.6
+
+
+def fewer(count, least):
+    return max(least, round(count * THRIFT))
+
 
 def to_blender(p):
     return Vector((p[0], -p[2], p[1]))
@@ -111,7 +119,7 @@ class Part:
 
     def blob(self, centre, radii, mat, segments=14, rings=9, tilt=0.0):
         """An ellipsoid, pitched by `tilt`."""
-        made = bmesh.ops.create_uvsphere(self.bm, u_segments=segments, v_segments=rings, radius=1.0)
+        made = bmesh.ops.create_uvsphere(self.bm, u_segments=fewer(segments, 8), v_segments=fewer(rings, 5), radius=1.0)
         index = self._index(mat)
         for v in made["verts"]:
             p = Vector((v.co.x * radii[0], v.co.z * radii[1], -v.co.y * radii[2]))
@@ -121,6 +129,7 @@ class Part:
 
     def cap(self, centre, radius, pole, reach, mat, segments=12, rings=5):
         """A cap of a sphere about `pole`, from the pole out to `reach` (radians) from it: an eyelid."""
+        segments, rings = fewer(segments, 8), fewer(rings, 3)
         index = self._index(mat)
         pole = Vector(pole).normalized()
         u = pole.cross(Vector((1, 0, 0)) if abs(pole.x) < 0.9 else Vector((0, 0, 1))).normalized()
@@ -140,6 +149,7 @@ class Part:
 
     def tube(self, points, radii, mat, segments=8, squash=(1.0, 1.0)):
         """Rings along `points`; `squash` scales each ring across (level) and up and down."""
+        segments = fewer(segments, 4) if segments > 4 else segments
         index = self._index(mat)
         rings = []
         for i, point in enumerate(points):
@@ -197,8 +207,8 @@ class Part:
         d = tip - root
         side = d.cross(Vector(up)).normalized()
         normal = side.cross(d).normalized()
-        steps = [0.0, 0.18, 0.42, 0.66, 0.84, 0.95] if not rounded else [0.0, 0.2, 0.45, 0.7, 0.88, 0.97]
-        profile = [0.45, 0.85, 1.0, 0.95, 0.72, 0.38] if not rounded else [0.5, 0.9, 1.0, 1.0, 0.85, 0.55]
+        steps = [0.0, 0.3, 0.66, 0.92] if not rounded else [0.0, 0.3, 0.7, 0.95]
+        profile = [0.5, 1.0, 0.85, 0.45] if not rounded else [0.55, 1.0, 1.0, 0.65]
         spine = [root + d * t + normal * (-sag * math.sin(math.pi * t)) for t in steps]
         left = [self._v(p + side * width * 0.5 * f) for p, f in zip(spine, profile)]
         right = [self._v(p - side * width * 0.5 * f) for p, f in zip(spine, profile)]

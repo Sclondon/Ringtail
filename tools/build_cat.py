@@ -352,6 +352,10 @@ CAT_FURS = ["spiky", "sleek", "shaggy", "soft"]
 if __name__ == "__main__":
     racc.reshaping()
     racc.reshape = cat_reshape
+    # (a Twilight Princess budget: tools/lowpoly.py)
+    import lowpoly
+    lowpoly.sides("cat")
+    PARTS = lowpoly.thrifty(PARTS, "cat")
     racc.as_drawn = cat_as_drawn
     kind = racc.fur_arg()
     folder = kit.PREVIEW_DIR

@@ -665,3 +665,17 @@ Read README.md first. Started 2026-11-01.
   for every Piece (build_world1.py) would darken the whole town: not done, the user's call.
 - `tests/zone_shots.gd -- --out=<dir>` (start, the jetty, the clearing, a street with the filter and without, the
   ring road, the views from the grove and a street; it shuts the pause screen first: a pad elsewhere can press Start).
+
+## Low-poly animals (2026-11-02)
+
+- The user: "we need to make sure all the animals are decently low poly twilight princess esque level of detail", "to
+  improve performance". Every animal but the raccoon (he and the villagers keep his full build) is built to a budget:
+  `tools/lowpoly.py` TRIANGLES gives each critter, grove animal and the cat a budget for its fused (remeshed) parts,
+  shared out by each part's old share, and a fraction of every tube's sides (thin strands down to three). The birds
+  have THRIFT in build_birds.py (fewer sides and rings, feathers in four steps), the dogs a coat of 2800 in
+  build_yard_dog.py, the porcupine's quills are three-sided cones, the badger's face bands are thinned. Smooth shaded
+  (the `_lo` builds stay flat-shaded demakes); the grove now uses the full models (they cost no more than `_lo`).
+- Triangles, before -> after: cats ~24.5k -> 6-6.5k, fox/skunk/badger 23-29k -> 5.7-5.9k, rabbit 21k -> 4k, grove
+  animals 18-30k -> 2-5.4k (mouse 2.1k, porcupine 5.4k), dogs 15k -> 4.9k, crow 6.6k -> 4.2k, owl 8.7k -> 5.2k. What is
+  left on most is the fur (ruffs ~1.4k, whiskers). `LOWPOLY=off` in the environment builds the old full ones.
+  `tests/tri_count.gd` prints every animal's count (and its `_lo`).

@@ -184,7 +184,8 @@ func _add_snake(world: Node3D, at: Vector3) -> void:
 
 func _add(world: Node3D, life: Array, home: Vector3) -> void:
 	var kind: String = life[0]
-	var beast := Critter.make(kind, true)
+	# (the full model: built to a Twilight Princess budget now, smooth, no dearer than the demade one: tools/lowpoly.py)
+	var beast := Critter.make(kind)
 	beast.name = "%s%d" % [kind.capitalize().replace(" ", ""), beasts.size()]
 	beast.position = home + Vector3.UP * 0.3
 	beast.rotation.y = _rng.randf() * TAU

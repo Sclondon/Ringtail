@@ -45,6 +45,12 @@ def along(table, y):
     return table[-1][1]
 
 
+def _across(way, radius):
+    """Two directions across `way`, `radius` long: a tube ring's (u, v)."""
+    u = way.cross(Vector((0.0, 0.0, 1.0)) if abs(way.z) < 0.9 else Vector((1.0, 0.0, 0.0))).normalized()
+    return u * radius, way.cross(u).normalized() * radius
+
+
 # What each animal is (Claude's picks after photos): proportions; colours; its muzzle, ears, cheeks, teeth, tail.
 SPECIES = {
     "beaver": dict(leg=0.6, arm=0.65, head=1.12, wide=1.35, long=1.12,
@@ -225,7 +231,8 @@ def build(name):
             out = Vector((math.cos(a) / max(w, 0.01), 0.0, -math.sin(a) / max(d, 0.01))).normalized()
             way = (out * 0.75 - Y * 0.65).normalized()
             length = rng.uniform(0.14, 0.24)
-            b.strand([root, root + way * length * 0.5, root + way * length], [0.009, 0.006, 0.0015], 5)
+            # (a three-sided cone, not a rounded strand: a Twilight Princess budget)
+            b.tube([(root, *_across(way, 0.009)), (root + way * length * 0.5, *_across(way, 0.006)), (root + way * length, *_across(way, 0.0008))], 3)
 
     def pupils(b):
         # (as the raccoon's, grown with its eyes; a frog's wide across)
@@ -408,7 +415,11 @@ if __name__ == "__main__":
     if ANIMAL == "burrow":
         burrow()
         sys.exit(0)
+    # (a Twilight Princess budget: tools/lowpoly.py)
+    import lowpoly
+    lowpoly.sides(ANIMAL)
     materials, parts = build(ANIMAL)
+    parts = lowpoly.thrifty(parts, ANIMAL)
     racc.reshaping()
     kit.export(ANIMAL, cr.reshaped_bones(), parts, cr.reshaped_weights, materials)
     racc.paint_grit(ANIMAL)
