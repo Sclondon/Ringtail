@@ -481,21 +481,21 @@ def ruffs(_b):
         # Arms: along X from the shoulder (as drawn)
         # (laid back along him, not standing straight out, and more of them: the user, "the fur shouldnt stick so
         # straight out and there should be more of it")
-        for d, r, flare in ((0.03, 0.054, 1.3), (0.08, 0.05, 1.3), (0.13, 0.047, 1.27), (UPPER_ARM, 0.043, 1.22)):
+        for d, r, flare in ((0.06, 0.052, 1.3), (0.13, 0.047, 1.27), (UPPER_ARM, 0.043, 1.22)):
             ruff(Vector((side * (SHOULDER.x + d), SHOULDER.y, 0.0)), out, r, flare,
                  REGION[("upper_arm" if d < UPPER_ARM else "forearm") + suffix])
         # Legs: down from the hip
-        for y, r, flare in ((HIP_Y - 0.01, 0.088, 1.27), (HIP_Y - 0.06, 0.082, 1.27), (0.35, 0.074, 1.25), (0.30, 0.066, 1.24), (KNEE_Y, 0.056, 1.2)):
+        for y, r, flare in ((HIP_Y - 0.03, 0.086, 1.27), (0.33, 0.072, 1.25), (KNEE_Y, 0.056, 1.2)):
             ruff(Vector((side * HIP_X, y, 0.0)), -Y, r, flare, REGION[("thigh" if y > KNEE_Y else "shin") + suffix])
         # Loose tufts between the ruffs of his upper arms and thighs
-        for k in range(20):
+        for k in range(10):
             d = rng.uniform(0.02, UPPER_ARM - 0.02)
             a = rng.uniform(0.0, math.tau)
             normal = Vector((0.0, math.cos(a), math.sin(a)))
             root = Vector((side * (SHOULDER.x + d), SHOULDER.y, 0.0)) + normal * 0.045
             tuft(made, tags, root, (normal * 0.45 + out).normalized(), rng.uniform(0.02, 0.045), 0.024,
                  REGION["upper_arm" + suffix], rng)
-        for k in range(22):
+        for k in range(11):
             y = rng.uniform(KNEE_Y + 0.02, HIP_Y - 0.02)
             a = rng.uniform(0.0, math.tau)
             normal = Vector((math.cos(a), 0.0, math.sin(a)))
@@ -503,13 +503,13 @@ def ruffs(_b):
             tuft(made, tags, root, (normal * 0.45 - Y).normalized(), rng.uniform(0.02, 0.05), 0.026,
                  REGION["thigh" + suffix], rng)
     # Shaggy layers round his body, widest at the belly
-    for y, depth, wide, flare in ((0.46, 0.14, 1.15, 1.24), (0.53, 0.155, 1.15, 1.22), (0.6, 0.162, 1.16, 1.21), (0.67, 0.156, 1.17, 1.2),
+    for y, depth, wide, flare in ((0.47, 0.142, 1.15, 1.24), (0.6, 0.162, 1.16, 1.21),
                                    (0.74, 0.132, 1.2, 1.2)):
         ruff(Vector((0.0, y, 0.006)), -Y, depth, flare, REGION["chest" if y > 0.7 else "hips"], 0.11, wide)
     # ...and loose tufts all over it between them, of every length
     profile = [(0.44, 0.145, 0.125, -0.01), (0.50, 0.178, 0.152, 0.0), (0.58, 0.188, 0.162, 0.012),
                (0.66, 0.178, 0.152, 0.012), (0.73, 0.158, 0.132, 0.004), (0.79, 0.142, 0.112, 0.0)]
-    for k in range(170):
+    for k in range(80):
         y = rng.uniform(0.45, 0.79)
         rx, rz, zo = profile[0][1], profile[0][2], profile[0][3]
         for (y0, rx0, rz0, z0), (y1, rx1, rz1, z1) in zip(profile, profile[1:]):
@@ -550,25 +550,26 @@ def tuft(made, tags, root, direction, length, width, region, rng):
 
 
 def head_fur(_b):
-    """Short fur over his head (the user: "his head should also small fur on it"): little tufts over the crown, the
-    back of the head and the sides, none on his face. A finished mesh in Blender's axes."""
+    """Fur on his head as a mane: a ring of tufts all round his face, just behind it (the user, 2026-11-02: "the head
+    fur should be like a mane ring around his head", after "you cant really see the fur on his head"). Three rows,
+    pointing out from the face and swept back; shorter under the jaw. A finished mesh in Blender's axes (Y up, the
+    face towards +Z)."""
     made = bmesh.new()
     tags = {}
     rng = random.Random(5)
-    placed = 0
-    while placed < 150:
-        # (a point on the skull, as drawn: not on the face in front of the ears, nor under the jaw)
-        a = rng.uniform(0.0, math.tau)
-        b = rng.uniform(-0.35, 1.25)
-        n = Vector((math.cos(b) * math.cos(a), math.sin(b), math.cos(b) * math.sin(a)))
-        if n.z > 0.35 and n.y < 0.75:
-            continue
-        root = HEAD_CENTRE + Vector((n.x * HEAD_RADII.x, n.y * HEAD_RADII.y, n.z * HEAD_RADII.z)) * 0.97
-        out = Vector((n.x / HEAD_RADII.x, n.y / HEAD_RADII.y, n.z / HEAD_RADII.z)).normalized()
-        # (laid back over the head, as fur is, but standing up off it enough to be seen: the user, 2026-11-02,
-        # "you cant really see the fur on his head")
-        tuft(made, tags, root, (out * 0.9 - Z * 0.75 - Y * 0.15).normalized(), rng.uniform(0.03, 0.055), 0.026, REGION["head"], rng)
-        placed += 1
+    for row, (depth, reach) in enumerate([(0.0, 1.0), (-0.16, 0.85)]):
+        count = 26 - row * 4
+        for k in range(count):
+            t = math.tau * (k + rng.uniform(-0.3, 0.3) + row * 0.5) / count
+            z = depth + rng.uniform(-0.04, 0.04)
+            r = math.sqrt(1.0 - z * z)
+            n = Vector((math.cos(t) * r, math.sin(t) * r, z))
+            root = HEAD_CENTRE + Vector((n.x * HEAD_RADII.x, n.y * HEAD_RADII.y, n.z * HEAD_RADII.z)) * 0.97
+            radial = Vector((math.cos(t), math.sin(t), 0.0))
+            # (under the jaw it is short, so it doesn't stick into his chest)
+            under = max(0.0, -math.sin(t))
+            length = rng.uniform(0.065, 0.105) * reach * (1.0 - 0.55 * under)
+            tuft(made, tags, root, (radial - Z * 0.45).normalized(), length, 0.034, REGION["head"], rng)
     bmesh.ops.recalc_face_normals(made, faces=made.faces[:])
     tag_spikes(made, tags)
     mesh = bpy.data.meshes.new("head_fur")
