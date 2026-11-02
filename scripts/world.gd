@@ -514,6 +514,8 @@ func _grow_lawn() -> void:
 	GroveAnimals.place(self, markers, player)
 	GroveMushrooms.place(self, markers, lawn)
 	GrovePlants.place(self, markers, lawn)
+	# (the spring pool, its waterfall and the pond's look: GroveWater)
+	GroveWater.place(self, markers)
 	# (the points to stand on one hand on: pole tops, tree tips: PointStand)
 	PointPerches.find(self)
 	# One wind over the hill: Wind Waker ribbons riding it round him, the grass gusting in step (GameCommon wind; the

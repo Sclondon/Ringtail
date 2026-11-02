@@ -34,6 +34,9 @@ extends Node3D
 ## What it mirrors when looked across, and how strongly.
 @export var sky := Color(0.72, 0.82, 0.9): set = _set_sky
 @export_range(0.0, 1.0) var mirror := 0.5: set = _set_mirror
+## How much it shows its own colours whatever the light (0 lit like anything else, 1 as if it gave light: for
+## a painted scene that lights things by hand). Its glints still come from the lights.
+@export_range(0.0, 1.0) var self_lit := 0.0: set = _set_self_lit
 ## Cut its light into flat tones, as a cel-shaded world is.
 @export var banded := false: set = _set_banded
 
@@ -199,6 +202,7 @@ render_mode blend_mix, depth_draw_never, cull_disabled, world_vertex_coords;
 //COMMON
 uniform vec3 sky : source_color = vec3(0.72, 0.82, 0.9);
 uniform float mirror = 0.5;
+uniform float self_lit = 0.0;
 uniform vec2 flow = vec2(0.0);
 uniform float lines = 0.5;
 uniform float line_size = 1.3;
@@ -323,6 +327,7 @@ void fragment() {
 		colour = mix(colour, mix(colour, foam, 0.4), line * lines * (1.0 - white));
 		colour = mix(colour, foam, white);
 		ALBEDO = colour;
+		EMISSION = colour * self_lit;
 		ALPHA = mix(alpha, 0.96, white);
 		ROUGHNESS = 1.0;
 		SPECULAR = 0.0;
@@ -832,7 +837,7 @@ func _material(code: String) -> ShaderMaterial:
 	var material := ShaderMaterial.new()
 	material.shader = _shader(code, use_depth)
 	_materials.append(material)
-	for setting: StringName in [&"shallow", &"deep", &"foam", &"depth_range", &"alpha_shallow", &"alpha_deep", &"sky", &"mirror", &"swell_height", &"swell_length", &"swell_speed", &"lines", &"line_size", &"glint", &"glint_size", &"foam_width", &"foam_ragged", &"foam_drift", &"caustics", &"caustic_size", &"murk", &"murk_tint"]:
+	for setting: StringName in [&"shallow", &"deep", &"foam", &"depth_range", &"alpha_shallow", &"alpha_deep", &"sky", &"mirror", &"self_lit", &"swell_height", &"swell_length", &"swell_speed", &"lines", &"line_size", &"glint", &"glint_size", &"foam_width", &"foam_ragged", &"foam_drift", &"caustics", &"caustic_size", &"murk", &"murk_tint"]:
 		material.set_shader_parameter(setting, get(setting))
 	material.set_shader_parameter(&"banded", 1.0 if banded else 0.0)
 	material.set_shader_parameter(&"level_edges", 1.0 if level_edges else 0.0)
@@ -938,6 +943,11 @@ func _set_alpha_deep(value: float) -> void:
 func _set_mirror(value: float) -> void:
 	mirror = value
 	_pass(&"mirror", value)
+
+
+func _set_self_lit(value: float) -> void:
+	self_lit = value
+	_pass(&"self_lit", value)
 
 func _set_banded(value: bool) -> void:
 	banded = value

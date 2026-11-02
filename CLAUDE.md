@@ -852,3 +852,19 @@ Read README.md first. Started 2026-11-01.
 - Checks: `tests/plant_shots.gd -- --out=<dir>` (every preset, three seeds, close from four sides, triangle counts),
   `tests/plants_world.gd` (headless: counts, every zone, none off the grass, hidden in a thicket; `-- --out=<dir>` in a
   window shoots the grove's woods, a lawn, a bramble, a road).
+
+## The grove's spring and waterfall (2026-11-02)
+
+- The user: "the pond needs to be much bigger, same with clearing, and the spring and waterfall need a ton of work, not
+  just flat texture, it needs to be a small bubbling pond with a real waterfall". (The bigger pond and clearing are the
+  town's: build_town.py.)
+- `GroveWater` (scripts/grove_water.gd, from World._grow_lawn) draws the water; the town only shapes the rock. A small
+  spring pool (GameCommon `Water`) at `spring_pool` (scale x its radius, y its depth) with a `WaterSpring` on its
+  bottom (a boil of white water, a ring every moment, bubbles rising and popping, froth drifting); a `Waterfall` from
+  `waterfall_top` to `waterfall_bottom` (a curved streaky sheet running from the pool's edge over the lip, white water,
+  spray, mist and a churning `FoamPatch` at its foot, rings and small splashes on the pond); the pond's Water given a
+  livelier look (green-blue shallows to deep fir-green, more lines and glints, a wider ragged foam rim). Without the
+  falls markers it steps out from the pool towards the pond till the rock falls away. The town's old flat
+  `nocol_spring_water` is hidden. Waterfall, WaterSpring and FoamPatch are new in GameCommon's `godot/water`.
+- Colours and sizes are Claude's picks. Check: `tests/water_shots.gd -- --out=<dir>` (window: the spawn, the falls from
+  the side and the front, the spring pool from above, the foot, the falls at night).
