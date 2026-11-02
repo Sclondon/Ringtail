@@ -299,7 +299,7 @@ Read README.md first. Started 2026-11-01.
   their backs being in the hill), brackets every metre, a swan neck to the gutter, a shoe over a grate. He climbs an
   unseen column round each (`climb_pipes_<building>_hidden`: World hides meshes named `_hidden` but keeps them solid
   and climbable) that leans out past the eaves at the top: a straight one left him stuck under the eaves.
-  tests/pipe_climb.gd climbs six buildings' pipes from three angles each (all 18 pass).
+  (Its test, pipe_climb.gd, went with those hand-made downpipes: tests/building_routes.gd covers the generated ones.)
 - "the spawning area is too small and cramped full of shit" / "the grove should be surrounded by a ring of trees" /
   "not all trees need a bunch of climbable branches": the plateau is 13 m across the radius, its middle open lawn
   (grove_heart at the middle, the spawn 3 m south facing down the hill: World turns him by the spawn marker and the
@@ -541,7 +541,7 @@ Read README.md first. Started 2026-11-01.
   station's platform, by the flats, a shop's roof up its pipe, the torii's top beam up its post), out by the third
   hairpin. tests/kit_spots.gd checks each sits on a surface with room over it, out of the clearing.
 - The trampoline and the ring's race are gone; the ring bath house keeps a chimney (`climb_chimney_ring`, no cap).
-- tests/cap_routes.gd walks the chimney, the glide and the log; tests/pipe_climb.gd names the new buildings.
+- tests/cap_routes.gd walks the chimney, the glide and the log.
 
 ## The one-hand handstand on points (2026-11-02)
 
@@ -926,5 +926,21 @@ Read README.md first. Started 2026-11-01.
 - Tests: kit_spots (40), cap_routes (the factory's stack cap; the glide from flats_10 to the billboard at HILL_EDGE +
   6 m on the Construction face; the log), plain_tree (a fir clear of the giant firs, a maple), zones_test, smoke (ring
   spots 63.6 m, the `smoke_pole` marker, the shortest wire, the goner kept running), vehicle_test, `zone_shots.gd --
-  --out=<dir>`. tests/pipe_climb.gd tests the old hand-made downpipes, which are gone; tests/building_routes.gd covers
-  the generated buildings.
+  --out=<dir>`. pipe_climb.gd is gone with the hand-made downpipes; tests/building_routes.gd covers the generated
+  buildings.
+- Fixes after the checkpoint (2026-11-02):
+  - "why is there a floating ring of trees in the distance" (the user): the far ridges (`nocol_ridges_<n>`, material
+    sky_paint) were culled, their sheets facing away from the town once exported (the build recalculates normals, so
+    rewinding them does nothing), and only their painted trees showed. World draws every `sky_` material two-sided;
+    the ridges' feet are also raised (30 to 66 m) to stand clear over the far land's rim (about 18 m).
+  - The grove's rings looked bare north and south from above only because ZoneStreaming stops drawing trees past
+    125 m (FAR_TREES) from the camera: the rings go all the way round (gaps: the path and view, the oak's room).
+    zone_shots.gd draws everything at any distance for its views from above, and adds `grove_top_down`.
+  - The grove's trees about 570k triangles (measured in game; were about 650k, the build's estimate 800k): the outer
+    rows fewer and bigger (spacing 6.0, 6.4, 6.8 m, sizes 1.2x), cedars over alders (a plain alder is about 8k
+    triangles, a cedar 1.3k), 8 young firs. The build's cost table is now the measured one.
+  - The vista shots stand on the ground at each face's foot; the far tower cranes' jibs are thin bars (turned
+    upright boxes, they came out as flat plates), with a hook line.
+  - street_light_test: headless, the dummy renderer keeps no MultiMesh transforms, so the pools-on-the-ground check
+    runs only in a window (it passes there, 0.04 m), and it looks for the ground from under each lens (from over it
+    the ray met the lamp's own head).

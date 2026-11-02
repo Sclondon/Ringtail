@@ -54,6 +54,20 @@ func _put(at: Vector3, look: Vector3) -> void:
 	await _frames(40)
 
 
+## The ground under `at` (the highest solid thing), or `at` itself over nothing.
+func _ground(at: Vector3) -> Vector3:
+	var space := world.get_world_3d().direct_space_state
+	var hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(Vector3(at.x, 300.0, at.z), Vector3(at.x, -300.0, at.z), 1, [world.player.get_rid()]))
+	return hit.position if not hit.is_empty() else at
+
+
+## Everything drawn at any distance (ZoneStreaming sets far trees to stop drawing: a view from high up would lose
+## the far side of the grove to that, not to the build).
+func _no_far() -> void:
+	for node in world.find_children("*", "GeometryInstance3D", true, false):
+		(node as GeometryInstance3D).visibility_range_end = 100000.0
+
+
 ## The camera set by hand at `from` looking at `to`.
 func _view(from: Vector3, to: Vector3) -> void:
 	world.camera.set_process(false)
@@ -94,13 +108,18 @@ func _run() -> void:
 	await _shot("grove_wall")
 	await _put(Vector3(5.0, 0.2, 63.0), Vector3(-30.0, 0.2, 55.0))
 	await _shot("ring_road")
+	_no_far()
 	await _view(Vector3(0.0, 85.0, 95.0), Vector3(0.0, 0.0, 0.0))
 	await _shot("grove_above")
+	await _view(Vector3(0.0, 120.0, 0.5), Vector3(0.0, 0.0, 0.0))
+	await _shot("grove_top_down")
 	for f in 4:
 		var name: String = ["city", "industrial", "construction", "rural"][f]
 		await _put(_face(f, 14.0, 0.0, 130.0), _face(f, -20.0, -10.0, 150.0))
 		await _shot("street_" + name)
-		await _view(_face(f, 0.0, -18.0, 205.0), _face(f, 0.0, 10.0, 700.0))
+		# (stood on the ground at the face's foot, a person's height up, looking out)
+		var foot := _ground(_face(f, 0.0, 0.0, 205.0)) + Vector3.UP * 4.0
+		await _view(foot, foot + (_face(f, 0.0, 0.0, 700.0) - _face(f, 0.0, 0.0, 205.0)).normalized() * 500.0 + Vector3.UP * 25.0)
 		await _shot("vista_" + name)
 	_filter(false)
 	await _put(_face(0, 14.0, 0.0, 130.0), _face(0, -20.0, -10.0, 150.0))

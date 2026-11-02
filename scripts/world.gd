@@ -208,6 +208,10 @@ func _dress(level: Node) -> void:
 				far.albedo_color = (original as BaseMaterial3D).albedo_color if original is BaseMaterial3D else Color.WHITE
 				far.vertex_color_use_as_albedo = true
 				far.disable_fog = true
+				# (both sides: the far ridges' sheets face away from the town once exported, so they went unseen and only their
+				# painted trees showed, a ring of trees floating over the far town; the user, 2026-11-02, "why is there a
+				# floating ring of trees in the distance")
+				far.cull_mode = BaseMaterial3D.CULL_DISABLED
 				if key == "sky_tree":
 					# (the far hills' painted trees: flat cut-outs, textures/anime_tree.png, tinted by their ridge's haze)
 					far.albedo_texture = load("res://textures/anime_tree.png")

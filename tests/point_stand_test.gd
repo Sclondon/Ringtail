@@ -59,7 +59,7 @@ func _run(world: World) -> void:
 		await physics_frame
 	if stand.on:
 		stand._let_go()
-	# (from the ground at its foot, facing it, the camera held behind him, as tests/pipe_climb.gd does)
+	# (from the ground at its foot, facing it, the camera held behind him)
 	var side := Vector3(0.0, 0.0, 0.45)
 	var foot := world.get_world_3d().direct_space_state.intersect_ray(PhysicsRayQueryParameters3D.create(pole + side + Vector3.DOWN * 3.0, pole + side + Vector3.DOWN * 30.0, 1))
 	player.global_position = (foot.position as Vector3) + Vector3.UP * 0.1 if not foot.is_empty() else pole + side + Vector3.DOWN * 8.0

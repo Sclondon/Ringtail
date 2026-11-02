@@ -1029,9 +1029,12 @@ def grove():
     wood = []   # [x, z, size%, kind, degrees]
     # (Douglas fir, western red cedar, bigleaf maple, red alder: TreeGen Fir, Spruce, Maple, Birch in World; "lo"
     # the plainer, cheaper kind)
-    rings = [(INNER[0], 4.4, ("fir", "redcedar", "fir", "maplelo")), (INNER[1], 4.6, ("firlo", "redcedarlo", "alderlo")),
-             (OUTER[0], 4.5, ("firlo", "redcedarlo", "firlo", "alderlo")), (OUTER[1], 4.7, ("redcedarlo", "firlo", "alderlo")),
-             (OUTER[2], 4.9, ("firlo", "firlo", "redcedarlo"))]
+    # (the outer rows fewer and bigger, cedars over alders (a plain alder is some 8k triangles, a cedar 1.3k):
+    # the grove's trees had grown to about 800k triangles; these keep the wall of wood the user asked for, "a denser
+    # surround woods", at about 550k)
+    rings = [(INNER[0], 4.4, ("fir", "redcedar", "fir", "maplelo")), (INNER[1], 5.2, ("firlo", "redcedarlo", "alderlo", "firlo", "redcedarlo", "redcedarlo")),
+             (OUTER[0], 6.0, ("redcedarlo", "firlo", "redcedarlo")), (OUTER[1], 6.4, ("redcedarlo", "redcedarlo", "firlo", "redcedarlo")),
+             (OUTER[2], 6.8, ("redcedarlo", "firlo", "redcedarlo", "redcedarlo"))]
     for row, (radius, spacing, kinds) in enumerate(rings):
         count = int(math.tau * radius / spacing)
         for i in range(count):
@@ -1041,9 +1044,11 @@ def grove():
             r = radius + rng_wood.uniform(-0.5, 0.5)
             kind = kinds[i % len(kinds)]
             size = rng_wood.randint(120, 170) if kind.startswith(("fir", "redcedar")) else rng_wood.randint(85, 120)
+            if row >= 2:
+                size = int(size * 1.2)
             wood.append([math.cos(math.radians(deg)) * r, math.sin(math.radians(deg)) * r, size, kind, deg])
     # young firs scattered in both rings
-    for i in range(26):
+    for i in range(8):
         deg = rng_wood.uniform(0.0, 360.0)
         if 55.0 < deg < 110.0:
             continue
@@ -1086,7 +1091,7 @@ def grove():
             w1.mark("tree_%d_%d_%d" % (k, 101 + k * 7, size), at)
         else:
             w1.mark("treep_%d_%d_%d_%s" % (k, 101 + k * 7, size, kind), at)
-    cost = {"camphor": 58036, "climb": 27278, "fir": 4514, "redcedar": 3754, "firlo": 2350, "redcedarlo": 1414, "maplelo": 6100, "alderlo": 3000}
+    cost = {"camphor": 41000, "climb": 41000, "fir": 4400, "redcedar": 3560, "firlo": 2180, "redcedarlo": 1290, "maplelo": 6500, "alderlo": 7900}   # (measured in game)
     tris = sum(cost.get(t[3], 3000) for t in wood)
     kinds = sorted(set(t[3] for t in wood))
     print("GROVE TREES %d (%s), about %d triangles" % (len(wood), ", ".join("%d %s" % (sum(t[3] == k for t in wood), k) for k in kinds), tris))
@@ -1409,7 +1414,15 @@ def beyond():
         y = _cone(x, z) - 0.3
         town.box((x, y + tall / 2, z), (1.2, tall, 1.2), mat)
         c, s = math.cos(turn), math.sin(turn)
-        town.box((x + c * jib * 0.3, y + tall + 0.6, z + s * jib * 0.3), (abs(c) * jib + 1.0, 1.0, abs(s) * jib + 1.0), mat)
+        # (the jib a long thin bar turned with the crane, from a short counter-jib behind the mast out over the site: as
+        # an upright box turned any way but square it came out a broad flat plate)
+        y0, y1 = y + tall + 0.1, y + tall + 1.1
+        back, out, half = -jib * 0.25, jib * 0.75, 0.5
+        k = [(x + c * u - s * v, yy, z + s * u + c * v) for u in (back, out) for yy in (y0, y1) for v in (-half, half)]
+        for q in [(0, 4, 5, 1), (2, 3, 7, 6), (0, 2, 6, 4), (1, 5, 7, 3), (2, 6, 7, 3), (0, 1, 5, 4)]:
+            town.face([k[i] for i in q], mat, 0.95)
+        # (and a hook line hanging from near its end)
+        town.box((x + c * jib * 0.6, y + tall - 4.0, z + s * jib * 0.6), (0.3, 8.0, 0.3), mat)
 
     for n in range(900):
         a = rng.uniform(0.0, math.tau)
@@ -1515,10 +1528,13 @@ def beyond():
     # textures/anime_tree.png) along the ridgelines and in copses down them, tinted by their ridge's haze.
     layers = [
         # (radius, height at the foot of its rounded tops, how high they roll, the colour along its top, its mist)
-        (430.0, 4.0, 26.0, (0.24, 0.42, 0.30), (0.70, 0.82, 0.84)),
-        (620.0, 16.0, 36.0, (0.34, 0.50, 0.50), (0.76, 0.85, 0.90)),
-        (860.0, 26.0, 48.0, (0.48, 0.60, 0.70), (0.80, 0.87, 0.94)),
-        (1150.0, 34.0, 62.0, (0.60, 0.70, 0.82), (0.84, 0.89, 0.96)),
+        # (their feet well over the far land's rim, which rises to about 18 m: lower, the ridges hid behind it and their
+        # painted trees seemed to float in a ring over the far town; the user, 2026-11-02, "why is there a floating ring
+        # of trees in the distance")
+        (430.0, 30.0, 26.0, (0.24, 0.42, 0.30), (0.70, 0.82, 0.84)),
+        (620.0, 44.0, 36.0, (0.34, 0.50, 0.50), (0.76, 0.85, 0.90)),
+        (860.0, 56.0, 48.0, (0.48, 0.60, 0.70), (0.80, 0.87, 0.94)),
+        (1150.0, 66.0, 62.0, (0.60, 0.70, 0.82), (0.84, 0.89, 0.96)),
     ]
     trees = PaintPiece("nocol_painted_trees")
     rng_s = random.Random(31)

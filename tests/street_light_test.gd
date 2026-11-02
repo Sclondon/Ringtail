@@ -26,6 +26,12 @@ func _ground(world: World, at: Vector3) -> Vector3:
 	return hit.position if not hit.is_empty() else at
 
 
+## The ground under a lamp's lens: looked for from just under it (from over it the ray met the lamp's own head).
+func _below(world: World, lens: Vector3) -> Vector3:
+	var hit := world.get_world_3d().direct_space_state.intersect_ray(PhysicsRayQueryParameters3D.create(lens + Vector3.DOWN * 0.3, lens + Vector3.DOWN * 40.0, 1, [world.player.get_rid()]))
+	return hit.position if not hit.is_empty() else lens
+
+
 func _run(world: World) -> void:
 	for _i in 20:
 		await physics_frame
@@ -55,11 +61,15 @@ func _run(world: World) -> void:
 	for _i in 6:
 		await process_frame
 	_check(day._pools != null and day._pools.multimesh.instance_count == day._street_spots.size(), "a pool under every lamp")
-	if day._pools:
+	# (headless the renderer is a dummy that keeps no MultiMesh transforms: every pool reads back at 0, so this is only
+	# checked in a window)
+	if day._pools and DisplayServer.get_name() == "headless":
+		print("skip the pools lie on the ground (headless: run it in a window to check)")
+	elif day._pools:
 		var worst := 0.0
 		for n in day._street_spots.size():
 			var pool := day._pools.multimesh.get_instance_transform(n).origin
-			worst = maxf(worst, absf(pool.y - _ground(world, day._street_spots[n]).y))
+			worst = maxf(worst, absf(pool.y - _below(world, day._street_spots[n]).y))
 		_check(worst < 0.2, "the pools lie on the ground (off by %.2f m at most)" % worst)
 	# Midnight, beside the first lamp
 	var lens := day._street_spots[0]
