@@ -95,7 +95,7 @@ func _physics_process(delta: float) -> void:
 	_state_t += delta
 	_rest_left = maxf(_rest_left - delta, 0.0)
 	var near := player != null and Vector2(player.global_position.x - perch.x, player.global_position.z - perch.z).length() < notice \
-			and player.is_on_floor() and not Hazards.safe(player.global_position)
+			and player.is_on_floor() and not Hazards.unseen(player)
 	match state:
 		State.PERCH:
 			global_position = perch

@@ -225,3 +225,21 @@ Read README.md first. Started 2026-11-01.
   upright oval pupil (no slit), a white glint, and upper lids of fur on his lid bones; CatRig.LID_REST lets them rest
   a little lowered (0.6 rad past his), so they blink with his rig and do not stare. `look_shots.gd ... eyes` films
   each cat's head front, quarter and side.
+
+## Dogs and hiding (2026-11-02)
+
+- The user: "there should be dogs as well (we already have the assets) and tall grass to hide in in spots as well".
+- Dogs are GameCommon's `godot/dog` (Warren's feral dog; installed under `creatures/dog/`), kept: `HazardDog`
+  (scripts/hazard_dog.gd) tints the coat (strong tints: its base is dark), drops the scars and bald patches and
+  softens the rib creases (`HazardDog.kept`); the gaunt build itself is the model's. Six looks and sizes, all bigger
+  than the raccoon, are Claude's picks (`HazardDog.LOOKS`). Each lives at a `dog_<n>` marker (else the haunts
+  furthest from the grove): potters, sits, sleeps; seeing him it barks, gallops after him and springs (a bite
+  hurts once a spring); gives up after 7 s, past 16 m from its yard, when he goes up out of reach, or when it loses
+  him, then casts about nose down and trots home. His tail spin sends it yelping home. It is in `hazards`, so the
+  band and the villagers run from it.
+- Hiding: `Hazards.unseen(target)` is the one check every hunter asks (dogs, cats, fox, hawk, crows, owl, people):
+  in the grove (`safe`) or `Hazards.hidden` = his feet down inside a tall-grass patch (`TownGrass.hidden`, main's
+  `tallgrass_<n>` markers) and not bounding flat out (Claude's pick: standing, walking, ducking or scurrying there
+  all hide him; sprinting through it does not).
+- Tests: `tests/dog_test.gd` (a dog sees, chases and bites him; hidden, it loses him and does not find him again; a
+  cat by him hidden does not stalk), `tests/dog_shots.gd -- --out=<dir>` (the looks beside him, four sides, a gallop).

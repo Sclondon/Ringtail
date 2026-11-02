@@ -78,6 +78,24 @@ static func safe(at: Vector3) -> bool:
 	return Vector2(at.x - haven.x, at.z - haven.z).length() < HAVEN_RADIUS
 
 
+## Whether what hunts can neither see nor get at `target`: in the grove (`safe`), or hidden (`hidden`). Every hunter
+## asks this: the dogs, cats, fox, hawk, crows, owl and people.
+static func unseen(target: Node3D) -> bool:
+	return target == null or safe(target.global_position) or hidden(target)
+
+
+## Whether `target` is hidden down in tall grass (TownGrass.hidden; the user, 2026-11-02, "tall grass to hide in in
+## spots as well"): on the ground in a patch, and not bounding through it flat out (then the grass thrashes and he
+## is seen). Claude's pick of when.
+static func hidden(target: Node3D) -> bool:
+	if not TownGrass.hidden(target.global_position):
+		return false
+	var body := target as CharacterBody3D
+	if body and not body.is_on_floor():
+		return false
+	return not (&"is_sprinting" in target and target.is_sprinting)
+
+
 ## The game's hurt (World.hurt), from `at`.
 static func hurt(node: Node, at: Vector3) -> void:
 	var game := node.get_tree().get_first_node_in_group(&"game")

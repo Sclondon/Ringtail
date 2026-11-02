@@ -93,7 +93,7 @@ func _physics_process(delta: float) -> void:
 	if target:
 		to_target = target.global_position - global_position
 		near = Vector2(to_target.x, to_target.z).length()
-	var sees := near < notice and absf(to_target.y) < 1.5 and not Hazards.safe(target.global_position)
+	var sees := near < notice and absf(to_target.y) < 1.5 and not Hazards.unseen(target)
 	is_ducking = false
 	rig.wiggle = 0.0
 	match mode:

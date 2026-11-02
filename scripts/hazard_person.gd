@@ -75,7 +75,7 @@ func _physics_process(delta: float) -> void:
 		State.STROLL:
 			if not is_going():
 				_next()
-			if near < notice and _rest <= 0.0 and absf(player.global_position.y - global_position.y) < 1.5:
+			if near < notice and _rest <= 0.0 and not Hazards.unseen(player) and absf(player.global_position.y - global_position.y) < 1.5:
 				stop()
 				face(player.global_position)
 				_go(State.START)
@@ -90,7 +90,7 @@ func _physics_process(delta: float) -> void:
 			if near < 0.95:
 				stop()
 				_go(State.STAMP)
-			elif near > give_up or _state_t > chase_time or absf(player.global_position.y - global_position.y) > 1.6:
+			elif near > give_up or _state_t > chase_time or Hazards.unseen(player) or absf(player.global_position.y - global_position.y) > 1.6:
 				_back()
 		State.STAMP:
 			face(player.global_position)

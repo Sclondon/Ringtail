@@ -108,7 +108,7 @@ func _him() -> Vector3:
 
 
 func _hawk(delta: float) -> void:
-	var under := player != null and Vector2(player.global_position.x - home.x, player.global_position.z - home.z).length() < notice and not Hazards.safe(player.global_position)
+	var under := player != null and Vector2(player.global_position.x - home.x, player.global_position.z - home.z).length() < notice and not Hazards.unseen(player)
 	match state:
 		State.FLY:
 			_angle += delta * 0.45
