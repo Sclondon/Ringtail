@@ -245,6 +245,10 @@ func _dress(level: Node) -> void:
 				(shape.shape as ConcavePolygonShape3D).backface_collision = true
 
 
+## Where the tops of the climbing trees' leaf pads are, added to the markers as more `npc_perch_<n>` once all is placed.
+var _pad_perches: Array[Vector3] = []
+
+
 func _place_things() -> void:
 	for name: String in markers:
 		var at: Vector3 = markers[name].origin
@@ -322,6 +326,9 @@ func _place_things() -> void:
 			body.scale = Vector3.ONE * (1.0 if great else float(parts[3]) / 100.0)
 			body.add_to_group(&"climbable")
 			add_child(body)
+			# (its leaf pads are perches for the villagers too: TreeGen leaf_pads)
+			for top: Vector3 in tree.pad_tops():
+				_pad_perches.append(body.transform * top)
 		elif name.begins_with("check_"):
 			_checkpoints.append(at)
 		elif name.begins_with("ladder_"):
@@ -378,6 +385,12 @@ func _place_things() -> void:
 		race.lost.connect(func() -> void: said.emit("Too slow! Try the stopwatch again."))
 		race.won.connect(func() -> void: _reveal("race"))
 		add_child(race)
+	var perch := 0
+	while markers.has("npc_perch_%d" % perch):
+		perch += 1
+	for top in _pad_perches:
+		markers["npc_perch_%d" % perch] = Transform3D(Basis.IDENTITY, top)
+		perch += 1
 
 
 ## The trash cans' painted metal, a dull green.

@@ -162,6 +162,13 @@ const GOLDEN := 2.39996
 ## The flat top every walkable limb's collision has at least, metres across (a round limb thinner than
 ## this is still stood on as if it were this wide).
 @export_range(0.1, 1.5) var walk_width := 0.42
+## Leafy platforms out on the limbs to stand on (Ringtail, 2026-11-02: "the giant tree should have leaf platforms in
+## its branches"): every `leaf_pads`th limb (0: none) carries a flat cushion of the tree's own leaves `pad_width`
+## across, `pad_at` of the way out, its top a little over the limb's and solid (a disc in `shapes()`). `pad_tops()`
+## gives where each one's top is.
+@export_range(0, 8) var leaf_pads := 0
+@export_range(1.0, 6.0) var pad_width := 3.0
+@export_range(0.2, 0.95) var pad_at := 0.6
 
 @export_group("Look")
 ## 0 soft light wrapping round the crown, 1 two-tone cel shading.
@@ -290,7 +297,7 @@ const PRESETS := {
 		gravitropism = 0.1, droop = 0.1, curl = 0.3, wildness = 0.5, leaf_style = Leaves.FLUFFY, clump_size = 1.4,
 		leaf_density = 2.4, cards = 0.55, card_size = 1.7, leaf_reach = 0.9, fill = 0.0, leaves_inner = Color(0.06, 0.15, 0.06), leaves_outer = Color(0.16, 0.34, 0.12),
 		leaves_tips = Color(0.4, 0.56, 0.2), limbs = 12, first_limb = 7.0, limb_step = 1.15, limb_turn = 0.9, limb_length = 18.0,
-		limb_radius = 0.75, limb_rise = 0.02, walk_width = 0.8},
+		limb_radius = 0.75, limb_rise = 0.02, walk_width = 0.8, leaf_pads = 2, pad_width = 3.6, pad_at = 0.62},
 }
 
 static var _cache := {}
@@ -330,6 +337,7 @@ static func clear_cache() -> void:
 	_cache.clear()
 	_shape_cache.clear()
 	_walk_cache.clear()
+	_pad_cache.clear()
 	_materials.clear()
 
 
@@ -351,6 +359,7 @@ func mesh(variant := 0) -> ArrayMesh:
 	_cache[key] = built
 	_shape_cache[key] = _last_shapes
 	_walk_cache[key] = _last_walks
+	_pad_cache[key] = _last_pads
 	return built
 
 
@@ -383,6 +392,15 @@ func walks(variant := 0) -> Array:
 		_cache.erase(key)
 		mesh(variant)
 	return _walk_cache[key]
+
+
+## Where the top of each leaf pad is (see `leaf_pads`), in the tree's own space.
+func pad_tops(variant := 0) -> Array:
+	var key := _key(variant)
+	if not _pad_cache.has(key):
+		_cache.erase(key)
+		mesh(variant)
+	return _pad_cache[key]
 
 
 ## The tree to climb: a StaticBody3D (on collision layer 1) holding its MeshInstance3D and its
@@ -724,6 +742,9 @@ var _top_y := 1.0
 var _last_shapes: Array = []
 ## The walks the last build made (see walks()).
 var _last_walks: Array = []
+## The tops of the leaf pads (see pad_tops()), last built and by key.
+var _last_pads: Array = []
+static var _pad_cache := {}
 var _top := 1.0
 var _centre := Vector3.ZERO
 var _rx := 1.0
@@ -733,6 +754,7 @@ var _ry := 1.0
 func _build(variant_seed: int) -> ArrayMesh:
 	_rng = RandomNumberGenerator.new()
 	_rng.seed = variant_seed
+	_last_pads = []
 	_branches.clear()
 	if climbable:
 		_grow_climbable()
@@ -740,6 +762,11 @@ func _build(variant_seed: int) -> ArrayMesh:
 		_grow()
 		_spread()
 	_last_shapes = _collision() if climbable else []
+	for top: Vector3 in _last_pads:
+		var disc := CylinderShape3D.new()
+		disc.radius = pad_width * 0.5
+		disc.height = 0.3
+		_last_shapes.append([disc, Transform3D(Basis.IDENTITY, top + Vector3.DOWN * 0.15)])
 	_last_walks = _walk_lines() if climbable else []
 	# what follows draws: a generator of its own, so a plain tree keeps the same branches and crown
 	var draw := RandomNumberGenerator.new()
@@ -778,6 +805,9 @@ func _build(variant_seed: int) -> ArrayMesh:
 						_fronds(leaves, b)
 				if apical >= 0.6:
 					_leader(leaves)
+		if leaf_style == Leaves.FLUFFY:
+			for top: Vector3 in _last_pads:
+				_pad_leaves(leaves, top, draw)
 		if fill > 0.0:
 			_fill(solid, leaf_spots.filter(func(s: Array) -> bool: return s[2]), draw)
 	var mesh := ArrayMesh.new()
@@ -881,6 +911,8 @@ func _grow_climbable() -> void:
 		_sprays(limb)
 		_sprays(fork)
 		_rng = limbs_rng
+		if leaf_pads > 0 and i % leaf_pads == 0:
+			_last_pads.append(_along(limb.pts, pad_at) + Vector3.UP * (_radius_along(limb, pad_at) + 0.18))
 	# The rest of the crown, grown as any tree's is, so it reads as one tree: `children` branches off the
 	# trunk from `trunk_base` up (not walked on; leaves kept off the walks, see _over_walk), and limbs
 	# going on up from the trunk's top
@@ -889,6 +921,19 @@ func _grow_climbable() -> void:
 	var forks := clampi(roundi(lerpf(4.0, 2.0, apical)), 2, 4)
 	for k in forks:
 		_spawn(t, 1.0, turn + k * TAU / forks + _rng.randf_range(-0.4, 0.4) * wildness, 1.0 if joined else 0.55)
+
+
+## A leaf pad: flattened clumps of the tree's leaves in rings over a disc, their tops at about `top`.
+func _pad_leaves(buf: _Buf, top: Vector3, rng: RandomNumberGenerator) -> void:
+	var flat := pads
+	pads = 1.0
+	var size := pad_width * 0.32
+	for ring: Array in [[0.0, 1], [0.3, 6], [0.5, 9]]:
+		for k in ring[1]:
+			var a: float = TAU * k / float(ring[1]) + rng.randf_range(-0.2, 0.2)
+			var at: Vector3 = top + Vector3(cos(a), 0.0, sin(a)) * pad_width * float(ring[0]) + Vector3.DOWN * size * 0.3
+			_fluffy(buf, at, size * rng.randf_range(0.85, 1.1), rng)
+	pads = flat
 
 
 ## Whether a clump of leaves at `p`, `size` across, would sit over (or on) the inner part of a walkable
