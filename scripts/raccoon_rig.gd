@@ -27,6 +27,12 @@ const BOUND_FEET := [0.0, 0.04, 0.5, 0.54]
 const TAIL_STAND := [0.95, 0.55, 0.15, -0.25, -0.6, -0.85]
 const TAIL_RUN := [0.25, 0.05, -0.08, -0.12, -0.12, -0.1]
 const TAIL_QUAD := [0.45, 0.55, 0.62, 0.62, 0.55, 0.45]  # (his hips are pitched well forward on all fours: this is back and a little up)
+## The shapes this rig uses (a figure on it, such as the cat, gives its own).
+var tail_stand: Array = TAIL_STAND
+var tail_run: Array = TAIL_RUN
+var tail_quad: Array = TAIL_QUAD
+## On all fours whenever it is on the ground, not only to duck or run (the cat).
+var always_on_fours := false
 
 var _tail: Array[Node3D] = []
 var _tail_dir: Array[Vector3] = []
@@ -71,7 +77,7 @@ func _ready() -> void:
 	if _player:
 		_moves = _player.get_node_or_null(^"TailMoves")
 		if _player.has_signal(&"jumped"):
-			_player.jumped.connect(func() -> void: _leaping = _quad > 0.5 and _gallop > 0.3)
+			_player.jumped.connect(func() -> void: _leaping = _quad > 0.5 and (_gallop > 0.3 or always_on_fours))
 
 
 func _pose_extra(delta: float) -> void:
@@ -91,7 +97,7 @@ func _pose_extra(delta: float) -> void:
 		_leaping = false
 	_leap_w = _approach(_leap_w, 1.0 if _leaping and not grounded else 0.0, 12.0, delta)
 	_leap_rise = clampf(velocity.y / 6.0, -1.0, 1.0)
-	var wanted := 1.0 if free and (((low or fast) and _air < 0.5) or _leaping) and busy < 0.2 else 0.0
+	var wanted := 1.0 if free and (((low or fast or always_on_fours) and _air < 0.5) or _leaping) and busy < 0.2 else 0.0
 	_quad = _approach(_quad, wanted, 7.0, delta)
 	_gallop = _approach(_gallop, smoothstep(_player.walk_speed, _player.run_speed * 0.8, speed) if fast else 0.0, 6.0, delta)
 	var stride := lerpf(0.44, 1.9, _gallop)
@@ -236,7 +242,7 @@ func _tail_shape(speed: float, spin: float) -> Array[Vector3]:
 	var wag := sin(_time * 2.1) * 0.25 * (1.0 - run) + sin(TAU * _phase) * 0.12 * run
 	var dirs: Array[Vector3] = []
 	for k in TAIL_BONES:
-		var down: float = lerpf(lerpf(TAIL_STAND[k], TAIL_RUN[k], run), TAIL_QUAD[k], _quad)
+		var down: float = lerpf(lerpf(tail_stand[k], tail_run[k], run), tail_quad[k], _quad)
 		down += sin(_time * 1.3 - k * 0.6) * 0.06 * (1.0 - run)
 		var across := wag * (0.4 + 0.15 * k)
 		dirs.append(Vector3(sin(across) * cos(down), -sin(down), -cos(across) * cos(down)).normalized())
