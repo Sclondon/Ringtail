@@ -45,7 +45,7 @@ racc.tail_radius = _tail_radius
 
 # --- Colours (sRGB): a ginger tabby ---
 
-FUR, CREAM, STRIPE, PAW, IRIS, PUPIL, PINK, LIMB = range(8)
+FUR, CREAM, STRIPE, PAW, IRIS, PUPIL, PINK, LIMB, SHINE = range(9)
 MATERIALS = [
     ("fur", (0.84, 0.43, 0.14)),
     ("light", (0.97, 0.90, 0.78)),
@@ -55,6 +55,7 @@ MATERIALS = [
     ("pupil", (0.03, 0.03, 0.04)),
     ("pink", (0.95, 0.58, 0.62)),
     ("limb", (0.76, 0.38, 0.12)),
+    ("shine", (1.0, 1.0, 1.0)),
 ]
 
 
@@ -80,21 +81,48 @@ def whiskers(b):
             b.strand([root, root.lerp(tip, 0.5) + Vector((0.0, 0.008, 0.0)), tip], [0.004, 0.003, 0.0018], 5)
 
 
-EYE = Vector((0.05, 0.018, 0.092))
-EYE_R = 0.036
+# The eyes (the user, 2026-11-02: "the cat eyes need work they look creepy"): big and round, set into the face (most
+# of each eye inside the head, so they do not bulge), the whole eye its iris colour (the look's "eye") as a cat's
+# is, in a thin dark rim; a soft oval pupil, not a slit; a white glint up and out; and an upper lid of fur over
+# each, on the raccoon's lid bones, so CatRig lets it rest a little lowered and the rig blinks it.
+EYE = Vector((0.05, 0.014, 0.082))
+EYE_R = 0.04
+TURN = 0.3
+# (his lids, eye bones and lid bones are built at these: racc.lids, racc.bones)
+racc.EYE_X, racc.EYE_Y, racc.EYE_Z, racc.EYE_R = EYE.x, EYE.y, EYE.z, EYE_R
+
+
+def _eye(side):
+    """An eye's centre, its turn out to the side, and the way it looks."""
+    turn = Matrix.Rotation(side * TURN, 3, Y)
+    return HC + Vector((side * EYE.x, EYE.y, EYE.z)), turn, turn @ Z
 
 
 def eyes(b):
-    # Big green eyes, the whole eye coloured as a cat's is
     for side in (1.0, -1.0):
-        b.ellipsoid(HC + Vector((side * EYE.x, EYE.y, EYE.z)), Vector((EYE_R, EYE_R * 1.15, EYE_R * 0.9)), Matrix.Rotation(side * 0.25, 3, Y), 14, 7)
+        centre, turn, _ = _eye(side)
+        b.ellipsoid(centre, Vector((EYE_R, EYE_R * 0.96, EYE_R * 0.86)), turn, 16, 8)
+
+
+def rims(b):
+    # A thin dark rim round each eye, as a cat's has
+    for side in (1.0, -1.0):
+        centre, turn, ahead = _eye(side)
+        b.ellipsoid(centre - ahead * 0.005, Vector((EYE_R * 1.1, EYE_R * 1.06, EYE_R * 0.86)), turn, 16, 8)
 
 
 def pupils(b):
-    # Slits
+    # Soft upright ovals, a little wider than tall is round
     for side in (1.0, -1.0):
-        centre = HC + Vector((side * (EYE.x + 0.008), EYE.y, EYE.z + EYE_R * 0.78))
-        b.ellipsoid(centre, Vector((0.006, 0.027, 0.008)), Matrix.Rotation(side * 0.25, 3, Y), 8, 6)
+        centre, turn, ahead = _eye(side)
+        b.ellipsoid(centre + ahead * EYE_R * 0.78, Vector((0.0125, 0.02, 0.008)), turn, 12, 6)
+
+
+def glints(b):
+    # A small white catch-light, up and to his left on both (one light)
+    for side in (1.0, -1.0):
+        centre, turn, ahead = _eye(side)
+        b.ellipsoid(centre + ahead * EYE_R * 0.84 + Vector((0.011, 0.013, 0.0)), Vector((0.0062, 0.0062, 0.003)), turn, 8, 4)
 
 
 def cheeks(b):
@@ -134,6 +162,8 @@ def stripes(b):
 def weights(part, p):
     if part in ("stripes",):
         return {"head": 1.0}
+    if part in ("rims", "glints"):
+        return {("eye_l" if p.x >= 0.0 else "eye_r"): 1.0}
     return racc.weights(part, p)
 
 
@@ -261,7 +291,7 @@ def paint_markings(name):
         if spike:
             mesh.uv_layers.remove(spike)
         tags = mesh.uv_layers.get(kit.METRES)
-        clean = {k for k, m in enumerate(mesh.materials) if m and m.name.split(".")[0] in ("eye", "pupil", "pink")}
+        clean = {k for k, m in enumerate(mesh.materials) if m and m.name.split(".")[0] in ("eye", "pupil", "pink", "shine")}
         for poly in mesh.polygons:
             for index in poly.loop_indices:
                 if poly.material_index in clean:
@@ -296,8 +326,11 @@ PARTS = [
     ("cheeks", CREAM, cheeks, None),
     ("muzzle", CREAM, muzzle, None),
     ("nose", PINK, nose, None),
+    ("rims", PUPIL, rims, None),
     ("eyes", IRIS, eyes, None),
     ("pupils", PUPIL, pupils, None),
+    ("glints", SHINE, glints, None),
+    ("lids", FUR, racc.lids, None),
     ("ears", FUR, ears, None),
     ("ear_insides", PINK, ear_insides, None),
     ("stripes", STRIPE, stripes, None),

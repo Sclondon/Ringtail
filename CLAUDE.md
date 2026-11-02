@@ -212,7 +212,7 @@ Read README.md first. Started 2026-11-01.
     lies (FurLook.REGION_AXES). Gloaming's hair textures (solid, straight, wavy, curly, soft, thick: its strands(),
     ported as FurLook._STRANDED) are the look's "texture". The tail: RaccoonRig.tail_length (on the spring chain's
     segment lengths and the joints' stretch) and tail_thickness (the joints scaled across), from look "tail".
-  - Checks: `tests/look_shots.gd -- --out=<dir> [cats] [furs] [shapes] [menus]` (window; menus at 1280x720 and 390x844).
+  - Checks: `tests/look_shots.gd -- --out=<dir> [cats] [furs] [shapes] [eyes] [menus]` (window; menus at 1280x720 and 390x844).
 - Then "the tree trunks jiggle like jelly because the leaf shader I think" and "you need to work on the ledges on the
   branches, it interrupts your climbing, you get near a branch incorrectly": a climbable or joined tree's wood has no
   sway at all (TreeGen._rigid; its collision never moves), its leaves a third as much. Scurry: no ledge catches while
@@ -220,3 +220,8 @@ Read README.md first. Started 2026-11-01.
   him under limbs); a limb over his head he goes round (the other way if stuck, and if both are blocked he steps up
   onto it); a trunk is not let go of while a limb pushes him out. tests/tree_scurry.gd climbs a trunk past its limbs
   (three presets, two seeds, four sides: 23 of 24 pass; oak seed 4 from one side drops off near the trunk's top).
+- Cats' eyes (the user, 2026-11-02: "the cat eyes need work they look creepy"): build_cat.py gives them big round
+  eyes set into the face (most of each inside the head), the whole eye its iris colour in a thin dark rim, a soft
+  upright oval pupil (no slit), a white glint, and upper lids of fur on his lid bones; CatRig.LID_REST lets them rest
+  a little lowered (0.6 rad past his), so they blink with his rig and do not stare. `look_shots.gd ... eyes` films
+  each cat's head front, quarter and side.

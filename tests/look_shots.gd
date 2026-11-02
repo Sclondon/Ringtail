@@ -41,6 +41,8 @@ func _run() -> void:
 		await _row("furs")
 	if only.is_empty() or "shapes" in only:
 		await _row("shapes")
+	if "eyes" in only:
+		await _eyes()
 	if only.is_empty() or "menus" in only:
 		await _menus()
 	print("LOOK SHOTS DONE ", out)
@@ -134,3 +136,47 @@ func _menus() -> void:
 	await _frames(20)
 	await _shoot("editor_face_" + tag)
 	root.get_tree().paused = false
+
+
+## Each cat's head close up from the front, a quarter and the side (the user, 2026-11-02: "the cat eyes need work").
+func _eyes() -> void:
+	var stage := Node3D.new()
+	root.add_child(stage)
+	var environment := Environment.new()
+	environment.background_mode = Environment.BG_COLOR
+	environment.background_color = Color(0.5, 0.62, 0.72)
+	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	environment.ambient_light_color = Color(0.6, 0.6, 0.65)
+	var lit := WorldEnvironment.new()
+	lit.environment = environment
+	stage.add_child(lit)
+	var sun := DirectionalLight3D.new()
+	sun.rotation_degrees = Vector3(-45.0, 30.0, 0.0)
+	stage.add_child(sun)
+	var eye := Camera3D.new()
+	eye.fov = 30.0
+	stage.add_child(eye)
+	eye.make_current()
+	for k in FurLook.CAT_LOOKS.size():
+		var stand := FurEditor.Stand.new()
+		var look: Dictionary = (FurLook.CAT_LOOKS[k] as Dictionary).duplicate(true)
+		var rig := CatRig.new()
+		rig.model = load(FurLook.model_path("cat", look["fur"]))
+		rig.look = look
+		rig.scale = Vector3.ONE * 0.85
+		rig.dusty = false
+		stand.add_child(rig)
+		stage.add_child(stand)
+		rig.restyle()
+		await _frames(20)
+		var skeleton: Skeleton3D = rig._skeleton
+		var head := skeleton.global_transform * skeleton.get_bone_global_pose(skeleton.find_bone("head")).origin
+		var ahead := rig.global_basis.z
+		for view: Array in [["front", 0.0], ["quarter", 0.7], ["side", 1.45]]:
+			var from := ahead.rotated(Vector3.UP, view[1]) * 0.75 + Vector3.UP * 0.05
+			eye.look_at_from_position(head + from, head)
+			await _frames(3)
+			await _shoot("eyes_%d_%s" % [k, view[0]])
+		stand.queue_free()
+		await _frames(2)
+	stage.queue_free()

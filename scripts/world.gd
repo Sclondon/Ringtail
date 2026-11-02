@@ -88,6 +88,7 @@ func _ready() -> void:
 	Hazards.place(self, markers, player)
 	# (the owl: on a pole far from the grove, swooping at him; a placeholder role, Claude's pick)
 	HazardOwl.place(self, markers, player)
+	HazardDog.place(self, markers, player)
 	# Daughter Of The Wind's clouds round the sky (GameCommon puff-clouds; the user: "the clouds should be like
 	# daughter of the wind")
 	PuffClouds.add_to(self, _sun)

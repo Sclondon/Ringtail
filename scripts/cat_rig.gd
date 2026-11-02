@@ -8,6 +8,8 @@ var wiggle := 0.0
 ## How far over it is tumbling (radians), knocked flying by his tail; set by YardCat.
 var tumble := 0.0
 
+## How far down its upper lids sit beyond his at rest (radians, about each eye).
+const LID_REST := 0.6
 # The cat's tail, as angles below straight back in its hips' space: carried up and curled over at the tip.
 const CAT_STAND := [-0.9, -1.05, -1.1, -0.9, -0.35, 0.3]
 const CAT_RUN := [-0.2, -0.3, -0.35, -0.3, -0.2, -0.1]
@@ -25,6 +27,10 @@ func _init() -> void:
 
 func _pose_extra(delta: float) -> void:
 	super(delta)
+	# (its upper lids rest a little lowered over its eyes, not rolled right back as his are: wide open all round they
+	# stared; the user, 2026-11-02, "the cat eyes need work they look creepy". A blink still closes them.)
+	for lid in _lids:
+		lid.basis = lid.basis * Basis(Vector3.RIGHT, LID_REST)
 	if wiggle > 0.001:
 		# (its rump sways side to side, quick, and the tip of its tail flicks)
 		_hips.basis = Basis(Vector3.UP, sin(_time * 24.0) * 0.16 * wiggle) * _hips.basis
