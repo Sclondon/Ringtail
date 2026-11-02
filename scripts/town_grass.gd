@@ -14,9 +14,11 @@ var _planes := {}
 ## Cell -> whether something lies over the grass there (found out the first time it is asked).
 var _covered := {}
 var _space: PhysicsDirectSpaceState3D
+## Reed patches: (x, z, radius).
+var _patches: Array[Vector3] = []
 
 
-static func place(world: Node3D, player: Node3D) -> TownGrass:
+static func place(world: Node3D, player: Node3D, markers := {}) -> TownGrass:
 	var lawn := TownGrass.new()
 	lawn._space = world.get_world_3d().direct_space_state
 	var meshes := world.find_children("*", "MeshInstance3D", true, false)
@@ -39,8 +41,50 @@ static func place(world: Node3D, player: Node3D) -> TownGrass:
 	})
 	# (the field holds on to it: its mask and height are calls on it, and nothing else keeps it)
 	field.set_meta(&"lawn", lawn)
+	lawn._grow_reeds(world, markers)
 	Grass.push(player)
 	return lawn
+
+
+## Reeds where the world model has `reeds_<n>` markers (scale.x the patch's radius): Warren's, its marsh's reed field
+## (TheClearing scripts/marsh.gd; the user, 2026-11-02, "please dont make new reeds check the ones we already have"),
+## on the lawn only.
+func _grow_reeds(world: Node3D, markers: Dictionary) -> void:
+	for name: String in markers:
+		if name.begins_with("reeds_"):
+			var at: Transform3D = markers[name]
+			_patches.append(Vector3(at.origin.x, at.origin.z, maxf(at.basis.get_scale().x, 0.5)))
+	if _patches.is_empty():
+		return
+	var reach := Rect2(Vector2(_patches[0].x, _patches[0].y), Vector2.ZERO)
+	for patch in _patches:
+		reach = reach.expand(Vector2(patch.x, patch.y) - Vector2.ONE * patch.z).expand(Vector2(patch.x, patch.y) + Vector2.ONE * patch.z)
+	var reeds := Grass.field(world, reach, 0.8, {
+		"mask": reeds_at,
+		"height": height,
+		"ground": Color(0.11, 0.14, 0.07),
+		"blade_height": 0.95 * 1.8,
+		"blade_width": 0.03,
+		"lean": 0.12,
+		"body": Color(0.15, 0.2, 0.09),
+		"tip": Color(0.42, 0.4, 0.22),
+		"dry": Color(0.48, 0.42, 0.24),
+		"dryness": 0.45,
+		"translucency": 0.1,
+		"flowers": 0.0,
+		"push_bend": 1.0,
+		"seed": 3,
+	})
+	reeds.set_meta(&"lawn", self)
+
+
+## Reeds at `p`: in a patch (thinning to its edge) and on open lawn.
+func reeds_at(p: Vector2) -> float:
+	var most := 0.0
+	for patch in _patches:
+		var d := Vector2(patch.x, patch.y).distance_to(p) / patch.z
+		most = maxf(most, 1.0 - smoothstep(0.6, 1.0, d))
+	return most * mask(p) if most > 0.0 else 0.0
 
 
 ## 1 where grass grows at `p` (world x, z), else 0.

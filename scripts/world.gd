@@ -381,5 +381,5 @@ func _on_respawned() -> void:
 func _grow_lawn() -> void:
 	await get_tree().physics_frame
 	await get_tree().physics_frame
-	var lawn := TownGrass.place(self, player)
+	var lawn := TownGrass.place(self, player, markers)
 	Wildlife.place(self, lawn, player)
