@@ -19,14 +19,19 @@ extends AnimatableBody3D
 ## Each kind: its size (width, height to the roof, length), cruising and cornering speeds (m/s), and the radius of its
 ## wheels.
 const KINDS := {
-	&"hatchback": {"size": Vector3(1.7, 1.48, 4.05), "cruise": 11.0, "corner": 4.5, "wheel": 0.33},
-	&"taxi": {"size": Vector3(1.7, 1.45, 4.65), "cruise": 11.5, "corner": 4.5, "wheel": 0.33},
-	&"kei_truck": {"size": Vector3(1.48, 1.8, 3.42), "cruise": 9.5, "corner": 4.0, "wheel": 0.29},
-	&"kei_van": {"size": Vector3(1.48, 1.88, 3.42), "cruise": 9.5, "corner": 4.0, "wheel": 0.29},
-	&"bus": {"size": Vector3(2.5, 3.05, 10.55), "cruise": 7.5, "corner": 3.0, "wheel": 0.48},
+	&"hatchback": {"size": Vector3(1.7, 1.48, 4.05), "cruise": 20.0, "corner": 7.0, "wheel": 0.33},
+	&"taxi": {"size": Vector3(1.7, 1.45, 4.65), "cruise": 21.0, "corner": 7.0, "wheel": 0.33},
+	&"kei_truck": {"size": Vector3(1.48, 1.8, 3.42), "cruise": 17.0, "corner": 6.0, "wheel": 0.29},
+	&"kei_van": {"size": Vector3(1.48, 1.88, 3.42), "cruise": 17.0, "corner": 6.0, "wheel": 0.29},
+	&"bus": {"size": Vector3(2.5, 3.05, 10.55), "cruise": 13.0, "corner": 4.5, "wheel": 0.48},
 }
 ## Room kept to whatever is ahead on the road (m).
 const GAP := 3.0
+## How hard it speeds up and brakes (m/s²): hard, so it is on him quickly out of a bend (the user, 2026-11-02: "the
+## cars need to be way faster like hard to dodge"). A bus or a kei takes it more gently (KIND_PULL).
+const PULL := 7.0
+const BRAKE := 14.0
+const KIND_PULL := {&"bus": 0.7, &"kei_truck": 0.85, &"kei_van": 0.85}
 ## How far each wheel may ride up or down on its own (m), and how many cars nearest him throw real light at night.
 const TRAVEL := 0.12
 const LIT := 3
@@ -51,6 +56,9 @@ var half_size := Vector3(0.85, 0.74, 2.0)
 var stops: Array[float] = []
 ## How far each wheel's contact is from the road under it, last step (m): for tests.
 var contact_error := 0.0
+## The speed the bend it is in allows, and how sharp that bend is (0..1): for tests.
+var bend_speed := INF
+var bend_sharp := 0.0
 
 var along := 0.0
 var speed := 0.0
@@ -152,12 +160,23 @@ func _physics_process(delta: float) -> void:
 	if route.size() < 2:
 		return
 	_hurt_rest = maxf(_hurt_rest - delta, 0.0)
-	# How sharp the bend ahead is: it slows for it
-	var here: Array = point_at(along)
-	var ahead: Array = point_at(along + 5.0 + half_size.z)
-	var bend := (here[1] as Vector3).angle_to(ahead[1])
-	var turning := clampf(bend / 1.0, 0.0, 1.0)
-	var want := lerpf(cruise, corner_speed, turning)
+	# How sharp the bends ahead are: it brakes for each in time to come into it at its speed (what it may go at now
+	# is the slowest of: each bend's speed, plus what braking at BRAKE over the road to it takes off)
+	var pull: float = KIND_PULL.get(kind, 1.0)
+	var want := cruise
+	var turning := 0.0
+	# (each point of the road from its rear bumper (it is out of a bend only when all of it is) to 44 m past its front:
+	# the bend measured there may start 4 m before it)
+	var look := -half_size.z * 2.0 - 4.0
+	while look <= 44.0:
+		var sharp := bend_at(along + look + half_size.z)
+		if absf(look) < 0.1:
+			turning = sharp
+		want = minf(want, sqrt(pow(lerpf(cruise, corner_speed, sharp), 2.0) + 2.0 * BRAKE * pull * maxf(look - 4.0, 0.0)))
+		look += 2.0
+	# (the bend its front is in, for tests)
+	bend_sharp = bend_at(along + half_size.z)
+	bend_speed = lerpf(cruise, corner_speed, bend_sharp)
 	# ...climbing, a little slower; going down steeply into a bend, slower still (the grade: up is positive)
 	var grade := sin(_pitch)
 	if grade > 0.0:
@@ -181,7 +200,7 @@ func _physics_process(delta: float) -> void:
 		want = 0.0
 	# ...and keeps back from whatever is ahead of it on its road
 	want = minf(want, _room_ahead())
-	speed = move_toward(speed, want, (3.5 if want > speed else 9.0) * delta)
+	speed = move_toward(speed, want, (PULL * pull if want > speed else BRAKE * pull * 1.3) * delta)
 	along = fposmod(along + speed * delta, _total)
 	_place(delta)
 	_bump()
@@ -189,6 +208,19 @@ func _physics_process(delta: float) -> void:
 	if _light_look <= 0.0:
 		_light_look = 0.5
 		_set_lights()
+
+
+## How sharp the road is at `distance` along its loop, 0 (straight) .. 1 (a hairpin, about 9 m round): the turn between
+## the 4 m chords either side of it (chords, not the road's segments, so where its points fall does not matter).
+func bend_at(distance: float) -> float:
+	var here: Vector3 = point_at(distance)[0]
+	var back := here - (point_at(distance - 4.0)[0] as Vector3)
+	var on := (point_at(distance + 4.0)[0] as Vector3) - here
+	back.y = 0.0
+	on.y = 0.0
+	if back.length_squared() < 0.01 or on.length_squared() < 0.01:
+		return 0.0
+	return clampf(back.angle_to(on) / 0.45, 0.0, 1.0)
 
 
 ## The speed it may go at for what is ahead of it on its road: closing on the one in front, to its speed at GAP.
@@ -199,8 +231,8 @@ func _room_ahead() -> float:
 		if other == null or other == self or other.road != road:
 			continue
 		var gap := fposmod(other.along - along, _total) - half_size.z - other.half_size.z
-		# (closing on it no faster than the room left allows: at GAP it goes as fast as the one in front)
-		most = minf(most, other.speed + maxf(gap - GAP, 0.0) * 1.5)
+		# (no faster than it could brake to the one in front's speed by GAP)
+		most = minf(most, sqrt(other.speed * other.speed + 2.0 * BRAKE * 0.7 * maxf(gap - GAP, 0.0)))
 	return most
 
 
