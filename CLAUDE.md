@@ -262,3 +262,8 @@ Read README.md first. Started 2026-11-01.
   the head's middle, FurLook.shape sending each region's bone place and limb way per frame; laid back the Angle stops
   short of flat (0.95); the elbows' and knees' fur springs half as far). Shots: `look_shots.gd ... spikes parts clip
   mane` (single figures front/side/quarter).
+- Then "the climbable trees are too sparse with leaves": fuller crowns (more crown branches and twigs, leafy sprays
+  from half way along each limb, many more clumps; a narrower clear space over the walks). Oak about 33k triangles,
+  maple 28k, great camphor 52k. Their sprays draw on a generator of their own, so leaf settings never move the limbs;
+  the maple's limbs are turned 1.0 rad apart (0.23 m thick) so all seven seeds climb. A joined tree's leaves clear a
+  tunnel from the camera to the middle of the view (1.3 m round, 4.5 m deep), so up in a crown he is seen.

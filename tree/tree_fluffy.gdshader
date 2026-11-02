@@ -14,6 +14,11 @@ uniform float leaf_row = 0.0;
 uniform float billboard : hint_range(0.0, 1.0) = 0.85;
 uniform float normal_bend : hint_range(0.0, 1.0) = 0.8;
 uniform float alpha_cut : hint_range(0.05, 0.95) = 0.45;
+// A tunnel through the leaves from the camera to the middle of the view, `camera_clear` metres round (0: off) and
+// `clear_reach` deep: cards in it shrink away, so a camera behind someone up a tree (a follow camera keeps him in the
+// middle) sees him past the leaves rather than the leaves (TreeGen.joined).
+uniform float camera_clear = 0.0;
+uniform float clear_reach = 4.5;
 
 varying float v_seed;
 
@@ -26,6 +31,12 @@ void vertex() {
 	vec3 here = (MODELVIEW_MATRIX * vec4(VERTEX, 1.0)).xyz + shift;
 	// (a card right by the camera would fill the view: it shrinks away)
 	float half_size = CUSTOM0.w * length(MODEL_MATRIX[0].xyz) * smoothstep(0.4, 2.0, -c.z);
+	float clear = 1.0;
+	if (camera_clear > 0.0) {
+		clear = max(smoothstep(camera_clear * 0.5, camera_clear, length(c.xy)), smoothstep(clear_reach - 1.0, clear_reach, -c.z));
+	}
+	half_size *= clear;
+	here = c + (here - c) * clear;
 	vec2 corner = vec2(UV.x * 2.0 - 1.0, 1.0 - UV.y * 2.0);
 	VERTEX = mix(here, c + vec3(corner * half_size, 0.0), billboard);
 	NORMAL = normalize((MODELVIEW_MATRIX * vec4(NORMAL, 0.0)).xyz);

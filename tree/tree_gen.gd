@@ -259,26 +259,26 @@ const PRESETS := {
 	# Trees to climb (see `climbable`): limbs to stand and walk on, a jump apart.
 	# (bark textures, bigger trunks, branches joined and leaves on their twigs: Ringtail, 2026-11-02, "the trees need bark
 	# textures and the branches need work, especially with how the leaves connect. The trunks should be bigger")
-	"Climbing oak": {climbable = true, height = 12.0, trunk_radius = 0.75, trunk_base = 0.3, children = 6, lean = 0.02, bend = 0.1, root_flare = 0.6, roots = 6,
-		bark = Color(0.5, 0.42, 0.34), bark_style = Bark.OAK, joined = true, levels = 3, twigs = 5, twig_angle = 42.0, angle_random = 14.0, length = 0.42,
-		twig_length = 0.45, radius_ratio = 0.42, start = 0.82, end = 0.95, crown_shape = Crown.SPHERICAL, apical = 0.15,
-		gravitropism = 0.25, droop = 0.05, curl = 0.2, wildness = 0.35, leaf_style = Leaves.FLUFFY, clump_size = 0.62,
-		leaf_density = 2.2, leaf_reach = 0.85, fill = 0.0, limbs = 7, first_limb = 1.3, limb_step = 1.25, limb_turn = 0.8,
+	"Climbing oak": {climbable = true, height = 12.0, trunk_radius = 0.75, trunk_base = 0.3, children = 8, lean = 0.02, bend = 0.1, root_flare = 0.6, roots = 6,
+		bark = Color(0.5, 0.42, 0.34), bark_style = Bark.OAK, joined = true, levels = 3, twigs = 6, twig_angle = 42.0, angle_random = 14.0, length = 0.42,
+		twig_length = 0.45, radius_ratio = 0.42, start = 0.55, end = 0.95, crown_shape = Crown.SPHERICAL, apical = 0.15,
+		gravitropism = 0.25, droop = 0.05, curl = 0.2, wildness = 0.35, leaf_style = Leaves.FLUFFY, clump_size = 0.9,
+		leaf_density = 1.5, cards = 0.6, card_size = 1.25, leaf_reach = 0.85, fill = 0.0, limbs = 7, first_limb = 1.3, limb_step = 1.25, limb_turn = 0.8,
 		limb_length = 4.6, limb_radius = 0.3, limb_rise = 0.1},
-	"Climbing maple": {climbable = true, height = 9.4, trunk_radius = 0.55, trunk_base = 0.3, children = 5, lean = 0.03, bend = 0.12, root_flare = 0.5, roots = 5,
-		bark = Color(0.46, 0.4, 0.36), bark_style = Bark.MAPLE, joined = true, levels = 3, twigs = 5, twig_angle = 40.0, angle_random = 12.0, length = 0.4,
-		twig_length = 0.45, radius_ratio = 0.42, start = 0.82, end = 0.95, crown_shape = Crown.SPHERICAL, apical = 0.2,
-		gravitropism = 0.22, droop = 0.08, curl = 0.15, wildness = 0.35, leaf_style = Leaves.FLUFFY, clump_size = 0.58,
-		leaf_density = 2.2, leaf_reach = 0.85, fill = 0.0, leaves_inner = Color(0.36, 0.06, 0.04),
+	"Climbing maple": {climbable = true, height = 9.4, trunk_radius = 0.55, trunk_base = 0.3, children = 8, lean = 0.03, bend = 0.12, root_flare = 0.5, roots = 5,
+		bark = Color(0.46, 0.4, 0.36), bark_style = Bark.MAPLE, joined = true, levels = 3, twigs = 7, twig_angle = 40.0, angle_random = 12.0, length = 0.4,
+		twig_length = 0.45, radius_ratio = 0.42, start = 0.55, end = 0.95, crown_shape = Crown.SPHERICAL, apical = 0.2,
+		gravitropism = 0.22, droop = 0.08, curl = 0.15, wildness = 0.35, leaf_style = Leaves.FLUFFY, clump_size = 0.8,
+		leaf_density = 2.0, cards = 0.6, card_size = 1.25, leaf_reach = 0.85, fill = 0.0, leaves_inner = Color(0.36, 0.06, 0.04),
 		leaves_outer = Color(0.78, 0.2, 0.08), leaves_tips = Color(1.0, 0.55, 0.18), accent = Color(0.95, 0.75, 0.2, 0.15),
-		limbs = 5, first_limb = 1.3, limb_step = 1.2, limb_turn = 0.9, limb_length = 3.6, limb_radius = 0.26, limb_rise = 0.12},
+		limbs = 5, first_limb = 1.3, limb_step = 1.2, limb_turn = 1.0, limb_length = 3.6, limb_radius = 0.23, limb_rise = 0.12},
 	# A great old tree, as the shrine trees in Whisper of the Heart and Pom Poko (Ringtail, 2026-11-02: "some much bigger
 	# and taller trees"): a huge flared trunk, long broad limbs a jump apart all the way up, a wide evergreen crown.
-	"Great camphor": {climbable = true, height = 16.0, trunk_radius = 1.4, trunk_base = 0.3, children = 12, lean = 0.03, bend = 0.12, root_flare = 0.8, roots = 9,
+	"Great camphor": {climbable = true, height = 16.0, trunk_radius = 1.4, trunk_base = 0.3, children = 16, lean = 0.03, bend = 0.12, root_flare = 0.8, roots = 9,
 		bark = Color(0.48, 0.42, 0.35), bark_style = Bark.CAMPHOR, bark_tile = 1.4, joined = true, levels = 3, twigs = 7, twig_angle = 40.0, angle_random = 14.0,
 		length = 0.75, twig_length = 0.42, radius_ratio = 0.42, start = 0.6, end = 0.95, crown_shape = Crown.HEMISPHERICAL, apical = 0.15,
-		gravitropism = 0.2, droop = 0.08, curl = 0.25, wildness = 0.4, leaf_style = Leaves.FLUFFY, clump_size = 0.75,
-		leaf_density = 1.8, cards = 0.75, leaf_reach = 0.85, fill = 0.0, leaves_inner = Color(0.06, 0.16, 0.07), leaves_outer = Color(0.16, 0.36, 0.14),
+		gravitropism = 0.2, droop = 0.08, curl = 0.25, wildness = 0.4, leaf_style = Leaves.FLUFFY, clump_size = 0.95,
+		leaf_density = 1.6, cards = 0.55, card_size = 1.25, leaf_reach = 0.85, fill = 0.0, leaves_inner = Color(0.06, 0.16, 0.07), leaves_outer = Color(0.16, 0.36, 0.14),
 		leaves_tips = Color(0.42, 0.6, 0.22), limbs = 11, first_limb = 1.2, limb_step = 1.2, limb_turn = 0.85, limb_length = 9.0,
 		limb_radius = 0.34, limb_rise = 0.06, walk_width = 0.6},
 }
@@ -458,7 +458,7 @@ func simple() -> TreeGen:
 # ------------------------------------------------------------------ materials
 
 func _look_key(kind: String) -> String:
-	return var_to_str([kind, toon, rim, billboard, normal_bend, alpha_cut, fluffy_leaf, needle_density, painted_leaf, bark_style])
+	return var_to_str([kind, toon, rim, billboard, normal_bend, alpha_cut, fluffy_leaf, needle_density, painted_leaf, bark_style, joined])
 
 
 func _solid_material() -> ShaderMaterial:
@@ -488,6 +488,8 @@ func _card_material() -> ShaderMaterial:
 			m.set_shader_parameter("billboard", billboard)
 			m.set_shader_parameter("normal_bend", normal_bend)
 			m.set_shader_parameter("alpha_cut", alpha_cut)
+			# (joined, as the trees he climbs: the leaves by the camera give way to it)
+			m.set_shader_parameter("camera_clear", 1.3 if joined else 0.0)
 		Leaves.NEEDLES:
 			m.shader = NEEDLE_SHADER
 			m.set_shader_parameter("needle_density", needle_density)
@@ -843,6 +845,8 @@ func _grow_climbable() -> void:
 	_base_y = first_limb
 	_top_y = maxf(t.length, height)
 	# The limbs, spiralling up
+	var sprays_rng := RandomNumberGenerator.new()
+	sprays_rng.seed = _rng.seed + 31
 	var turn := _rng.randf() * TAU
 	for i in limbs:
 		# (a little uneven, but never further than a jump from the one below)
@@ -861,8 +865,12 @@ func _grow_climbable() -> void:
 			_radius_along(limb, at) * 0.8, 2)
 		fork.parent = limb
 		_branches.append(fork)
+		# (the sprays draw on a generator of their own, so how leafy it is never moves the limbs he climbs)
+		var limbs_rng := _rng
+		_rng = sprays_rng
 		_sprays(limb)
 		_sprays(fork)
+		_rng = limbs_rng
 	# The rest of the crown, grown as any tree's is, so it reads as one tree: `children` branches off the
 	# trunk from `trunk_base` up (not walked on; leaves kept off the walks, see _over_walk), and limbs
 	# going on up from the trunk's top
@@ -888,7 +896,7 @@ func _over_walk(p: Vector3, size: float) -> bool:
 			var near := a + ab * f
 			var off := p - near
 			# (above it by up to his height and a jump, or beside it within his reach)
-			if Vector2(off.x, off.z).length() < size * 0.7 + 0.6 and off.y > -size * 0.6 and off.y < 2.0 + size * 0.5:
+			if Vector2(off.x, off.z).length() < size * 0.5 + 0.45 and off.y > -size * 0.6 and off.y < 1.7 + size * 0.4:
 				return true
 	return false
 
