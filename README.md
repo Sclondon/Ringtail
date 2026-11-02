@@ -66,6 +66,7 @@ and jumps to each Bottlecap.
 
 ## Credits
 
-- Font: Pixelify Sans (Stefie Justprince, SIL Open Font License 1.1; `fonts/OFL.txt`), from Google Fonts. The game's
+- Font: Pixelify Sans (The Pixelify Sans Project Authors, github.com/eifetx/Pixelify-Sans; SIL Open Font License 1.1;
+  `fonts/OFL.txt`), from Google Fonts. The game's
   default font (project setting `gui/theme/custom_font`), imported without antialiasing so it stays crisp. The
   user, 2026-11-02: "find a cuter font", "a pixelated one maybe".
