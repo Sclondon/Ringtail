@@ -16,6 +16,11 @@ signal respawned
 
 enum Mind { FOLLOW, SNIFF, SCATTER, SIT }
 
+## Landing faster than this (m/s) kills it.
+const DEADLY_FALL := 17.0
+
+var dead := false
+
 ## (what the rig reads of a body)
 var walk_speed := 1.0
 var run_speed := 4.4
@@ -68,15 +73,24 @@ func _physics_process(delta: float) -> void:
 	var hero_speed := Vector2(hero.velocity.x, hero.velocity.z).length()
 	_still = _still + delta if hero_speed < 0.2 and hero.is_on_floor() else 0.0
 
-	# Far behind (a fall, a climb he cannot follow): put back near him, out of sight behind
-	if flat_to.length() > 18.0 or global_position.y < -20.0:
-		var behind := -Vector3(sin(hero.facing_yaw), 0.0, cos(hero.facing_yaw))
-		var aside := behind.cross(Vector3.UP) * (index - 2) * 0.5
-		global_position = hero.global_position + behind * 2.0 + aside + Vector3.UP * 0.3
-		velocity = Vector3.ZERO
-		mind = Mind.FOLLOW
-		respawned.emit()
+	# (far behind it is never put back by him: it runs after him, or is left behind; the user, 2026-11-02, "the
+	# kits should not teleport to you". Off the bottom of the world, it is dead.)
+	if global_position.y < -20.0:
+		die(velocity)
 		return
+	# Hit by a car going at any speed: dead
+	for car: Node in get_tree().get_nodes_in_group(&"cars"):
+		var body := car as Node3D
+		var moving: float = car.get(&"speed") if car.get(&"speed") is float else 0.0
+		if body == null or moving < 1.5:
+			continue
+		# (within the car's own box: about 2 m wide, 4.6 m long)
+		var local := body.to_local(global_position)
+		if absf(local.x) < 1.05 and absf(local.z) < 2.3 and local.y < 1.6:
+			var away := global_position - body.global_position
+			away.y = 0.0
+			die(away.normalized() * moving + Vector3.UP * 3.0)
+			return
 
 	# What its mind is on
 	var threat := squad.threat_near(global_position, 4.5)
@@ -167,7 +181,23 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 	if is_on_floor() and not _was_floor:
 		landed.emit(_fall_speed)
+		if _fall_speed > DEADLY_FALL:
+			die(Vector3.DOWN * _fall_speed * 0.3)
+			return
 	_was_floor = is_on_floor()
+
+
+## Killed: it goes limp where it is, a ragdoll, and moves no more of itself (the user, 2026-11-02: "if they die they
+## should just rag doll and stop moving"). Out of the band for good.
+func die(push: Vector3) -> void:
+	if dead:
+		return
+	dead = true
+	set_physics_process(false)
+	collision_layer = 0
+	collision_mask = 0
+	squad.lose(self)
+	rig.go_limp(push)
 
 
 ## Sent running from `from` for a while.

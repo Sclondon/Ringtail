@@ -105,6 +105,13 @@ func something_to_sniff(near: Vector3, hero_at: Vector3, member: SquadRaccoon) -
 	return choices.pick_random() if not choices.is_empty() else null
 
 
+## One of the band is dead: the rest close up the ring.
+func lose(member: SquadRaccoon) -> void:
+	members.erase(member)
+	for k in members.size():
+		members[k].index = k
+
+
 ## The nearest danger within `reach` of `at`, or Vector3.INF.
 func threat_near(at: Vector3, reach: float) -> Vector3:
 	var best := Vector3.INF

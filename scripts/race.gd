@@ -56,7 +56,8 @@ func _process(delta: float) -> void:
 
 func _on_body(body: Node) -> void:
 	if body is Player and not running and _rest <= 0.0 and not route.is_empty():
-		start()
+		# (not inside the physics signal: the pickups it makes set up their areas)
+		start.call_deferred()
 
 
 func start() -> void:
