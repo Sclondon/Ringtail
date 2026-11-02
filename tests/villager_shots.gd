@@ -1,6 +1,6 @@
 extends SceneTree
 ## Pictures of the other raccoons (Villagers): the grove's gathering from four sides and above, a kit beside a
-## grown-up close up from four sides, the talk button and box, and a raccoon out in the town.
+## grown-up close up from four sides, its speech bubble, and a raccoon out in the town.
 ##   godot --path . --audio-driver Dummy --fixed-fps 60 --resolution 1280x720 -s res://tests/villager_shots.gd -- --out=<dir>
 ## Needs a window (kept off the screen).
 
@@ -95,12 +95,9 @@ func _run() -> void:
 	world.player.velocity = Vector3.ZERO
 	world.camera.snap()
 	await _frames(40)
-	await _shot("talk_prompt")
-	band.talk.press()
-	print("talking to %s (prompt was %s, hero state %s floor %s)" % [band.talk.talking, band.talk._prompt.visible, world.player.state, world.player.is_on_floor()])
-	await _frames(90)
-	await _shot("talk_box")
-	band.talk.close()
+	# (near one, it says its line in a bubble over its head: Chatter)
+	await _frames(60)
+	await _shot("talk_bubble")
 
 	# Out in the town
 	var goer: Villager = null

@@ -13,6 +13,9 @@ extends Node
 @export var reach := 0.5
 ## How tall his collider is while he scurries (Player.height_cap).
 @export var low_height := 0.62
+## How fast he scurries along the ground: slower than he runs (the user, 2026-11-02, "scurrying should be slower than
+## running"; his run is 4.4 m/s). Player.speed_cap.
+@export var scurry_speed := 3.2
 
 var held := false
 var climbing := false
@@ -66,6 +69,7 @@ func _physics_process(delta: float) -> void:
 		_player.height_cap = low_height
 	elif _player.height_cap < INF and _player._has_headroom(_player.stand_height):
 		_player.height_cap = INF
+	_player.speed_cap = scurry_speed if held else INF
 	var free := _player.state == Player.State.FREE and not _player.is_limp
 	if not free or not held:
 		climbing = false

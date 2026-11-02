@@ -319,6 +319,9 @@ var is_crawling := false
 ## The tallest his collider may be just now, whatever his stance (INF: no limit). Set from outside: a figure on
 ## all fours climbing, as Ringtail's Scurry, is held this low so it is not caught under what it climbs past.
 var height_cap := INF
+## The fastest he may go on the ground just now (INF: no limit). Set from outside: Ringtail's Scurry holds him
+## below his run ("scurrying should be slower than running", 2026-11-02).
+var speed_cap := INF
 ## Swimming, with his head under.
 var is_underwater := false
 ## How far through a swing of a bat he is, 0..1 (1: not swinging).
@@ -1014,6 +1017,7 @@ func _move_horizontal(strength: float, grounded: bool, delta: float) -> void:
 			target_speed = sprint_speed
 		if is_pushing:
 			target_speed = minf(target_speed, push_speed)
+		target_speed = minf(target_speed, speed_cap)
 		if is_ducking:
 			target_speed = minf(target_speed, crawl_speed if is_crawling else crouch_speed)
 		if swing_progress < 1.0:

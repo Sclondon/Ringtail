@@ -34,7 +34,7 @@ var villagers: Villagers
 var rig: RaccoonRig
 var kit := false
 var dead := false
-## Its name over the talk box, and what it says, a line at a time (empty: it has nothing to say).
+## Its name, and what it says, a line at a time in a bubble over its head (empty: it has nothing to say).
 var display_name := ""
 var lines: PackedStringArray = []
 ## At the grove: where it keeps to. In the town: the haunts it goes round, and which it is making for.
@@ -224,8 +224,6 @@ func die(push: Vector3) -> void:
 		return
 	dead = true
 	remove_from_group(&"talkers")
-	if villagers.talk and villagers.talk.talking == self:
-		villagers.talk.close()
 	set_physics_process(false)
 	collision_layer = 0
 	collision_mask = 0

@@ -1,6 +1,8 @@
 class_name SpeechBubble
 extends Node3D
-# A speech bubble for a crow. Where it hangs is 3D (this node sits above the
+# A speech bubble (from Hemlock's Tower, where it was a crow's; in Ringtail drawn as Gloaming's talk box: a dark
+# see-through pill, white words typed out, the speaker's name small over its corner: the user, 2026-11-02, "the pop
+# up texts needs to be like gloaming though on a see through background and type writer in"). Where it hangs is 3D (this node sits above the
 # crow's head), but it's drawn flat on the UI overlay at full resolution: the
 # 3D view renders at half size, and text written into it came out soft,
 # see-through and hard to read. The balloon tracks its crow on screen, pops
@@ -13,13 +15,17 @@ const FONT_SIZE := 22
 const MAX_WIDTH := 320.0             # wrap width, in overlay pixels
 const TAIL := 12.0
 const MARGIN := 8.0                  # kept this far inside the screen edges
-const PAPER := Color(1.0, 0.97, 0.9)
-const EDGE := Color(0.15, 0.08, 0.2)
-const INK := Color(0.12, 0.06, 0.16)
+const PAPER := Color(0.04, 0.04, 0.06, 0.62)
+const EDGE := Color(0.0, 0.0, 0.0, 0.0)
+const INK := Color(1.0, 1.0, 1.0)
+## Letters a second the words are typed out at.
+const TYPE_SPEED := 40.0
 
 var box: Control                     # the balloon and its tail, on the overlay
 var panel: PanelContainer
 var label: Label
+var speaker: Label
+var _typed := 0.0
 var openness := 0.0
 var want := false
 var hold := 0.0                      # seconds left on a timed line (say)
@@ -30,17 +36,21 @@ class Tail extends Control:
 	func _draw() -> void:
 		var w := size.x
 		draw_colored_polygon(PackedVector2Array([Vector2(0, 0), Vector2(w, 0), Vector2(w * 0.5, size.y)]), PAPER)
-		draw_polyline(PackedVector2Array([Vector2(0, 0), Vector2(w * 0.5, size.y), Vector2(w, 0)]), EDGE, 3.0)
 
 # Show `text` for `seconds` (for crows that pipe up now and then)
-func say(text: String, seconds := 3.0) -> void:
+func say(text: String, seconds := 3.0, who := "") -> void:
 	setup(text)
+	if speaker:
+		speaker.text = who
+		speaker.visible = who != ""
 	hold = seconds
 
 func setup(text: String) -> void:
 	if box == null:
 		_build()
 	label.text = text
+	_typed = 0.0
+	label.visible_characters = 0
 	# Size it by hand: an autowrapping label only learns its height after a
 	# layout pass, and until then the balloon comes out tall and narrow
 	var font: Font = label.get_theme_font("font")
@@ -63,10 +73,10 @@ func _build() -> void:
 	var style := StyleBoxFlat.new()
 	style.bg_color = PAPER
 	style.border_color = EDGE
-	style.set_border_width_all(3)
-	style.set_corner_radius_all(6)
-	style.content_margin_left = 12
-	style.content_margin_right = 12
+	style.set_border_width_all(0)
+	style.set_corner_radius_all(20)
+	style.content_margin_left = 18
+	style.content_margin_right = 18
 	style.content_margin_top = 7
 	style.content_margin_bottom = 8
 	panel.add_theme_stylebox_override("panel", style)
@@ -78,6 +88,15 @@ func _build() -> void:
 	label.add_theme_color_override("font_color", INK)
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	panel.add_child(label)
+	speaker = Label.new()
+	speaker.add_theme_font_size_override("font_size", 15)
+	speaker.add_theme_color_override("font_color", Color(1.0, 0.9, 0.62))
+	speaker.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.8))
+	speaker.add_theme_constant_override("outline_size", 4)
+	speaker.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	speaker.position = Vector2(14, -20)
+	speaker.visible = false
+	box.add_child(speaker)
 	var tail := Tail.new()
 	tail.name = "Tail"
 	tail.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -97,7 +116,7 @@ func tick(delta: float, want_open: bool) -> void:
 	want = want_open or hold > 0.0
 	openness = move_toward(openness, 1.0 if want else 0.0, delta * 6.0)
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if box == null:
 		return
 	if box.get_parent() == null and overlay:
@@ -108,6 +127,10 @@ func _process(_delta: float) -> void:
 	box.visible = shown
 	if not shown:
 		return
+	# (the words typed out)
+	if label.visible_characters >= 0 and label.visible_characters < label.text.length():
+		_typed += delta * TYPE_SPEED
+		label.visible_characters = mini(int(_typed), label.text.length())
 	panel.reset_size()                # (shrinks back to fit, if it grew while laying out)
 	var size := panel.size
 	var tail: Control = box.get_node("Tail")

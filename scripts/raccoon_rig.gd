@@ -25,8 +25,12 @@ const WALK_FEET := [0.0, 0.5, 0.25, 0.75]
 ## Sprinting he bounds: both hind feet push off nearly together, he flies stretched out, lands on both
 ## fore paws, and gathers his hind feet up under him (the user: "more of a bounding leap"; and again, 2026-11-02,
 ## "I liked when the all 4s run was more of basically a jump").
-const BOUND_FEET := [0.0, 0.04, 0.5, 0.54]
+const BOUND_FEET := [0.0, 0.04, 0.6, 0.64]
 const BOUND_STRIDE := 2.6
+## The part of a stride he is in the air bounding: from the hind feet leaving the ground (BOUND_FEET[1] + the duty) to
+## the fore paws coming down (BOUND_FEET[2]).
+const BOUND_UP := 0.34
+const BOUND_DOWN := 0.6
 ## Scurrying fast he gallops as a raccoon does (Muybridge, Animal Locomotion plate 744, "Raccoon walking, changing
 ## to a gallop"; the user, 2026-11-02, "the scurry can use this new animation"): a hind foot, then the other a beat
 ## later (not a mirrored pair: "his back legs seem so mirrored and stiff"), a short flight stretched out, a fore
@@ -665,7 +669,11 @@ func _pose_quad(w: float, speed: float, stride: float) -> void:
 	# The bound: he is thrown up and forward off his hind feet, and hops up a little again off his fore paws (a
 	# raccoon's run, 2026-11-01, "higher quality a little bouncier and more raccoonie": a bouncy lope, the rump thrown
 	# high, a humped back, a rolling waddle, hind feet reaching up by the fore paws).
-	var flight := _bump(_qphase, 0.2, 0.62) * 0.21 + _bump(fposmod(_qphase - 0.7, 1.0), 0.0, 0.34) * 0.08
+	# (one clean arc through the air, as a thrown thing goes, from the hind feet leaving the ground to the fore paws
+	# landing, and none while a foot is down: the user, 2026-11-02, "he needs to have a cleaner arc through the air
+	# between bounds while running")
+	var aloft := clampf((_qphase - BOUND_UP) / (BOUND_DOWN - BOUND_UP), 0.0, 1.0)
+	var flight := 4.0 * aloft * (1.0 - aloft) * 0.24
 	# The gallop, after the plate: low and long, not thrown high. Gathered (his hind feet swung far forward under his
 	# belly to land just behind his fore paws) his back is arched, the rump its highest point; reaching (after the
 	# hind feet push off, before the fore paws land) he is stretched out long and nearly flat. `gather` is 1 gathered,

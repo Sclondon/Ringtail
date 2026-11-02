@@ -3,15 +3,16 @@ extends CanvasLayer
 ## The other raccoons talk as the crows in Hemlock's Tower do (the user, 2026-11-02: "the text should just be like
 ## Hemlock's Tower where they say things rather than like a popup"): come near one with something to say and it
 ## turns to him and says it in a speech bubble over its head (SpeechBubble, from Hemlock's Tower), then its next
-## line a little after, and so on while he stays; walk off and it goes back to what it was doing. Nothing to press,
-## and he is never stopped.
+## line after a good pause, through its lines once; walk off and it goes back to what it was doing (and has its say
+## again next time). Only the nearest one talks, one bubble at a time (the user, 2026-11-02: "they are spamming, why
+## too many things"). Nothing to press, and he is never stopped.
 ##
 ## Anyone to talk is in `Villagers.members` with `lines` (Villager.talks()).
 
 ## How near he must come, how long each line shows and the pause before the next.
 const REACH := 2.6
-const SHOWN := 3.6
-const PAUSE := 1.2
+const SHOWN := 4.0
+const PAUSE := 3.5
 
 var villagers: Villagers
 var _overlay: Control
@@ -47,11 +48,19 @@ func _process(delta: float) -> void:
 	var hero := villagers.player
 	if hero == null:
 		return
+	# (the one nearest him, of those that can talk, is the only one that talks)
+	var nearest: Villager
+	var best := REACH
+	for who: Villager in villagers.members:
+		if is_instance_valid(who) and who.talks() and not who.dead and who.doing != Villager.Doing.FLEE:
+			var d := hero.global_position.distance_to(who.global_position)
+			if d < best:
+				best = d
+				nearest = who
 	for who: Villager in villagers.members:
 		if not is_instance_valid(who) or not who.talks():
 			continue
-		var near := not who.dead and who.doing != Villager.Doing.FLEE \
-				and hero.global_position.distance_to(who.global_position) < REACH
+		var near := who == nearest
 		var was: bool = _near.get(who, false)
 		if not near and not was and not _bubbles.has(who):
 			continue
@@ -59,15 +68,16 @@ func _process(delta: float) -> void:
 		if near and not was:
 			who.listen(true)
 			_wait[who] = 0.0
+			_line[who] = 0
 		elif was and not near:
 			who.listen(false)
 		_near[who] = near
 		if near:
 			_wait[who] = float(_wait[who]) - delta
-			if _wait[who] <= 0.0:
-				# (its next line; round again after the last)
+			if _wait[who] <= 0.0 and int(_line[who]) < who.lines.size():
+				# (its next line, until it has said them all)
 				var k: int = _line[who]
-				bubble.say(who.lines[k % who.lines.size()], SHOWN)
+				bubble.say(who.lines[k], SHOWN, who.display_name)
 				_line[who] = k + 1
 				_wait[who] = SHOWN + PAUSE
 		bubble.tick(delta, false)
