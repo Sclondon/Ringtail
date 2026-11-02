@@ -84,6 +84,7 @@ func _ready() -> void:
 	# daughter of the wind")
 	PuffClouds.add_to(self, _sun)
 	Squad.place(self, player)
+	Villagers.place(self, markers, player)
 	add_child(N64Filter.new())
 	hud = Hud.new()
 	hud.world = self

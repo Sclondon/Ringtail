@@ -258,6 +258,30 @@ func _run() -> void:
 	world.hurt(player.global_position + Vector3.FORWARD)
 	_check(world.hearts == World.MAX_HEARTS - 1, "hurt takes a heart")
 	_release()
+
+	# The other raccoons: grown-ups and kits at the grove, some out in the town; one can be talked to
+	var villagers := world.get_node(^"Villagers") as Villagers
+	var at_grove := villagers.members.filter(func(m: Villager) -> bool: return m.home != Vector3.INF)
+	var kits := at_grove.filter(func(m: Villager) -> bool: return m.kit)
+	var out_about := villagers.members.filter(func(m: Villager) -> bool: return not m.route.is_empty())
+	_check(at_grove.size() >= 6 and kits.size() >= 3 and out_about.size() >= 3, "raccoons at the grove (%d, %d kits) and about the town (%d)" % [at_grove.size(), kits.size(), out_about.size()])
+	var talker: Villager = at_grove[0]
+	await _put(talker.global_position + Vector3(0.0, 0.4, 1.0))
+	var prompted: bool = villagers.talk._prompt.visible
+	villagers.talk.press()
+	# (whoever is nearest: a kit may have run up closer)
+	var opened := villagers.talk.talking != null and Player.input_blocked
+	for _i in 12:
+		if villagers.talk.talking == null:
+			break
+		villagers.talk.press()
+		await physics_frame
+	_check(prompted and opened and villagers.talk.talking == null and not Player.input_blocked, "talks to a raccoon at the grove, and the talk ends")
+	# (killed, one goes limp where it is and stays: it is never put back)
+	var goner: Villager = out_about[0]
+	goner.global_position.y = -25.0
+	await _frames(5)
+	_check(goner.dead and goner.global_position.y < -20.0, "a raccoon off the world is dead, not put back")
 	print("PASSED" if failures.is_empty() else "FAILED: " + ", ".join(failures))
 	quit(0 if failures.is_empty() else 1)
 
