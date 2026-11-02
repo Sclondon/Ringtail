@@ -56,27 +56,18 @@ func _run() -> void:
 	world.camera.set_process(false)
 	world.camera.set_physics_process(false)
 
-	# Up the chimney: scurry up it from its foot, over the top onto its cap
+	# Up the chimney: the factory's stack on the Industrial side (tools/buildings.py; tests/building_routes.gd walks
+	# its route up): the cap stands on a surface at its route's top, and the stack is climbable
 	var cap := _cap("roof")
-	var foot := Vector3(cap.x, 0.0, cap.z)
 	var space := world.get_world_3d().direct_space_state
-	var hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(foot + Vector3(0.0, cap.y - 1.0, 2.0), foot + Vector3(0.0, -80.0, 2.0), 1, [player.get_rid()]))
-	var ground := (hit.position as Vector3).y if not hit.is_empty() else cap.y - 16.0
-	await _put(Vector3(cap.x, ground + 0.2, cap.z + 1.3), foot)
-	(player.get_node(^"Scurry") as Scurry).button = true
-	Input.action_press(&"move_up")
-	var nearest := INF
-	for _i in 600:
-		await physics_frame
-		nearest = minf(nearest, player.global_position.distance_to(cap))
-		if nearest < 0.8:
-			break
-	_release()
-	_check(nearest < 0.8, "up the chimney to its Bottlecap (came within %.1f m)" % nearest)
+	var hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(cap + Vector3.UP * 0.2, cap + Vector3.DOWN * 1.5, 1, [player.get_rid()]))
+	var stack := world.find_children("climb_factory_*", "MeshInstance3D", true, false)
+	_check(not hit.is_empty() and cap.y - (hit.position as Vector3).y < 1.0 and cap.y > 10.0 and not stack.is_empty(),
+		"the chimney's Bottlecap on its factory's route top (%.1f m up, a surface %.2f m under it, climbable stack %s)" % [cap.y, cap.y - ((hit.position as Vector3).y if not hit.is_empty() else -99.0), not stack.is_empty()])
 
 	# The glide: from the back of the hilltop flats' roof, jump, jump again to twirl, and glide to the billboard
 	cap = _cap("glide")
-	var flats := world.find_child("danchi_10", true, false) as MeshInstance3D
+	var flats := world.find_child("flats_10", true, false) as MeshInstance3D
 	var box := flats.global_transform * flats.get_aabb()
 	var roof_top := box.end.y - 3.0
 	var middle := box.get_center()
@@ -97,7 +88,7 @@ func _run() -> void:
 	await _frames(4)
 	player._queue_jump()
 	Input.action_press(&"jump")
-	nearest = INF
+	var nearest := INF
 	var landed_y := -INF
 	for _i in 900:
 		await physics_frame

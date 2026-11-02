@@ -21,7 +21,7 @@ func _check(ok: bool, what: String) -> void:
 func _run(world: World) -> void:
 	for _i in 20:
 		await physics_frame
-	var heart: Vector3 = world.markers["grove_heart"].origin if world.markers.has("grove_heart") else Vector3.ZERO
+	var heart: Vector3 = world.markers.get("haven", world.markers.get("grove_heart", Transform3D())).origin
 	# (unless the world has its own zones already)
 	var zones := world.zones
 	if zones == null or zones.names.is_empty():

@@ -60,7 +60,7 @@ func _run() -> void:
 			(node as Node3D).global_position.y = -300.0
 
 	# Running goes onto all fours, bounding
-	await _put(Vector3(0.0, 0.15, 41.6))
+	await _put(Vector3(0.0, 0.15, 63.6))
 	Input.action_press(&"move_up")
 	var most := 0.0
 	var bound := 0.0
@@ -71,7 +71,7 @@ func _run() -> void:
 	_check(most > 0.9 and bound > 0.5, "running on all fours (quad %.2f)" % most)
 
 	# Scurrying, he goes on all fours at a walk too
-	await _put(Vector3(0.0, 0.15, 41.6))
+	await _put(Vector3(0.0, 0.15, 63.6))
 	(player.get_node(^"Scurry") as Scurry).button = true
 	await _frames(10)
 	Input.action_press(&"move_up", 0.35)
@@ -80,7 +80,7 @@ func _run() -> void:
 	(player.get_node(^"Scurry") as Scurry).button = false
 
 	# Jump pressed again in the air and held: the twirl, falling slowly
-	await _put(Vector3(0.0, 0.15, 41.6))
+	await _put(Vector3(0.0, 0.15, 63.6))
 	Input.action_press(&"jump")
 	player._queue_jump()
 	var glided := false
@@ -109,7 +109,7 @@ func _run() -> void:
 	cat.set_physics_process(true)
 
 	# The long jump: flat out, duck into a slide and jump, and he goes long
-	await _put(Vector3(0.0, 0.15, -41.6))
+	await _put(Vector3(0.0, 0.15, -63.6))
 	Input.action_press(&"move_up")
 	await _frames(45)
 	Input.action_press(&"duck")
@@ -126,7 +126,7 @@ func _run() -> void:
 	_check(long_speed > 8.0, "a long jump out of a slide (%.1f m/s along)" % long_speed)
 
 	# The spin in the air is a second jump
-	await _put(Vector3(0.0, 0.15, 41.6))
+	await _put(Vector3(0.0, 0.15, 63.6))
 	Input.action_press(&"jump")
 	player._queue_jump()
 	await _frames(16)
@@ -138,7 +138,7 @@ func _run() -> void:
 	await _frames(60)
 
 	# A spin in the air
-	await _put(Vector3(0.0, 0.15, 41.6))
+	await _put(Vector3(0.0, 0.15, 63.6))
 	player._queue_jump()
 	await _frames(12)
 	moves.press()
@@ -181,10 +181,11 @@ func _run() -> void:
 
 	# Dropped onto a wire (GameCommon's Tightrope, Warren's) he lands on it and walks it; duck and he hangs under it
 	var wire: Tightrope
+	# (the shortest span in the world, over 8 m: a long one sags and bounces him further, and the test reads him
+	# a while after landing)
 	for node in world.get_children():
-		if node is Tightrope:
+		if node is Tightrope and (node as Tightrope).span() > 8.0 and (wire == null or (node as Tightrope).span() < wire.span()):
 			wire = node
-			break
 	_check(wire != null, "the world has wires")
 	if wire:
 		_release()
@@ -227,7 +228,7 @@ func _run() -> void:
 		_check(swimming and highest - pond.surface_y() > 1.7, "a leap out of the water (%.2f m over it)" % (highest - pond.surface_y()))
 
 	# Whipping the stick round he spins; jumping then is a spin jump, higher than a jump
-	await _put(Vector3(0.0, 0.15, 41.6))
+	await _put(Vector3(0.0, 0.15, 63.6))
 	var spinner := player.get_node(^"SpinJump") as SpinJump
 	player.is_spinning = true
 	player._queue_jump()
@@ -244,10 +245,12 @@ func _run() -> void:
 
 	# Scurrying into a power pole, he climbs it
 	var scurry := player.get_node(^"Scurry") as Scurry
-	await _put(Vector3(47.34, 0.15, 11.43))
+	# (a step from a ring pole, facing it: the world's smoke_pole marker)
+	var pole_at: Vector3 = world.markers["smoke_pole"].origin if world.markers.has("smoke_pole") else Vector3(58.93, 0.15, 14.54)
+	await _put(pole_at)
 	world.camera.set_process(false)
 	world.camera.set_physics_process(false)
-	world.camera.global_transform = Transform3D(Basis(Vector3.UP, PI), Vector3(47.34, 2.0, 7.63))
+	world.camera.global_transform = Transform3D(Basis(Vector3.UP, PI), pole_at + Vector3(0.0, 1.85, -3.8))
 	scurry.button = true
 	Input.action_press(&"move_up")
 	var base := player.global_position.y
@@ -272,19 +275,28 @@ func _run() -> void:
 	var kits := at_grove.filter(func(m: Villager) -> bool: return m.kit)
 	var out_about := villagers.members.filter(func(m: Villager) -> bool: return not m.route.is_empty())
 	_check(at_grove.size() >= 6 and kits.size() >= 3 and out_about.size() >= 3, "raccoons at the grove (%d, %d kits) and about the town (%d)" % [at_grove.size(), kits.size(), out_about.size()])
-	var talker: Villager = at_grove[0]
+	# (one free to talk: not up a tree, chatting with another or running off)
+	var free: Array = at_grove.filter(func(m: Villager) -> bool: return m.talks() and m.doing != Villager.Doing.CLIMB and m.doing != Villager.Doing.CHAT and m.doing != Villager.Doing.FLEE)
+	var talker: Villager = free[0] if not free.is_empty() else at_grove[0]
 	await _put(talker.global_position + Vector3(0.0, 0.4, 1.0))
-	await _frames(30)
+	# (kept beside it: in the bigger clearing it may wander off meanwhile)
+	for _i in 30:
+		player.global_position = talker.global_position + Vector3(0.0, 0.4, 1.0)
+		await physics_frame
 	# (whichever is nearest him talks: a kit may have run up closer)
 	var open := func() -> Array: return villagers.talk._bubbles.values().filter(func(b: SpeechBubble) -> bool: return b.openness > 0.5)
-	var said: bool = (open.call() as Array).size() == 1
-	await _put(talker.global_position + Vector3(0.0, 0.4, 12.0))
+	var spoke: Array = open.call()
+	var said: bool = villagers.talk.busy() and not spoke.is_empty()
+	# (and then right away from them all, out on the ring road)
+	await _put(Vector3(0.0, 0.15, -63.6))
 	await _frames(40)
 	# (the one that spoke to him: others may be chatting among themselves meanwhile)
 	var stopped: bool = not villagers.talk._near.get(talker, false) and villagers.talk.bubble_of(talker).openness < 0.1
 	_check(said and stopped and not Player.input_blocked, "a raccoon at the grove says its line in a bubble as he comes near, and stops as he goes")
 	# (killed, one goes limp where it is and stays: it is never put back)
 	var goner: Villager = out_about[0]
+	# (running, wherever it is: ZoneStreaming pauses one out in another zone)
+	goner.process_mode = Node.PROCESS_MODE_INHERIT
 	goner.global_position.y = World.KILL_Y - 5.0
 	await _frames(5)
 	_check(goner.dead and goner.global_position.y < World.KILL_Y, "a raccoon off the world is dead, not put back")

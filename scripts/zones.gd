@@ -13,8 +13,8 @@ extends Node
 signal changed
 
 ## How far the grove's zone reaches from its heart (m): the clearing, the woods round it and the ring road
-## (build_town.py: ROAD's outer edge 47.6).
-const GROVE_RADIUS := 48.0
+## (build_town.py: ROAD's outer edge 69.6), from the hill's middle (`haven`).
+const GROVE_RADIUS := 72.0
 
 var world: World
 ## Each zone: its name and middle, and its counts.
@@ -46,7 +46,7 @@ static func place(world: World) -> Zones:
 		zones.names.append(String(zone[1]) if zone[1] != "" else "Zone %d" % (int(zone[0]) + 1))
 		zones.middles.append(zone[2])
 	if not zones.names.is_empty():
-		zones.heart = (world.markers["grove_heart"] as Transform3D).origin if world.markers.has("grove_heart") else Vector3.ZERO
+		zones.heart = (world.markers.get("haven", world.markers.get("grove_heart", Transform3D())) as Transform3D).origin
 		zones.grove = zones.names.size()
 		zones.names.append("Grove")
 		zones.middles.append(zones.heart)

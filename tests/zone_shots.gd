@@ -68,6 +68,13 @@ func _filter(on: bool) -> void:
 			node.visible = on
 
 
+## A point of a face's own frame (x across it, z down it from the hill's middle) in the world (build_town.py's
+## FACES: City south, Industrial east, Construction north, Rural west).
+func _face(f: int, x: float, y: float, z: float) -> Vector3:
+	var turn := PI / 2.0 * f
+	return Vector3(x * cos(turn) + z * sin(turn), y, z * cos(turn) - x * sin(turn))
+
+
 func _run() -> void:
 	await _frames(60)
 	await _shot("start")
@@ -75,21 +82,31 @@ func _run() -> void:
 	var water: Vector3 = world.markers["fishing_water"].origin
 	await _put(spot.origin, water)
 	await _shot("pond_jetty")
-	await _put(Vector3(0.0, 3.0, -6.0), Vector3(0.0, 2.0, 30.0))
+	var spring: Vector3 = world.markers["spring"].origin
+	await _put(water + (water - spring).normalized() * 3.0, spring)
+	await _shot("pond_spring")
+	await _put(Vector3(0.0, 3.0, 6.0), Vector3(0.0, 2.0, -30.0))
 	await _shot("clearing_to_the_wood")
-	# down the Station street's second run, along it
-	await _put(Vector3(10.0, 0.0, 117.0), Vector3(-30.0, -10.0, 117.0))
-	await _shot("street_filter")
+	var fir: Vector3 = world.markers["giantfir_0_60"].origin
+	await _view(fir + Vector3(12.0, 9.0, 12.0), fir + Vector3.UP * 9.0)
+	await _shot("giant_fir")
+	await _put(Vector3(0.0, 0.2, 56.0), Vector3(30.0, 0.2, 50.0))
+	await _shot("grove_wall")
+	await _put(Vector3(5.0, 0.2, 63.0), Vector3(-30.0, 0.2, 55.0))
+	await _shot("ring_road")
+	await _view(Vector3(0.0, 85.0, 95.0), Vector3(0.0, 0.0, 0.0))
+	await _shot("grove_above")
+	for f in 4:
+		var name: String = ["city", "industrial", "construction", "rural"][f]
+		await _put(_face(f, 14.0, 0.0, 130.0), _face(f, -20.0, -10.0, 150.0))
+		await _shot("street_" + name)
+		await _view(_face(f, 0.0, -18.0, 205.0), _face(f, 0.0, 10.0, 700.0))
+		await _shot("vista_" + name)
 	_filter(false)
+	await _put(_face(0, 14.0, 0.0, 130.0), _face(0, -20.0, -10.0, 150.0))
 	await _shot("street_plain")
 	_filter(true)
-	await _put(Vector3(5.0, 0.2, 41.0), Vector3(-30.0, 0.2, 30.0))
-	await _shot("ring_road")
-	await _view(Vector3(0.0, 9.0, 6.0), Vector3(-120.0, 40.0, 1000.0))
+	await _view(Vector3(0.0, 12.0, 0.0), Vector3(-400.0, 30.0, 900.0))
 	await _shot("vista_grove")
-	await _view(Vector3(0.0, -8.0, 118.0), Vector3(-200.0, 20.0, 1000.0))
-	await _shot("vista_street")
-	await _view(Vector3(0.0, 30.0, 0.0), Vector3(600.0, 20.0, 300.0))
-	await _shot("vista_east")
 	print("SHOTS DONE ", out)
 	quit()

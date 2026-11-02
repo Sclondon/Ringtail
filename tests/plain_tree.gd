@@ -33,12 +33,21 @@ func _run() -> void:
 		node.process_mode = Node.PROCESS_MODE_DISABLED
 	world.camera.set_process(false)
 	world.camera.set_physics_process(false)
-	for kind: String in ["cedar", "oak"]:
+	for kind: String in ["fir", "maplelo"]:
 		var at := Vector3.INF
+		# (the one furthest from the giant firs' leafy platforms, so he does not come down onto one)
+		var clear := -1.0
 		for name: String in world.markers:
 			if name.begins_with("treep_") and name.ends_with("_" + kind) and (world.markers[name].origin as Vector3).y > 0.5:
-				at = world.markers[name].origin
-				break
+				var here: Vector3 = world.markers[name].origin
+				var room := INF
+				for other: String in world.markers:
+					if other.begins_with("npc_perch_") or other.begins_with("giantfir_"):
+						var p: Vector3 = world.markers[other].origin
+						room = minf(room, Vector2(p.x - here.x, p.z - here.z).length())
+				if room > clear:
+					clear = room
+					at = here
 		if at == Vector3.INF:
 			_check(false, "a plain %s in the world" % kind)
 			continue

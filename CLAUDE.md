@@ -868,3 +868,63 @@ Read README.md first. Started 2026-11-01.
   `nocol_spring_water` is hidden. Waterfall, WaterSpring and FoamPatch are new in GameCommon's `godot/water`.
 - Colours and sizes are Claude's picks. Check: `tests/water_shots.gd -- --out=<dir>` (window: the spawn, the falls from
   the side and the front, the spring pool from above, the foot, the falls at night).
+
+## 2026-11-02: the Pacific Northwest town (the user's calls; supersedes the Japanese town above)
+
+- "it takes place in the PNW not japan the mountain should look more rainier like and there should be other mountains
+  as well": no torii, shrine, tiled roofs, danchi, vending machines, paddies or bamboo. The Ghibli mood stays. Every
+  building is `tools/buildings.py`'s (the BUILDINGS work: craftsman, box, farmhouse, aframe, walkup, commercial,
+  construction, factory, warehouse, substation), made at the origin and set on a levelled lot (`made_at_origin`,
+  `set_made`, `line_up`). Ring lots: LOTS kinds; the walk-up on lot 10 is `flats_10` (the glide starts from its roof).
+  Mountains (`cascades()`): Rainier south-east (a broad glaciated dome), St Helens south (a crater), Adams, Baker and
+  the jagged Olympics to the west. Their places and sizes are Claude's picks.
+- The zones: "one of the zones should be a neighborhood under construction, one a more rural suburb vibe, one more
+  commercial and city like, and one zone needs to be sewers, substations, factories and warehouses", then "and the
+  zones need different road layouts". Claude's picks: S City, a grid on the slope (boulevard with a planted median,
+  three cross streets with traffic lights, two avenues; streets `follow` the slope so crossings meet with no step);
+  E Industrial, a trunk road with level gravel yard roads off it to terraced yards and an open sewer channel; N
+  Construction, three runs and hairpins; W Rural, a winding lane with three cul-de-sacs, a barn, a pasture, an orchard
+  and the hollow log. Faces are `zone_<n>_City/Industrial/Construction/Rural`.
+- "the hill slope doesn't need to be so severe in the zones", "or not all of them at least": FOOTS (City -16,
+  Industrial -14, Construction -34, Rural -13; Claude's picks). The ridges and the valley follow `foot_at(angle)`.
+  graded() eases each road's grade in and out. Industrial was -24, then -17: at about 12% on a long straight the
+  vehicles' wheel check failed (vehicle_test).
+- "each zone should have a different view in the distance", "so the city zone sees more city in the distance, suburbs
+  more suburb, ...": beyond() fills the valley by the nearest face. City: towers rising to a downtown with a needle
+  tower. Industrial: sheds, stacks, tanks, a rail yard and a bay with container cranes. Construction: half-built
+  streets, tower cranes and dirt. Rural: fields, barns and tree rows. The hills and mountains are behind.
+  `far_height` keeps the valley at the foot's height out to PLAY + 30 m: it used to rise from 190 m, so past the
+  bigger hill's foot the far land and its trees floated over the faces (the user's "floating ring of trees").
+- The grove: "the grove needs to be bigger, and have 2 rings of trees, in between we need a couple big trees for npcs
+  to be in", then "the pond needs to be much bigger, same with clearing", "the grove still needs a denser surround
+  woods". PLATEAU 34 m, INNER rows 37/40 m, three `giantfir_<n>_<seed>` markers at r 44.4 m (main grows the Giant
+  firs and their perches in world.gd), OUTER rows 48.5/50.5/52.3 m. Kinds: fir, redcedar, maple, alder (`treep_` kind,
+  `lo` the plainer build; world.gd maps fir/cedar->Fir, redcedar->Spruce, maple->Maple in summer green,
+  alder->Birch). Understory: ferns, salal, huckleberry, nurse logs with seedlings. About 273 trees, ~800k triangles
+  (build_town.py prints it).
+- "there should be a stone fence surround the grove next to the sidewalk", then "the stone wall surrounding the grove
+  should be taller than a person": `climb_grove_wall` at WALL_R 54.3 m, 2.2 m high and climbable, with a mossy walkable
+  top and ivy. It has four gaps with stone-pillar arches (the path's and the quarters').
+- "there should be a little hill in the grove": KNOLL (13, -16), 11 m across the radius, 3 m high.
+- The pond: POOL (19, 7), radii 10 x 7.5, 1.9 m deep; jetty, `fishing_spot`, `fishing_water`. The spring (the WATER
+  work draws the water): `spring_rocks` is a solid outcrop with a round basin and a notch whose lip overhangs the
+  rock face. Markers: `spring_pool` (the pool's surface middle; scale.x its radius 1.4, scale.y its depth 0.6),
+  `waterfall_top`, `waterfall_bottom`, `spring`.
+- The great oak is main's ("Great oak" preset at OAK (-20, -20)). Here only its marker, the wood cleared 14 m round
+  it, and `oak_roots`.
+- Street furniture ("there needs to be street lights", "stop signs, street lights", "telephone booths", "covered bus
+  stops", "benches"). Styles by zone are Claude's picks: cobra heads in the suburbs, the industrial zone and the ring;
+  ornamental posts in the City; work lights at the construction site; lanterns up the grove's path. Each post is
+  climbable and named for a pole (PointPerches). Markers: `streetlamp_<n>` (lens material "streetlamp"),
+  `signal_<n>` (lenses signal_red/amber/green), `busstop_<n>`, `bench_<n>`. Stop signs have painted stop lines.
+  Booths and shelters can be climbed onto: a newspaper box or bin to jump from.
+- "each of the 4 zones should have 10 raccoons to save and 50 pieces of food": kit_0..39, ten a face, easy to hard
+  (pavement, beside a building, building tops, specials), set down on their surface (`snap_kits`). `zone_food()`
+  counts each side's food (a Crumb 1, a can 3, a dumpster 4) in the zone Zones would give it, trims the loose
+  pavement Crumbs to 50, and prints `ZONE FOOD`. Zones and Hazards measure the grove from `haven` (GROVE_RADIUS 72,
+  HAVEN_RADIUS 55).
+- Tests: kit_spots (40), cap_routes (the factory's stack cap; the glide from flats_10 to the billboard at HILL_EDGE +
+  6 m on the Construction face; the log), plain_tree (a fir clear of the giant firs, a maple), zones_test, smoke (ring
+  spots 63.6 m, the `smoke_pole` marker, the shortest wire, the goner kept running), vehicle_test, `zone_shots.gd --
+  --out=<dir>`. tests/pipe_climb.gd tests the old hand-made downpipes, which are gone; tests/building_routes.gd covers
+  the generated buildings.

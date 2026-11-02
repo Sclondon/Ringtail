@@ -271,11 +271,21 @@ func _place_things() -> void:
 			# (treep_<n>_<seed>_<size%>_<kind>: a plain tree, no limbs to stand on; the user, 2026-11-02, "not all
 			# trees need a bunch of climbable branches")
 			var parts := name.split("_")
-			# (a kind ending lo is the plainer, cheaper version: the wood's outer rows)
-			var cedar := parts[4].begins_with("cedar")
-			var tree := TreeGen.preset("Fir" if cedar else "Oak")
+			# (a kind ending lo is the plainer, cheaper version: the wood's outer rows. The Pacific Northwest's trees,
+			# the user, 2026-11-02: "it takes place in the PNW": Douglas fir, western red cedar, bigleaf maple, red alder)
+			var kind := parts[4].trim_suffix("lo")
+			var cedar := kind in ["fir", "cedar", "redcedar"]
+			var tree := TreeGen.preset({"fir": "Fir", "cedar": "Fir", "redcedar": "Spruce", "maple": "Maple", "alder": "Birch"}.get(kind, "Oak"))
 			tree.seed = int(parts[2])
 			tree.bark_style = TreeGen.Bark.OAK
+			if kind == "maple":
+				# (a bigleaf maple in summer: green, not the preset's autumn red)
+				tree.leaves_inner = Color(0.14, 0.27, 0.1)
+				tree.leaves_outer = Color(0.33, 0.5, 0.2)
+				tree.leaves_tips = Color(0.56, 0.7, 0.3)
+				tree.accent = Color(0.0, 0.0, 0.0, 0.0)
+			elif kind == "alder":
+				tree.bark = Color(0.6, 0.58, 0.54)
 			tree.joined = true
 			if parts[4].ends_with("lo"):
 				tree = tree.simple()

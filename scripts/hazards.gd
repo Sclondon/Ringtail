@@ -30,7 +30,7 @@ const KIND_PAINTS := {
 	&"kei_truck": [Color(0.93, 0.93, 0.9), Color(0.75, 0.76, 0.78)],
 }
 ## How far round the grove's heart he is safe: nothing chases, stalks or dives at him there (the hill and its slopes).
-const HAVEN_RADIUS := 31.0
+const HAVEN_RADIUS := 55.0
 
 static var haven := Vector3(0.0, -1000.0, 0.0)
 ## Paint the cars come in.

@@ -33,7 +33,7 @@ func _run() -> void:
 		print(("ok   " if ok else "FAIL "), name, " at %s: surface %.2f m off, %s over it, %.1f m from the grove's heart" % [at, gap, "room" if up.is_empty() else "something", Vector2(at.x - heart.x, at.z - heart.z).length()])
 		if not ok:
 			failures.append(name)
-	if count != 20:
+	if count != 40:
 		failures.append("%d kits" % count)
 	print("PASSED" if failures.is_empty() else "FAILED: " + ", ".join(failures))
 	quit(0 if failures.is_empty() else 1)
