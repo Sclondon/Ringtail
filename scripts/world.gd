@@ -50,6 +50,8 @@ var camera: FollowCamera
 var hud: Hud
 ## The lost kits (LostKits).
 var lost_kits: LostKits
+## The hill's zones (Zones).
+var zones: Zones
 var race: Race
 var crumbs := 0
 var crumbs_total := 0
@@ -105,6 +107,8 @@ func _ready() -> void:
 	Villagers.place(self, markers, player)
 	# The kits lost about the hill, to find and send home to the grove
 	lost_kits = LostKits.place(self, markers, get_node(^"Villagers") as Villagers, player)
+	# The hill's four sides, each with its own food and kits to find
+	zones = Zones.place(self)
 	_grow_lawn()
 	add_child(N64Filter.new())
 	hud = Hud.new()
@@ -355,6 +359,8 @@ func _on_spilled(spots: Array[Vector3]) -> void:
 		var crumb := Pickup.make(Pickup.Kind.CRUMB, at)
 		crumb.taken.connect(_on_crumb)
 		add_child.call_deferred(crumb)
+		if zones:
+			zones.spilled(crumb)
 
 
 func _add_cap(called: String, at: Vector3) -> void:

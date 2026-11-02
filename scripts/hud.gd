@@ -11,6 +11,7 @@ var _hearts: HBoxContainer
 var _crumbs: Label
 var _caps: Label
 var _kits: Label
+var _zone: Label
 var _clock_row: HBoxContainer
 var _clock: Label
 var _message: Label
@@ -35,14 +36,19 @@ func _ready() -> void:
 	_hearts = HBoxContainer.new()
 	_hearts.add_theme_constant_override(&"separation", 6)
 	top_left.add_child(_hearts)
+	# (which side of the hill he is on: its own food and kits are counted below; in the grove, the whole hill's)
+	_zone = _label(24, Color(1.0, 0.94, 0.8))
+	top_left.add_child(_zone)
 	_crumbs = _counter(top_left, Icon.Kind.CRUMB, Color(0.85, 0.6, 0.33))
-	# (the lost kits sent home, when there are any to find)
+	# (the lost kits led home, when there are any to find)
 	_kits = _counter(top_left, Icon.Kind.KIT, Color(0.9, 0.88, 0.84))
 	if world.lost_kits and world.lost_kits.total > 0:
-		_kits.text = "0 / %d" % world.lost_kits.total
-		world.lost_kits.changed.connect(func(home: int, total: int) -> void: _kits.text = "%d / %d" % [home, total])
+		world.lost_kits.changed.connect(func(_home: int, _total: int) -> void: _show_counts())
 	else:
 		_kits.get_parent().visible = false
+	if world.zones:
+		world.zones.changed.connect(_show_counts)
+	_show_counts.call_deferred()
 
 	var top_right := HBoxContainer.new()
 	top_right.set_anchors_preset(Control.PRESET_TOP_RIGHT)
@@ -115,10 +121,27 @@ func _ready() -> void:
 	if OS.has_feature("editor") or "--dev" in OS.get_cmdline_user_args() or _web_dev():
 		_dev_panel(root)
 
-	world.crumbs_changed.connect(func(count: int, total: int) -> void: _crumbs.text = "%d / %d" % [count, total])
+	world.crumbs_changed.connect(func(_count: int, _total: int) -> void: _show_counts())
 	world.caps_changed.connect(func(count: int, total: int) -> void: _caps.text = "%d / %d" % [count, total])
 	world.hearts_changed.connect(_show_hearts)
 	world.said.connect(say)
+
+
+## The food and kit counts: the zone he is in (Zones), or the whole hill's in the grove (the user, 2026-11-02:
+## "each zone should ... have different kit and food trackers").
+func _show_counts() -> void:
+	var zones := world.zones
+	var zone := zones.current if zones else -1
+	if zone >= 0:
+		_zone.text = zones.names[zone]
+		_crumbs.text = "%d / %d" % [zones.food[zone], zones.food_total[zone]]
+		_kits.text = "%d / %d" % [zones.kits[zone], zones.kits_total[zone]]
+	else:
+		_zone.text = "The grove" if zones and not zones.names.is_empty() else ""
+		_crumbs.text = "%d / %d" % [world.crumbs, world.crumbs_total]
+		if world.lost_kits:
+			_kits.text = "%d / %d" % [world.lost_kits.found, world.lost_kits.total]
+	_zone.visible = _zone.text != ""
 
 
 func _web_dev() -> bool:
