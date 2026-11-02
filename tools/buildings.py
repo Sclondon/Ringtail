@@ -60,6 +60,7 @@ for _key, _colour in {
     "awning_green": (0.20, 0.42, 0.30), "chainlink": (0.55, 0.58, 0.60), "gravel": (0.55, 0.53, 0.50),
     "sewage": (0.26, 0.34, 0.30), "pallet": (0.70, 0.56, 0.36), "crate": (0.62, 0.48, 0.30),
     "siding4": (0.84, 0.82, 0.74), "siding5": (0.36, 0.44, 0.40),
+    "solar": (0.14, 0.18, 0.32), "dish": (0.88, 0.88, 0.85), "light_red": (0.92, 0.16, 0.10),
 }.items():
     w1.COLOURS.setdefault(_key, _colour)
 
@@ -83,7 +84,9 @@ class Kit:
     """One building being made: its pieces (by what they are: solid, seen only, climbable, unseen climbable, unseen
     solid), its route, its markers. Every helper takes points in the building's own frame."""
 
-    ROLES = {"solid": "%s", "see": "nocol_%s", "climb": "climb_%s", "feel": "climb_%s_hidden", "block": "%s_hidden"}
+    # (pole and chimney: PointPerches finds the tops of climbable meshes named for them, for his handstand)
+    ROLES = {"solid": "%s", "see": "nocol_%s", "climb": "climb_%s", "feel": "climb_%s_hidden", "block": "%s_hidden",
+             "pole": "climb_%s_pole_hidden", "chimney": "climb_%s_chimney"}
 
     def __init__(self, name, site, seed):
         self.name, self.site = name, site
@@ -92,6 +95,7 @@ class Kit:
         self.route = []
         self.ladders = []
         self.bounds = [1e9, 1e9, -1e9, -1e9]
+        self.taken = []
 
     # --- drawing ---
 
@@ -373,6 +377,213 @@ def check_route(route):
 
 
 # ======================================================================================================================
+# Rooftop things (the user, 2026-11-02: "the rooftops need chimneys, antennas, satellite dishes, signs, AC units, vents
+# etc"): seeded, low poly, put where they block no route (Kit.clear); the boxy ones steps to hop on, the masts' and
+# stacks' tips points for his handstand (an unseen climbable column named _pole_hidden round each: PointPerches)
+# ======================================================================================================================
+
+def _clear(kit, x, z, r, y0, y1):
+    """Whether a thing r round at (x, z), from y0 up to y1, keeps off every route link and every thing already put
+    there; if so it takes the spot."""
+    for cx, cz, cr in kit.taken:
+        if math.dist((x, z), (cx, cz)) < r + cr + 0.25:
+            return False
+    stops = [at for _how, at in kit.route]
+    for a, b in zip(stops, stops[1:] or stops):
+        ax, az, bx, bz = a[0], a[2], b[0], b[2]
+        length = (bx - ax) ** 2 + (bz - az) ** 2
+        t = 0.0 if length < 1e-9 else max(0.0, min(1.0, ((x - ax) * (bx - ax) + (z - az) * (bz - az)) / length))
+        px, pz = ax + (bx - ax) * t, az + (bz - az) * t
+        py = a[1] + (b[1] - a[1]) * t
+        if math.dist((x, z), (px, pz)) < r + 0.9 and py - 0.4 < y1 and py + HEADROOM + 0.4 > y0:
+            return False
+    kit.taken.append((x, z, r))
+    return True
+
+
+def antenna_mast(kit, x, y, z, height, light=True, arms=2):
+    """A TV or radio mast: a steel pole with crossbars (seen), the unseen column he climbs, a red light on top. Its tip
+    is a point for his handstand."""
+    kit.cylinder(x, y, z, 0.04, height, "steel", 6, "see")
+    for k in range(arms):
+        yy = y + height * (0.55 + 0.18 * k)
+        half = 0.7 - 0.2 * k
+        kit.bar((x - half, yy, z), (x + half, yy, z), 0.03, "steel", "see")
+        for j in range(5):
+            u = x - half + j * half / 2
+            kit.bar((u, yy, z - 0.18), (u, yy, z + 0.18), 0.02, "steel", "see")
+    kit.box(x - 0.06, y, z - 0.06, x + 0.06, y + 0.05, z + 0.06, "steel")
+    if light:
+        kit.box(x - 0.06, y + height, z - 0.06, x + 0.06, y + height + 0.1, z + 0.06, "light_red", "see")
+    kit.column([(x, y, z), (x, y + height + 0.1, z)], 0.16, role="pole")
+
+
+def dish(kit, x, y, z, facing, size=0.5, role="see"):
+    """A satellite dish on a short arm, looking `facing` radians from +z and up a little."""
+    fx, fz = math.sin(facing), math.cos(facing)
+    kit.bar((x, y, z), (x, y + 0.45, z), 0.05, "steel", role)
+    cx, cy, cz = x + fx * 0.1, y + 0.5 + size * 0.4, z + fz * 0.1
+    ring = 8
+    side = (fz, 0.0, -fx)
+    up = (0.0, 0.94, 0.0)
+    rim = []
+    for k in range(ring):
+        a = math.tau * k / ring
+        rim.append(tuple([cx, cy, cz][i] + (side[i] * math.cos(a) + up[i] * math.sin(a)) * size / 2 + [fx, 0.3, fz][i] * size * 0.25 for i in range(3)))
+    for k in range(ring):
+        kit.face([(cx, cy, cz), rim[k], rim[(k + 1) % ring]], "dish", 1.0, "see")
+    kit.bar((cx, cy, cz), (cx + fx * size * 0.55, cy + size * 0.2, cz + fz * size * 0.55), 0.025, "steel", "see")
+
+
+def ac_unit(kit, x, y, z, turn_x=True):
+    """An air conditioner on a rooftop: a box on rails, a fan grille on top (a step to hop on)."""
+    w, d = (1.1, 0.8) if turn_x else (0.8, 1.1)
+    kit.box(x - w / 2 - 0.05, y, z - d / 2 - 0.05, x + w / 2 + 0.05, y + 0.08, z + d / 2 + 0.05, "steel")
+    kit.box(x - w / 2, y + 0.08, z - d / 2, x + w / 2, y + 0.9, z + d / 2, "white")
+    kit.cylinder(x, y + 0.9, z, 0.3, 0.03, "black", 8, "see")
+    for k in range(3):
+        kit.box(x - w / 2 - 0.01, y + 0.25 + k * 0.2, z - d / 2 + 0.1, x - w / 2, y + 0.3 + k * 0.2, z + d / 2 - 0.1, "steel", "see")
+
+
+def vent_cap(kit, x, y, z, radius=0.25):
+    """A round vent with a mushroom cap."""
+    kit.cylinder(x, y, z, radius, 0.5, "zinc", 8)
+    kit.cylinder(x, y + 0.6, z, radius * 1.6, 0.08, "zinc", 8)
+    kit.bar((x, y + 0.5, z), (x, y + 0.6, z), 0.04, "zinc", "see")
+
+
+def extractor(kit, x, y, z):
+    """A turbine extractor fan on an industrial roof."""
+    kit.cylinder(x, y, z, 0.45, 0.3, "zinc", 8)
+    kit.cylinder(x, y + 0.3, z, 0.38, 0.4, "corrugated", 10, "see")
+    kit.cone(x, y + 0.7, z, 0.42, 0.25, "zinc", 10)
+    kit.box(x - 0.3, y, z - 0.3, x + 0.3, y + 0.62, z + 0.3, "zinc", "block")
+
+
+def flue(kit, x, y, z, height, radius=0.18, mat="steel"):
+    """A thin steel flue stack (its tip a point for his handstand, the column round it climbable)."""
+    kit.cylinder(x, y, z, radius, height, mat, 8, "see")
+    kit.cylinder(x, y + height, z, radius * 1.5, 0.06, mat, 8, "see")
+    kit.column([(x, y, z), (x, y + height + 0.06, z)], max(radius, 0.16) + 0.02, role="pole")
+
+
+def roof_sign(kit, x0, x1, y, z, height, mat="sign2", legs=True):
+    """A sign board along x standing on legs at the roof's edge (its back braced)."""
+    kit.box(x0, y + (0.6 if legs else 0.0), z - 0.06, x1, y + (0.6 if legs else 0.0) + height, z + 0.06, mat)
+    kit.box(x0 + 0.1, y + (0.6 if legs else 0.0) + height * 0.3, z + 0.06, x1 - 0.1, y + (0.6 if legs else 0.0) + height * 0.42, z + 0.08, "white", "see")
+    if legs:
+        for x in (x0 + 0.3, (x0 + x1) / 2, x1 - 0.3):
+            kit.bar((x, y, z), (x, y + 0.6 + height, z), 0.08, "steel", "see")
+            kit.bar((x, y, z - 1.0), (x, y + 0.6 + height * 0.7, z - 0.05), 0.05, "steel", "see")
+
+
+def gable_things(kit, hw, hd, over, ridge, slope, roof, chimneys, rng):
+    """On a gable roof (ridge along x, the walls hw by hd): plumbing vent stacks, roof vents, a skylight or solar panels
+    on some, a TV antenna mast (on the roof or strapped to a chimney), a satellite dish on a gable end."""
+    def roof_y(z):
+        return ridge - slope * abs(z)
+
+    def spot(r, y0_off, y1_off, z_lo=0.9, z_hi=None, tries=24):
+        z_hi = z_hi if z_hi is not None else hd - 0.4
+        for _ in range(tries):
+            x = rng.uniform(-hw + 0.8, hw - 0.8)
+            z = rng.choice([-1, 1]) * rng.uniform(z_lo, z_hi)
+            if _clear(kit, x, z, r, roof_y(z) + y0_off, roof_y(z) + y1_off):
+                return x, z
+        return None
+
+    for _ in range(rng.randint(1, 2)):
+        found = spot(0.15, -0.2, 0.6)
+        if found:
+            x, z = found
+            kit.cylinder(x, roof_y(z) - 0.2, z, 0.05, 0.75, "black", 6, "see")
+    for _ in range(rng.randint(1, 2)):
+        found = spot(0.35, 0.0, 0.5)
+        if found:
+            x, z = found
+            kit.box(x - 0.25, roof_y(z) - 0.25, z - 0.25, x + 0.25, roof_y(z) + 0.3, z + 0.25, "zinc")
+            kit.box(x - 0.32, roof_y(z) + 0.3, z - 0.32, x + 0.32, roof_y(z) + 0.36, z + 0.32, "zinc")
+    if rng.random() < 0.5:
+        found = spot(1.0, 0.0, 0.2, 1.2, hd - 1.0)
+        if found:
+            x, z = found
+            s = 1.0 if z > 0 else -1.0
+            z0, z1 = z - 0.5, z + 0.5
+            kit.slab([(x - 0.6, z0), (x + 0.6, z0), (x + 0.6, z1), (x - 0.6, z1)], [roof_y(z0) + 0.1, roof_y(z0) + 0.1, roof_y(z1) + 0.1, roof_y(z1) + 0.1], 0.2, "glass", under="white")
+            _ = s
+    if rng.random() < 0.35:
+        # (a run of solar panels across the back slope, a few inches proud of it: walkable)
+        z0, z1 = -hd + 0.6, -1.0
+        x0 = rng.uniform(-hw + 0.8, -1.0)
+        x1 = min(hw - 0.8, x0 + rng.uniform(3.0, 5.0))
+        if all(_clear(kit, x, (z0 + z1) / 2, 0.6, roof_y(z1), roof_y(z1) + 0.3) for x in (x0 + 0.6, (x0 + x1) / 2, x1 - 0.6)):
+            kit.slab([(x0, z0), (x1, z0), (x1, z1), (x0, z1)], [roof_y(z0) + 0.15, roof_y(z0) + 0.15, roof_y(z1) + 0.15, roof_y(z1) + 0.15], 0.06, "solar", under="steel")
+            for k in range(1, int((x1 - x0) / 1.0)):
+                kit.bar((x0 + k, roof_y(z0) + 0.22, z0), (x0 + k, roof_y(z1) + 0.22, z1), 0.02, "white", "see")
+    if rng.random() < 0.45:
+        # (a second, smaller chimney through the back slope: stone, with a cap)
+        found = spot(0.45, -0.3, 1.4, 1.0, hd - 1.0)
+        if found:
+            x, z = found
+            kit.taken.pop()
+            _chimney(kit, x, z, roof_y(z) - 0.4, roof_y(z) + 1.3, 0.6, rng.choice(["stone", "brick"]))
+    if rng.random() < 0.75:
+        # (a TV antenna on its mast near the ridge, clear of the way along it)
+        found = spot(0.4, 0.0, 3.5, 1.3, 2.6)
+        if found:
+            x, z = found
+            antenna_mast(kit, x, roof_y(z) - 0.1, z, 2.8, light=False)
+    if rng.random() < 0.6:
+        side = rng.choice([-1, 1])
+        z = rng.uniform(-hd + 0.6, hd - 1.0)
+        y = ridge - slope * abs(z) - 1.4
+        if _clear(kit, side * (hw + 0.3), z, 0.4, y, y + 1.2):
+            dish(kit, side * (hw + 0.05), y, z, side * math.pi / 2 + 0.3)
+
+
+def flat_things(kit, x0, x1, z0, z1, y, rng, kind="flats"):
+    """On a flat roof (x0..x1 by z0..z1 at height y): AC units (steps), a run of duct, vents, satellite dishes, an
+    antenna mast with a red light, red lights on the parapet's corners; signs on a shop's front edge."""
+    placed = 0
+
+    def spot(r, h, tries=30):
+        for _ in range(tries):
+            x = kit.rng.uniform(x0 + r + 0.3, x1 - r - 0.3)
+            z = kit.rng.uniform(z0 + r + 0.3, z1 - r - 0.3)
+            if _clear(kit, x, z, r, y, y + h):
+                return x, z
+        return None
+
+    for _ in range(rng.randint(2, 4)):
+        found = spot(0.75, 1.0)
+        if found:
+            ac_unit(kit, found[0], y, found[1], rng.random() < 0.5)
+            placed += 1
+    for _ in range(rng.randint(2, 4)):
+        found = spot(0.4, 0.7)
+        if found:
+            vent_cap(kit, found[0], y, found[1])
+    # (a duct along the roof, low enough to hop over, from an AC unit's side)
+    for _ in range(6):
+        xa = rng.uniform(x0 + 1.0, x1 - 4.0)
+        za = rng.uniform(z0 + 1.0, z1 - 1.0)
+        if all(_clear(kit, xa + k, za, 0.35, y, y + 0.5) for k in (0.5, 1.5, 2.5)):
+            kit.box(xa, y, za - 0.25, xa + 3.0, y + 0.45, za + 0.25, "zinc")
+            kit.box(xa + 2.9, y, za - 0.3, xa + 3.1, y + 0.55, za + 0.3, "zinc")
+            break
+    for _ in range(rng.randint(1, 2)):
+        found = spot(0.4, 1.1)
+        if found:
+            dish(kit, found[0], y, found[1], rng.uniform(-0.6, 0.6) + math.pi, 0.6, "solid")
+    found = spot(0.8, 5.0)
+    if found:
+        antenna_mast(kit, found[0], y, found[1], rng.uniform(3.5, 5.5), light=True, arms=3)
+    for x in (x0, x1):
+        for z in (z0, z1):
+            kit.box(x - 0.08, y + 0.7, z - 0.08, x + 0.08, y + 0.82, z + 0.08, "light_red", "see")
+
+
+# ======================================================================================================================
 # Houses
 # ======================================================================================================================
 
@@ -399,8 +610,10 @@ def _fence(kit, x0, x1, z, gate=None, height=1.0, mat="fence"):
 
 
 def _chimney(kit, x, z, base, top, w=0.9, mat="brick"):
-    kit.box(x - w / 2, base, z - w / 2, x + w / 2, top, z + w / 2, mat)
-    kit.box(x - w / 2 - 0.06, top - 0.18, z - w / 2 - 0.06, x + w / 2 + 0.06, top, z + w / 2 + 0.06, "concrete")
+    """A chimney with a cap (climbable, its top a point for his handstand), the spot taken for the rooftop things."""
+    kit.box(x - w / 2, base, z - w / 2, x + w / 2, top, z + w / 2, mat, "chimney")
+    kit.box(x - w / 2 - 0.06, top - 0.18, z - w / 2 - 0.06, x + w / 2 + 0.06, top, z + w / 2 + 0.06, "concrete", "chimney")
+    kit.taken.append((x, z, w * 0.75))
 
 
 def house(kit, style):
@@ -509,12 +722,14 @@ def house(kit, style):
         kit.shed(dx - 1.3, dx + 1.3, dz0, dz1, y_back - 0.45 - (dz1 - dz0) * 0.25, y_back - 0.3, "z0", roof, over=0.2)
         cx = -s * (hw + 0.45)
         _chimney(kit, cx, -0.6, 0.0, ridge + 0.85)
+        chims = [(cx, -0.6, ridge + 0.85, 0.9)]
         kit.node("walk", -s * (hw - 0.4), ridge, -0.6 + 0.0)
         kit.node("jump", cx, ridge + 0.85, -0.6)
     else:
         # The farmhouse's brick chimney through the ridge
         cx = -s * hw * 0.4
         _chimney(kit, cx, 0.0, ridge - 1.2, ridge + 0.9, 0.8)
+        chims = [(cx, 0.0, ridge + 0.9, 0.8)]
         kit.node("walk", cx + s * 0.9, ridge, 0.0)
         kit.node("jump", cx, ridge + 0.9, 0.0)
     # A lower wing out the back under a cross gable (an L to one side, a T in the middle), always on the farmhouse
@@ -536,6 +751,7 @@ def house(kit, style):
     for sx in (-1, 1):
         kit.downpipe(sx * hw, -hd + 0.6, float(sx), 0.0, edge, 0.0)
     _fence(kit, -hw - 2.0, hw + 2.0, pz1 + 3.5, gate=door_x)
+    gable_things(kit, hw, hd, over, ridge, slope, roof, chims, rng)
     return kit
 
 
@@ -589,6 +805,7 @@ def _box_house(kit, w, d, base, eave, ridge, edge, slope, over, siding, roof, do
     kit.node("slope", x_on, ridge, 0.0)
     cx = -s * hw * 0.5
     _chimney(kit, cx, -0.4, ridge - 1.2, ridge + 0.9, 0.8)
+    chims = [(cx, -0.4, ridge + 0.9, 0.8)]
     kit.node("walk", cx + s * 0.9, ridge, -0.4)
     kit.node("jump", cx, ridge + 0.9, -0.4)
     # A trellis up the garage's front corner of the house (climbable), downpipes behind, a deck out the back
@@ -602,6 +819,7 @@ def _box_house(kit, w, d, base, eave, ridge, edge, slope, over, siding, roof, do
     kit.railing((-hw + 0.5, deck_y, -hd - 3.0), (hw - 3.6, deck_y, -hd - 3.0), 0.9, "white")
     kit.stair_flight(hw - 3.0, -hd - 3.0 - 0.3 * 7, 0.0, 1.0, 1.0, 0.0, deck_y, "wood")
     _fence(kit, -hw - 2.0, hw + 2.0 if s < 0 else hw + gw + 2.0, hd + 4.5, gate=door_x) if rng.random() < 0.6 else None
+    gable_things(kit, hw, hd, over, ridge, slope, roof, chims, rng)
     return kit
 
 
@@ -634,7 +852,7 @@ def _aframe(kit, siding, roof):
     kit.railing((-s * (hw + 0.5), deck_y, hd + 0.5), (-s * (hw + 0.5), deck_y, hd + 3.5), 0.9, "wood", spindles=False)
     end = kit.stair_flight(s * (hw + 1.1), hd + 3.4 - 0.3 * 8, 0.0, 1.0, 1.0, 0.0, deck_y, "wood")
     _ = end
-    kit.cylinder(-s * hw * 0.3, ridge - 1.5, -hd * 0.4, 0.12, 2.6, "black", 8)
+    flue(kit, -s * hw * 0.3, ridge - 1.5, -hd * 0.4, 2.6, 0.12, "black")
     # (a cap along the ridge to stand on; the way up: scurry up a slope from its foot, walk along the ridge to the
     # stovepipe)
     kit.box(-0.5, ridge - 0.2, -hd - 0.5, 0.5, ridge, hd + 0.5, "darkwood")
@@ -644,6 +862,10 @@ def _aframe(kit, siding, roof):
     # A woodshed and a woodpile beside it
     kit.box(-s * (hw + 3.5), 0.0, -1.0, -s * (hw + 1.5), 1.6, 1.0, "cedar")
     kit.shed(-s * (hw + 3.5), -s * (hw + 1.5), -1.0, 1.0, 1.6, 2.0, "x1" if s < 0 else "x0", roof, over=0.2)
+    # (a TV mast on the ridge's far end, a dish on the back gable)
+    if _clear(kit, 0.0, -hd - 0.1, 0.3, ridge, ridge + 3.0):
+        antenna_mast(kit, 0.0, ridge, -hd - 0.1, 2.6, light=False)
+    dish(kit, rng.uniform(-1.0, 1.0), 1.2, -hd - 0.05, math.pi + 0.3)
     return kit
 
 
@@ -753,8 +975,8 @@ def walkup(kit):
         kit.railing((fx - s * 1.25, y, -2.0), (fx - s * 1.25, y, 2.0), 0.9, "steel_red", spindles=False)
         kit.bar((fx - s * 1.0, y - storey + 0.6, 2.1), (fx - s * 1.0, y + 0.9, 2.1), 0.05, "steel_red", "see")
         kit.bar((fx - s * 0.4, y - storey + 0.6, 2.1), (fx - s * 0.4, y + 0.9, 2.1), 0.05, "steel_red", "see")
-    for x in (-hw * 0.5, hw * 0.5):
-        kit.cylinder(x, roof_y, -2.5, 0.25, 0.9, "zinc", 6)
+    kit.taken += [(hx, 0.0, 2.2), (tx, 0.0, 1.9), (ac, 0.5, 0.7)]
+    flat_things(kit, -hw + 0.25, hw - 0.25, -hd + 0.25, hd - 0.25, roof_y, rng)
     return kit
 
 
@@ -847,8 +1069,31 @@ def commercial(kit):
     kit.node("walk", lx, roof_y, bz + 1.6)
     kit.node("ladder", lx, walk_y, bz + 0.45)
     kit.node("walk", bx, walk_y, bz + 0.55)
-    kit.box(s * hw * 0.4 - 0.7, roof_y, 1.0, s * hw * 0.4 + 0.7, roof_y + 1.1, 2.4, "white")
-    kit.cylinder(0.0, roof_y, 2.5, 0.3, 0.8, "zinc", 6)
+    # The rest of the roof: the billboard's spot kept, a stair hut, a sign along the front edge, maybe a water tank,
+    # then the AC units, ducts, vents, dishes and mast
+    kit.taken += [(bx - 2.5, bz, 0.5), (bx, bz + 0.4, 1.2), (bx + 2.5, bz, 0.5), (lx, bz + 1.4, 0.6)]
+    for _ in range(30):
+        hx, hz = rng.uniform(-hw + 2.0, hw - 2.0), rng.uniform(-hd + 2.5, hd - 2.0)
+        if _clear(kit, hx, hz, 1.6, roof_y, roof_y + 2.5):
+            kit.box(hx - 1.1, roof_y, hz - 1.2, hx + 1.1, roof_y + 2.3, hz + 1.2, brick)
+            kit.box(hx - 1.2, roof_y + 2.3, hz - 1.3, hx + 1.2, roof_y + 2.4, hz + 1.3, "tar")
+            kit.box(hx - 0.45, roof_y, hz + 1.2, hx + 0.45, roof_y + 2.0, hz + 1.24, "door", "see")
+            break
+    sx0 = rng.uniform(-hw + 0.8, hw - 6.0)
+    if all(_clear(kit, sx0 + k, hd - 0.9, 0.5, roof_y, roof_y + 2.4) for k in (0.5, 2.5, 4.5)):
+        roof_sign(kit, sx0, sx0 + 5.0, roof_y, hd - 0.9, 1.5, rng.choice(["sign", "sign2", "awning_red"]))
+    if rng.random() < 0.6:
+        for _ in range(30):
+            tx, tz = rng.uniform(-hw + 2.0, hw - 2.0), rng.uniform(-hd + 2.0, hd - 2.0)
+            if _clear(kit, tx, tz, 1.5, roof_y, roof_y + 4.2):
+                for x in (tx - 0.9, tx + 0.9):
+                    for z in (tz - 0.9, tz + 0.9):
+                        kit.bar((x, roof_y, z), (x, roof_y + 2.0, z), 0.12, "steel")
+                kit.box(tx - 1.2, roof_y + 1.9, tz - 1.2, tx + 1.2, roof_y + 2.0, tz + 1.2, "steel")
+                kit.cylinder(tx, roof_y + 2.0, tz, 1.0, 1.8, "cedar", 10, top="cedar")
+                kit.cone(tx, roof_y + 3.8, tz, 1.1, 0.5, "tar", 10)
+                break
+    flat_things(kit, -hw + 0.3, hw - 0.3, -hd + 0.3, hd - 0.3, roof_y, rng)
     return kit
 
 
@@ -974,6 +1219,14 @@ def construction(kit):
     px = -s * (hw + 2.2)
     kit.box(px - 0.6, 0.0, hd + 1.0, px + 0.6, 2.3, hd + 2.2, "sign2")
     kit.box(px - 0.65, 2.3, hd + 0.95, px + 0.65, 2.4, hd + 2.25, "white")
+    # A floodlight mast at the site's back corner (its tip a point), the builder's sign on the scaffold's end
+    fx, fz = -s * (hw + 1.5), -hd - 1.5
+    if _clear(kit, fx, fz, 0.4, 0.0, 9.0):
+        antenna_mast(kit, fx, 0.0, fz, 8.0, light=False, arms=1)
+        for k in (-1, 1):
+            kit.box(fx + k * 0.5 - 0.25, 7.6, fz - 0.15, fx + k * 0.5 + 0.25, 7.95, fz + 0.15, "white", "see")
+    if all(_clear(kit, x, hd + 4.6, 0.4, 0.0, 1.8) for x in (-1.0, 0.0, 1.0)):
+        roof_sign(kit, -1.5, 1.5, 0.0, hd + 4.6, 1.0, "sign")
     return kit
 
 
@@ -1058,6 +1311,23 @@ def factory(kit):
             kit.face([(-hw, 4.3 + r + b, z + a), (hw, 4.3 + r + b, z + a), (hw, 4.3 + r + e, z + c), (-hw, 4.3 + r + e, z + c)], "zinc", 0.9 + 0.1 * b / r)
     for k in range(2):
         kit.cylinder(-s * (hw - 3.0 - k * 3.5), 0.0, hd + 3.0, 1.4, 4.0, "white", 10)
+    # On the teeth: extractor fans and steel flues along their slopes, a pipe along the back tooth; a sign over the door
+    for k in range(teeth):
+        z = -hd + (k + 0.45) * tooth
+        for j in range(int(w / 7.0)):
+            x = -hw + 3.5 + j * 7.0 + rng.uniform(-1.0, 1.0)
+            if _clear(kit, x, z, 0.6, roof_at(z), roof_at(z) + 1.0):
+                extractor(kit, x, roof_at(z) - 0.1, z)
+    for _ in range(rng.randint(1, 3)):
+        x, z = rng.uniform(-hw + 2.0, hw - 2.0), -hd + rng.uniform(0.3, 0.6) * tooth
+        if _clear(kit, x, z, 0.3, roof_at(z), roof_at(z) + 4.0):
+            flue(kit, x, roof_at(z) - 0.1, z, rng.uniform(3.0, 4.5))
+    zp = -hd + tooth * 0.2
+    if all(_clear(kit, x, zp, 0.3, roof_at(zp), roof_at(zp) + 0.5) for x in (-hw * 0.5, 0.0, hw * 0.5)):
+        kit.bar((-hw * 0.6, roof_at(zp) + 0.35, zp), (hw * 0.6, roof_at(zp) + 0.35, zp), 0.3, "steel_red")
+        for x in (-hw * 0.6, 0.0, hw * 0.6):
+            kit.bar((x, roof_at(zp) - 0.1, zp), (x, roof_at(zp) + 0.2, zp), 0.12, "steel", "see")
+    roof_sign(kit, -4.0, 4.0, wall - 1.6, hd + 0.15, 1.3, rng.choice(["sign", "sign2", "steel_red"]), legs=False)
     return kit
 
 
@@ -1132,6 +1402,20 @@ def warehouse(kit):
     kit.node("climb", sx, silo_h + 0.3, 0.0)
     for k in range(3):
         kit.box(-s * (hw - 4.0) - 0.6, k * 0.16, hd + 6.0 - 0.6, -s * (hw - 4.0) + 0.6, k * 0.16 + 0.14, hd + 6.0 + 0.6, "pallet")
+    # Extractor fans down the back slope, a flue, skylight strips on the front slope, the firm's sign over the canopy
+    for j in range(int(w / 6.0)):
+        x, z = -hw + 3.0 + j * 6.0, -hd * 0.45
+        if _clear(kit, x, z, 0.6, ridge - slope * abs(z), ridge - slope * abs(z) + 1.0):
+            extractor(kit, x, ridge - slope * abs(z) - 0.1, z)
+    x, z = rng.uniform(-hw + 2.0, hw - 2.0), -hd + 1.5
+    if _clear(kit, x, z, 0.3, ridge - slope * abs(z), ridge + 4.0):
+        flue(kit, x, ridge - slope * abs(z) - 0.1, z, 3.5)
+    for j in range(int(w / 6.0)):
+        x, z = -hw + 3.0 + j * 6.0, hd * 0.5
+        if _clear(kit, x, z, 0.8, ridge - slope * z, ridge - slope * z + 0.3):
+            z0, z1 = z - 1.2, z + 1.2
+            kit.slab([(x - 0.5, z0), (x + 0.5, z0), (x + 0.5, z1), (x - 0.5, z1)], [ridge - slope * z0 + 0.06] * 2 + [ridge - slope * z1 + 0.06] * 2, 0.1, "glass", under="steel")
+    roof_sign(kit, -w * 0.2, w * 0.2, canopy + 0.4, hd + 0.12, 1.1, rng.choice(["sign", "sign2", "awning_green"]), legs=False)
     return kit
 
 
@@ -1213,6 +1497,18 @@ def substation(kit):
     for x in (-4.5, 0.0, 4.5):
         kit.cylinder(px + x, arm - 1.4, pz, 0.12, 1.4, "insulator", 6, "see")
     kit.column([(px, 0.0, pz + base + 0.1), (px, arm * 0.5, pz + (base + waist) / 2 + 0.1), (px, arm + 0.3, pz + waist + 0.3)], 0.4)
+    # On the hut's roof: an AC unit and a radio mast with its red light (a dish on its wall)
+    for _ in range(20):
+        x, z = hx + rng.uniform(-1.4, 1.4), hd + rng.uniform(-2.1, 0.6)
+        if _clear(kit, x, z, 0.7, hut + 0.12, hut + 1.2):
+            ac_unit(kit, x, hut + 0.12, z)
+            break
+    for _ in range(20):
+        x, z = hx + rng.uniform(-1.6, 1.6), hd + rng.uniform(-2.2, 0.7)
+        if _clear(kit, x, z, 0.3, hut + 0.12, hut + 5.0):
+            antenna_mast(kit, x, hut + 0.12, z, 4.0, light=True, arms=2)
+            break
+    dish(kit, hx + 2.0, 1.5, hd - 1.0, math.pi / 2)
     return kit
 
 
@@ -1271,6 +1567,10 @@ def culvert(kit):
     kit.node("walk", lx, 0.0, 0.9)
     kit.node("ladder", lx, bank + 0.6, -0.9)
     kit.node("walk", -s * 3.0, bank + 0.06, -4.0)
+    # A sewer vent stack up out of the bank (its tip a point), a warning sign on the headwall
+    if _clear(kit, s * 4.0, -6.0, 0.3, bank, bank + 3.0):
+        flue(kit, s * 4.0, bank - 0.2, -6.0, 2.8, 0.15, "steel_red")
+    kit.box(-s * (open_r + 1.5) - 0.5, 1.6, 0.0, -s * (open_r + 1.5) + 0.5, 2.3, 0.05, "safety", "see")
     return kit
 
 

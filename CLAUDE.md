@@ -750,3 +750,13 @@ Read README.md first. Started 2026-11-01.
   (models/buildings_preview.glb, pictures from four sides and above), then `tests/building_routes.gd [-- <name prefix>]`
   (headless: he is put at each link's start and walks, jumps, catches, scurries or climbs to its end). All 11 kinds
   passed for seeds 1 to 5, and turned 1 rad.
+- Rooftops (the user, 2026-11-02: "the rooftops need chimneys, antennas, satellite dishes, signs, AC units, vents
+  etc"): every kind gets seeded clutter after its route is laid, each thing put only where `_clear` finds it off every
+  route link (0.9 m plus his headroom) and every other thing. Houses: chimneys (now climbable, `climb_<name>_chimney`,
+  a second stone one on some), plumbing vents, roof vents, a skylight, solar panels on the back slope, a TV mast near
+  the ridge, a dish on a gable end. Flats and shops: AC units (steps), a duct, mushroom vents, dishes, a mast with a
+  red light, red lights on the parapet corners; shops also a stair hut, a sign on the front edge, a water tank.
+  Factory and warehouse: extractor fans, steel flues, a pipe, skylight strips, a sign over the door; substation an AC
+  unit and mast on the hut; the culvert a vent stack; the site a floodlight mast. Masts and flues have an unseen
+  climbable column named `climb_<name>_pole_hidden`, so PointPerches finds their tips (and the chimneys') for the
+  handstand (building_routes.gd counts them). Routes all pass for seeds 1 to 6.

@@ -56,6 +56,11 @@ func _setup() -> void:
 	root.add_child(eye)
 	eye.current = true
 	await physics_frame
+	# (the tips of masts, flues and chimneys for his handstand: PointPerches finds them as World does)
+	PointPerches.find(level)
+	print("points for the handstand: %d" % PointPerches.points.size())
+	if PointPerches.points.is_empty():
+		failures.append("no handstand points")
 	_run(routes)
 
 
