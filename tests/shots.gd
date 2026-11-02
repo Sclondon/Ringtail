@@ -41,21 +41,21 @@ func _put(at: Vector3, yaw: float) -> void:
 func _run() -> void:
 	await _frames(60)
 	await _shot("start")
-	await _put(Vector3(8.4, 0.85, -12.0), -PI * 0.5)
-	await _shot("porch")
-	await _put(Vector3(14.0, 7.7, -16.0), 0.0)
-	await _shot("roof")
-	await _put(Vector3(0.0, 0.05, 0.0), 0.0)
-	await _shot("alley")
+	await _put(Vector3(0.0, 3.6, 16.0), PI)
+	await _shot("hill")
+	await _put(Vector3(0.0, 7.2, 6.0), PI)
+	await _shot("grove")
+	await _put(Vector3(21.0, 0.15, 21.0), PI * 0.75)
+	await _shot("street")
 	for node in world.get_children():
 		if node is N64Filter:
 			node.visible = false
-	await _shot("alley_plain")
+	await _shot("street_plain")
 	for node in world.get_children():
 		if node is N64Filter:
 			node.visible = true
 	world.race.start()
-	await _put(Vector3(-1.0, 0.05, -30.0), 0.0)
+	await _put(Vector3(-2.0, 0.15, 34.0), PI)
 	await _shot("race")
 	print("SHOTS DONE ", out)
 	quit()

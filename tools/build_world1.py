@@ -524,6 +524,9 @@ def look(folder):
         bpy.ops.render.render(write_still=True)
 
 
-build()
-if PREVIEW_DIR:
-    look(PREVIEW_DIR)
+# (run as a script it builds the alley; imported, as tools/build_town.py does, it only lends its Piece, mark and
+# the like)
+if __name__ == "__main__":
+    build()
+    if PREVIEW_DIR:
+        look(PREVIEW_DIR)

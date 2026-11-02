@@ -42,10 +42,23 @@ func _run() -> void:
 	var rig := player.get_node(^"Rig") as RaccoonRig
 	var moves := player.get_node(^"TailMoves") as TailMoves
 	_check(world.crumbs_total >= 90, "world has its Crumbs (%d)" % world.crumbs_total)
-	_check(get_nodes_in_group(&"cats").size() >= 3, "cats in the alley")
+	_check(get_nodes_in_group(&"cats").size() >= 3, "cats about the town")
+	_check(get_nodes_in_group(&"hazards").size() >= 6, "hazards about the town (%d)" % get_nodes_in_group(&"hazards").size())
+	var band := world.find_children("*", "", true, false).filter(func(n: Node) -> bool: return n is SquadRaccoon)
+	_check(band.size() >= 3, "his band of raccoons (%d)" % band.size())
+	# (out of the way of the checks below: the hazards and the band stood still and put far off)
+	var quiet: Array = band.duplicate()
+	for node in get_nodes_in_group(&"hazards"):
+		quiet.append(node)
+		if node.get_parent() is HazardCrows:
+			quiet.append(node.get_parent())
+	for node: Node in quiet:
+		node.process_mode = Node.PROCESS_MODE_DISABLED
+		if node is Node3D:
+			(node as Node3D).global_position.y = -300.0
 
 	# Running goes onto all fours, bounding
-	await _put(Vector3(0.0, 0.05, 8.0))
+	await _put(Vector3(0.0, 0.15, 29.5))
 	Input.action_press(&"move_up")
 	var most := 0.0
 	var bound := 0.0
@@ -56,7 +69,7 @@ func _run() -> void:
 	_check(most > 0.9 and bound > 0.5, "running on all fours (quad %.2f)" % most)
 
 	# Scurrying, he goes on all fours at a walk too
-	await _put(Vector3(0.0, 0.05, 8.0))
+	await _put(Vector3(0.0, 0.15, 29.5))
 	(player.get_node(^"Scurry") as Scurry).button = true
 	await _frames(10)
 	Input.action_press(&"move_up", 0.35)
@@ -65,7 +78,7 @@ func _run() -> void:
 	(player.get_node(^"Scurry") as Scurry).button = false
 
 	# Jump held on the way down: the twirl, falling slowly
-	await _put(Vector3(0.0, 0.05, 8.0))
+	await _put(Vector3(0.0, 0.15, 29.5))
 	Input.action_press(&"jump")
 	player._queue_jump()
 	var glided := false
@@ -92,7 +105,7 @@ func _run() -> void:
 	cat.set_physics_process(true)
 
 	# The long jump: flat out, duck into a slide and jump, and he goes long
-	await _put(Vector3(0.0, 0.05, -36.0))
+	await _put(Vector3(0.0, 0.15, -29.5))
 	Input.action_press(&"move_up")
 	await _frames(45)
 	Input.action_press(&"duck")
@@ -109,7 +122,7 @@ func _run() -> void:
 	_check(long_speed > 8.0, "a long jump out of a slide (%.1f m/s along)" % long_speed)
 
 	# The spin in the air is a second jump
-	await _put(Vector3(0.0, 0.05, 8.0))
+	await _put(Vector3(0.0, 0.15, 29.5))
 	Input.action_press(&"jump")
 	player._queue_jump()
 	await _frames(16)
@@ -121,7 +134,7 @@ func _run() -> void:
 	await _frames(60)
 
 	# A spin in the air
-	await _put(Vector3(0.0, 0.05, 8.0))
+	await _put(Vector3(0.0, 0.15, 29.5))
 	player._queue_jump()
 	await _frames(12)
 	moves.press()
@@ -205,7 +218,7 @@ func _run() -> void:
 		_check(swimming and highest - pond.surface_y() > 1.7, "a leap out of the water (%.2f m over it)" % (highest - pond.surface_y()))
 
 	# Whipping the stick round he spins; jumping then is a spin jump, higher than a jump
-	await _put(Vector3(0.0, 0.05, 8.0))
+	await _put(Vector3(0.0, 0.15, 29.5))
 	var spinner := player.get_node(^"SpinJump") as SpinJump
 	player.is_spinning = true
 	player._queue_jump()
@@ -222,10 +235,10 @@ func _run() -> void:
 
 	# Scurrying into a power pole, he climbs it
 	var scurry := player.get_node(^"Scurry") as Scurry
-	await _put(Vector3(3.0, 0.05, -31.2))
+	await _put(Vector3(34.4, 0.15, -1.2))
 	world.camera.set_process(false)
 	world.camera.set_physics_process(false)
-	world.camera.global_transform = Transform3D(Basis(Vector3.UP, PI), Vector3(3.0, 2.0, -35.0))
+	world.camera.global_transform = Transform3D(Basis(Vector3.UP, PI), Vector3(34.4, 2.0, -5.0))
 	scurry.button = true
 	Input.action_press(&"move_up")
 	var base := player.global_position.y

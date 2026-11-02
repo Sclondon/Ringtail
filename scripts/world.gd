@@ -50,6 +50,7 @@ var markers := {}
 var _hurt_rest := 0.0
 var _cats_left := 0
 var _checkpoints: Array[Vector3] = []
+var _sun: DirectionalLight3D
 
 
 func _ready() -> void:
@@ -77,6 +78,12 @@ func _ready() -> void:
 	add_child(camera)
 
 	_place_things()
+	# The town's hazards (birds, the fox, people, cars), and his band of raccoons
+	Hazards.place(self, markers, player)
+	# Daughter Of The Wind's clouds round the sky (GameCommon puff-clouds; the user: "the clouds should be like
+	# daughter of the wind")
+	PuffClouds.add_to(self, _sun)
+	Squad.place(self, player)
 	add_child(N64Filter.new())
 	hud = Hud.new()
 	hud.world = self
@@ -119,6 +126,7 @@ func _controls() -> void:
 
 func _environment() -> void:
 	var sun := DirectionalLight3D.new()
+	_sun = sun
 	# Low evening sun from over the alley
 	sun.rotation_degrees = Vector3(-28.0, 60.0, 0.0)
 	sun.light_color = Color(1.0, 0.78, 0.58)
@@ -195,6 +203,17 @@ func _place_things() -> void:
 			cat.add_to_group(&"interest")
 			add_child(cat)
 			_cats_left += 1
+		elif name.begins_with("tree_"):
+			# (tree_<n>_<seed>_<size%>: a climbable tree of the grove, GameCommon's TreeGen, its limbs to stand on)
+			var parts := name.split("_")
+			var tree := TreeGen.preset("Climbing oak" if int(parts[1]) % 3 != 1 else "Climbing maple")
+			tree.seed = int(parts[2])
+			var body := tree.body()
+			body.position = at
+			body.rotation.y = float(parts[2]) * 0.7
+			body.scale = Vector3.ONE * float(parts[3]) / 100.0
+			body.add_to_group(&"climbable")
+			add_child(body)
 		elif name.begins_with("check_"):
 			_checkpoints.append(at)
 		elif name.begins_with("ladder_"):
