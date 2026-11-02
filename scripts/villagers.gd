@@ -4,7 +4,7 @@ extends Node3D
 ## to talk to", "kits and adults", "And there should be other raccons just running around the map doing stuff"):
 ## a gathering at the grove's heart, grown-ups standing and sitting about while their kits play tag round them,
 ## each with a word for the hero; and a few out in the town going round their haunts, one with a kit at its heels.
-## Walk up to one with something to say and the talk button shows (TalkBox).
+## Walk up to one with something to say and "Talk to <name>" shows (TalkBox, as in Gloaming).
 ##
 ##   Villagers.place(world, markers, player)    # in World._ready, once the player is in
 ##
@@ -24,20 +24,20 @@ const TINTS := [
 	{"fur": Color(0.55, 0.52, 0.5), "tan": Color(0.62, 0.58, 0.55)},
 	{"fur": Color(0.62, 0.55, 0.47), "tan": Color(0.7, 0.61, 0.5)},
 ]
-## What each at the grove says (Claude's placeholders: hello-level chatter, no lore).
+## Who each at the grove is and what it says (Claude's placeholders: names, and hello-level chatter, no lore).
 const GROVE_LINES := [
-	["Oh, hello! Back from the town already?", "Mind the cars on the ring road. They never look where they're going."],
-	["Shh. I'm resting my eyes.", "...", "Fine. Hello."],
-	["Have you seen what the people leave out by the shops? Pizza!", "Whole slices! Some of them barely bitten."],
-	["Tag! You're it!", "...Aw, you're too big to play."],
-	["Can you really spin your tail like that?", "Show me again! Again!"],
-	["I found an acorn. It's mine.", "You can look at it, though."],
+	["Old Grey", "Oh, hello! Back from the town already?", "Mind the cars on the ring road. They never look where they're going."],
+	["Dozy", "Shh. I'm resting my eyes.", "...", "Fine. Hello."],
+	["Gobbler", "Have you seen what the people leave out by the shops? Pizza!", "Whole slices! Some of them barely bitten."],
+	["Pip", "Tag! You're it!", "...Aw, you're too big to play."],
+	["Tumble", "Can you really spin your tail like that?", "Show me again! Again!"],
+	["Nutmeg", "I found an acorn. It's mine.", "You can look at it, though."],
 ]
 ## And out in the town, the grown-ups going about.
 const TOWN_LINES := [
-	["Busy busy. Lots of bins to see to.", "Catch you later!"],
-	["Keep an eye on the sky. The hawk's about."],
-	["This one's with me. Say hello, little one."],
+	["Binsley", "Busy busy. Lots of bins to see to.", "Catch you later!"],
+	["Lookout", "Keep an eye on the sky. The hawk's about."],
+	["Hazel", "This one's with me. Say hello, little one."],
 ]
 
 var player: Player
@@ -62,14 +62,14 @@ static func place(world: Node3D, markers: Dictionary, hero: Player) -> void:
 		var a := TAU * k / 3 + 0.4
 		var adult := band._add(false, k, heart + Vector3(cos(a), 0.4, sin(a)) * 1.3)
 		adult.home = heart + Vector3(cos(a), 0.0, sin(a)) * 1.3
-		adult.lines = PackedStringArray(GROVE_LINES[spot])
+		adult.say(GROVE_LINES[spot])
 		spot += 1
 	var kits: Array[Villager] = []
 	for k in 3:
 		var a := TAU * k / 3 + 1.4
 		var young := band._add(true, k + 2, heart + Vector3(cos(a), 0.4, sin(a)) * 2.3)
 		young.home = heart
-		young.lines = PackedStringArray(GROVE_LINES[spot])
+		young.say(GROVE_LINES[spot])
 		spot += 1
 		kits.append(young)
 	# (two play tag; the third sometimes, with whichever)
@@ -86,7 +86,7 @@ static func place(world: Node3D, markers: Dictionary, hero: Player) -> void:
 		var goer := band._add(false, k + 1, route[at] + Vector3.UP * 0.4)
 		goer.route = route
 		goer.leg = at
-		goer.lines = PackedStringArray(TOWN_LINES[k])
+		goer.say(TOWN_LINES[k])
 		if k == 2:
 			var young := band._add(true, k + 3, route[at] + Vector3(0.6, 0.4, 0.0))
 			young.parent = goer
@@ -179,16 +179,3 @@ func threat_near(at: Vector3, reach: float) -> Vector3:
 				best = thing.global_position
 	return best
 
-
-## The nearest one near enough the hero to talk to, or null.
-func talker_near(reach := 1.8) -> Villager:
-	var best: Villager = null
-	var nearest := reach
-	for member in members:
-		if member.dead or not member.talks() or member.doing == Villager.Doing.FLEE:
-			continue
-		var d := member.global_position.distance_to(player.global_position)
-		if d < nearest:
-			nearest = d
-			best = member
-	return best

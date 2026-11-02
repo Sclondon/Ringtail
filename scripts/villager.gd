@@ -34,7 +34,8 @@ var villagers: Villagers
 var rig: RaccoonRig
 var kit := false
 var dead := false
-## What it says, a line at a time (empty: it has nothing to say).
+## Its name over the talk box, and what it says, a line at a time (empty: it has nothing to say).
+var display_name := ""
 var lines: PackedStringArray = []
 ## At the grove: where it keeps to. In the town: the haunts it goes round, and which it is making for.
 var home := Vector3.INF
@@ -222,6 +223,7 @@ func die(push: Vector3) -> void:
 	if dead:
 		return
 	dead = true
+	remove_from_group(&"talkers")
 	if villagers.talk and villagers.talk.talking == self:
 		villagers.talk.close()
 	set_physics_process(false)
@@ -233,9 +235,21 @@ func die(push: Vector3) -> void:
 	rig.go_limp(push)
 
 
+## Gives it a name and its lines ([name, line, line...]), and makes it one to talk to.
+func say(entry: Array) -> void:
+	display_name = entry[0]
+	lines = PackedStringArray(entry.slice(1))
+	add_to_group(&"talkers")
+
+
 ## Whether it has a word for him.
 func talks() -> bool:
 	return not lines.is_empty()
+
+
+## Whether the hero is near enough to talk to it (TalkBox).
+func in_reach(hero: Node3D) -> bool:
+	return not dead and doing != Doing.FLEE and hero.global_position.distance_to(global_position) < (1.5 if kit else 1.9)
 
 
 ## Stops what it is doing and turns to him to talk (or goes back to it).

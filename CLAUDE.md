@@ -93,3 +93,17 @@ Read README.md first. Started 2026-11-01.
 - Built by forked agents this day: cats (build_cat.py, CatRig), fox/skunk/badger/rabbit (build_critters.py,
   CritterRig: built, role not decided), hazards, food, squad, tightrope, trees, clouds. Their reports are in the
   commit messages.
+
+## 2026-11-02: the other raccoons (the user's calls, in their words)
+
+- "There should be other raccons in the center of the grove to talk to", "kits and adults", "And there should be
+  other raccons just running around the map doing stuff": `Villagers.place` (scripts/villagers.gd, villager.gd).
+  Three grown-ups and three kits at `grove_heart` (fallback: just south of the great tree), the kits playing tag;
+  three grown-ups going round `haunt_<n>` (fallback: the ring road's pavements), one with a kit at heel. Kits are
+  RaccoonRig at 0.5 with the head and spine bones' rest made bigger (Villagers._kit_shape).
+- "The talking should work like in gloaming not like this": TalkBox is Gloaming's Story talk box ported ("Talk to
+  <name>" at the bottom; a Breath of the Wild pill with the name over its corner, typed out; the ▶ goes on; he stands
+  still). Talk is T or RB on a pad (Y is duck here); in the box T, RB, A, Space or Enter go on.
+- "the kits should not teleport to you, and if they die they should just rag doll and stop moving": villagers too
+  (Villager.die: a car, a fall over SquadRaccoon.DEADLY_FALL, off the world).
+- Claude's placeholders: every villager's name and line (hello-level chatter), their tints and sizes.

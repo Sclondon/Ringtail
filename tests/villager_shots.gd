@@ -97,6 +97,7 @@ func _run() -> void:
 	await _frames(40)
 	await _shot("talk_prompt")
 	band.talk.press()
+	print("talking to %s (prompt was %s, hero state %s floor %s)" % [band.talk.talking, band.talk._prompt.visible, world.player.state, world.player.is_on_floor()])
 	await _frames(90)
 	await _shot("talk_box")
 	band.talk.close()
