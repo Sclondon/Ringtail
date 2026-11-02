@@ -52,6 +52,8 @@ var hud: Hud
 var lost_kits: LostKits
 ## The hill's zones (Zones).
 var zones: Zones
+## The wind over the hill (GameCommon WindField).
+var wind: WindField
 var race: Race
 var crumbs := 0
 var crumbs_total := 0
@@ -444,3 +446,14 @@ func _grow_lawn() -> void:
 	await get_tree().physics_frame
 	var lawn := TownGrass.place(self, player, markers)
 	Wildlife.place(self, lawn, player)
+	# One wind over the hill: Wind Waker ribbons riding it round him, the grass gusting in step (GameCommon wind; the
+	# user, 2026-11-02, "there should be Wind Waker like wind trails (we have the assets for that, look at other games)")
+	wind = WindField.new()
+	wind.speed = 6.0
+	for node in get_children():
+		if node is Grass:
+			wind.apply_grass(node)
+	var ribbons := WindRibbons.new()
+	ribbons.field = wind
+	ribbons.follow_camera = true
+	add_child(ribbons)
