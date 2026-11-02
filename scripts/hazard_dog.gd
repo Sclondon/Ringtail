@@ -1,7 +1,9 @@
 class_name HazardDog
 extends CharacterBody3D
-## A yard dog (the user, 2026-11-02: "there should be dogs as well (we already have the assets)"): GameCommon's dog
-## (godot/dog, Warren's) fed and kept, coat tinted, no mange, living in a yard at a `dog_<n>` marker. It potters
+## A yard dog (the user, 2026-11-02: "there should be dogs as well (we already have the assets)", then "the dog needs to
+## look less hellish" and "should be like a shiba inu and beagle and blood hound and basset hound and wiener dog"):
+## GameCommon's dog (godot/dog: every move) on one of Ringtail's friendly breeds (YardDog, tools/build_yard_dog.py),
+## glad and wagging at rest, snarling only as it chases; living in a yard at a `dog_<n>` marker. It potters
 ## about its yard (sniffing, sitting, lying down for a sleep); seeing the raccoon near it barks, then gives chase at
 ## a gallop and springs at him (a bite hurts). He can outrun it bounding flat out; it gives up after a while, when
 ## he gets too far from its yard, when he goes up out of its reach, or when it loses him: in the grove, or hidden in
@@ -12,15 +14,14 @@ extends CharacterBody3D
 
 enum State { POTTER, SIT, SLEEP, ALERT, CHASE, LUNGE, SEARCH, HOME, YELP }
 
-## Each dog's look: [coat tint (over the dog's own dark grey-brown, so strong), size, variant]. Claude's picks; each is
-## bigger than the raccoon.
-const LOOKS := [
-	[Color(5.0, 3.5, 2.0), 1.25, 0],   # a tan shepherd-ish dog
-	[Color(0.55, 0.52, 0.52), 1.35, 1], # a big black one
-	[Color(5.6, 5.4, 5.0), 1.1, 0],     # a white one
-	[Color(3.0, 1.9, 1.1), 1.2, 1],     # a brown one
-	[Color(4.6, 4.0, 3.0), 1.0, 1],     # a little cream one
-	[Color(2.6, 2.5, 2.4), 1.3, 0],     # a grey one
+## The dogs in turn: [breed, size, chase speed (m/s; the short-legged ones are slower)]. Claude's picks; each a
+## good deal bigger than the raccoon.
+const BREEDS := [
+	["shiba", 1.3, 5.4],
+	["beagle", 1.35, 5.0],
+	["bloodhound", 1.4, 4.8],
+	["basset", 1.35, 3.6],
+	["dachshund", 1.3, 4.0],
 ]
 
 ## How far it sees him, how far from its yard it will chase, how long, and how fast it goes.
@@ -68,15 +69,13 @@ static func make(at: Vector3, k: int, hero: Player) -> HazardDog:
 	body.home = at
 	body.player = hero
 	body.position = at + Vector3.UP * 0.3
-	var look: Array = LOOKS[k % LOOKS.size()]
-	body.dog = Dog.new()
-	body.dog.name = "Dog"
-	body.dog.coat_tint = look[0]
-	body.dog.mange = 0.0
-	body.dog.eyeshine = 0.2
-	body.dog.variant = look[2]
-	body.dog.fur_shells = 1
-	body.dog.scale = Vector3.ONE * float(look[1])
+	var kind: Array = BREEDS[k % BREEDS.size()]
+	var yard_dog := YardDog.new()
+	yard_dog.breed = kind[0]
+	yard_dog.name = "Dog"
+	yard_dog.scale = Vector3.ONE * float(kind[1])
+	body.dog = yard_dog
+	body.chase_speed = kind[2]
 	return body
 
 
@@ -95,15 +94,8 @@ func _ready() -> void:
 	collider.position.y = 0.35
 	add_child(collider)
 	add_child(dog)
-	kept(dog)
+	dog.friendly = true
 	_goal = home
-
-
-## A kept dog, not Warren's feral one: no scars or bald patches, the creases of its ribs soft, its coat smoother.
-static func kept(which: Dog) -> void:
-	if which.rig and which.rig.materials.has("coat"):
-		DogLook.tune(which.rig.materials["coat"], {&"scar_width": 0.0, &"scar_bald": 0.0, &"crease": 0.2, &"patch": 0.0,
-				&"clump_tone": 0.2, &"streak": 0.05})
 
 
 func _go(to: State) -> void:
@@ -114,6 +106,8 @@ func _go(to: State) -> void:
 	dog.tracking = to == State.SEARCH
 	dog.snarling = to == State.CHASE or to == State.LUNGE
 	dog.stalking = false
+	# (glad, tail up and wagging, while it is about its own business)
+	dog.friendly = to == State.POTTER or to == State.SIT or to == State.HOME
 
 
 func _physics_process(delta: float) -> void:

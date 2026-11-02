@@ -229,10 +229,16 @@ Read README.md first. Started 2026-11-01.
 ## Dogs and hiding (2026-11-02)
 
 - The user: "there should be dogs as well (we already have the assets) and tall grass to hide in in spots as well".
-- Dogs are GameCommon's `godot/dog` (Warren's feral dog; installed under `creatures/dog/`), kept: `HazardDog`
-  (scripts/hazard_dog.gd) tints the coat (strong tints: its base is dark), drops the scars and bald patches and
-  softens the rib creases (`HazardDog.kept`); the gaunt build itself is the model's. Six looks and sizes, all bigger
-  than the raccoon, are Claude's picks (`HazardDog.LOOKS`). Each lives at a `dog_<n>` marker (else the haunts
+- Then "the dog needs to look less hellish" and "should be like a shiba inu and beagle and blood hound and basset
+  hound and wiener dog": the dogs are GameCommon's `godot/dog` (installed under `creatures/dog/`: its moves and rig)
+  on Ringtail's own models, `tools/build_yard_dog.py` (Blender; Warren's tools/build_dog.py imported as a library,
+  same bones; writes models/yard_dog_<breed>.glb and _lo, .blends in tools/): a full healthy body (no ribs, spine,
+  hip bones, scars or crest), big dark eyes, small upper teeth only, each breed's build, ears and tail, and its coat
+  colours painted in the vertex colours (sRGB as given: the glTF export makes float colours linear itself; converting
+  first came out dark and over-red). `YardDog`/`YardDogRig` (scripts/yard_dog*.gd) draw the coat with Toon by those
+  colours and the eyes and mouth with the component's parts shader (no eyeshine). Glad and wagging at rest
+  (`friendly`), snarling only chasing. The breeds' looks, sizes (about 1.3x the model, bigger than him) and chase
+  speeds (basset 3.6 to shiba 5.4 m/s) are Claude's picks (`HazardDog.BREEDS`). Each lives at a `dog_<n>` marker (else the haunts
   furthest from the grove): potters, sits, sleeps; seeing him it barks, gallops after him and springs (a bite
   hurts once a spring); gives up after 7 s, past 16 m from its yard, when he goes up out of reach, or when it loses
   him, then casts about nose down and trots home. His tail spin sends it yelping home. It is in `hazards`, so the
@@ -242,7 +248,8 @@ Read README.md first. Started 2026-11-01.
   `tallgrass_<n>` markers) and not bounding flat out (Claude's pick: standing, walking, ducking or scurrying there
   all hide him; sprinting through it does not).
 - Tests: `tests/dog_test.gd` (a dog sees, chases and bites him; hidden, it loses him and does not find him again; a
-  cat by him hidden does not stalk), `tests/dog_shots.gd -- --out=<dir>` (the looks beside him, four sides, a gallop).
+  cat by him hidden does not stalk), `tests/dog_shots.gd -- --out=<dir>` (the breeds beside him from four sides, each
+  face close, one snarling, a gallop). Rebuild: `blender -b --factory-startup --python tools/build_yard_dog.py [-- <dir> [breed]]`.
 - More of the model editor (the user, 2026-11-02): "why is there not any fur shape options beside triangle" (Shape:
   triangle, teardrop, ribbon, wavy, curl, blunt, forked; each but the triangle a build of its own, `build_raccoon.py
   -- shape=<shape>` writes models/raccoon_shape_<shape>.glb at the plain fur type: every tuft a lock of rings along a
