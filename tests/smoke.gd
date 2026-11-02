@@ -58,7 +58,7 @@ func _run() -> void:
 			(node as Node3D).global_position.y = -300.0
 
 	# Running goes onto all fours, bounding
-	await _put(Vector3(0.0, 0.15, 29.5))
+	await _put(Vector3(0.0, 0.15, 41.6))
 	Input.action_press(&"move_up")
 	var most := 0.0
 	var bound := 0.0
@@ -69,7 +69,7 @@ func _run() -> void:
 	_check(most > 0.9 and bound > 0.5, "running on all fours (quad %.2f)" % most)
 
 	# Scurrying, he goes on all fours at a walk too
-	await _put(Vector3(0.0, 0.15, 29.5))
+	await _put(Vector3(0.0, 0.15, 41.6))
 	(player.get_node(^"Scurry") as Scurry).button = true
 	await _frames(10)
 	Input.action_press(&"move_up", 0.35)
@@ -78,7 +78,7 @@ func _run() -> void:
 	(player.get_node(^"Scurry") as Scurry).button = false
 
 	# Jump pressed again in the air and held: the twirl, falling slowly
-	await _put(Vector3(0.0, 0.15, 29.5))
+	await _put(Vector3(0.0, 0.15, 41.6))
 	Input.action_press(&"jump")
 	player._queue_jump()
 	var glided := false
@@ -107,7 +107,7 @@ func _run() -> void:
 	cat.set_physics_process(true)
 
 	# The long jump: flat out, duck into a slide and jump, and he goes long
-	await _put(Vector3(0.0, 0.15, -29.5))
+	await _put(Vector3(0.0, 0.15, -41.6))
 	Input.action_press(&"move_up")
 	await _frames(45)
 	Input.action_press(&"duck")
@@ -124,7 +124,7 @@ func _run() -> void:
 	_check(long_speed > 8.0, "a long jump out of a slide (%.1f m/s along)" % long_speed)
 
 	# The spin in the air is a second jump
-	await _put(Vector3(0.0, 0.15, 29.5))
+	await _put(Vector3(0.0, 0.15, 41.6))
 	Input.action_press(&"jump")
 	player._queue_jump()
 	await _frames(16)
@@ -136,7 +136,7 @@ func _run() -> void:
 	await _frames(60)
 
 	# A spin in the air
-	await _put(Vector3(0.0, 0.15, 29.5))
+	await _put(Vector3(0.0, 0.15, 41.6))
 	player._queue_jump()
 	await _frames(12)
 	moves.press()
@@ -225,7 +225,7 @@ func _run() -> void:
 		_check(swimming and highest - pond.surface_y() > 1.7, "a leap out of the water (%.2f m over it)" % (highest - pond.surface_y()))
 
 	# Whipping the stick round he spins; jumping then is a spin jump, higher than a jump
-	await _put(Vector3(0.0, 0.15, 29.5))
+	await _put(Vector3(0.0, 0.15, 41.6))
 	var spinner := player.get_node(^"SpinJump") as SpinJump
 	player.is_spinning = true
 	player._queue_jump()
@@ -242,10 +242,10 @@ func _run() -> void:
 
 	# Scurrying into a power pole, he climbs it
 	var scurry := player.get_node(^"Scurry") as Scurry
-	await _put(Vector3(34.4, 0.15, -1.2))
+	await _put(Vector3(47.34, 0.15, 11.43))
 	world.camera.set_process(false)
 	world.camera.set_physics_process(false)
-	world.camera.global_transform = Transform3D(Basis(Vector3.UP, PI), Vector3(34.4, 2.0, -5.0))
+	world.camera.global_transform = Transform3D(Basis(Vector3.UP, PI), Vector3(47.34, 2.0, 7.63))
 	scurry.button = true
 	Input.action_press(&"move_up")
 	var base := player.global_position.y

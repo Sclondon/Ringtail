@@ -5,7 +5,7 @@ extends SceneTree
 ## climb to the roof's edge and hop over onto it. Prints each and PASSED/FAILED. Headless:
 ##   godot --headless --path . --audio-driver Dummy --fixed-fps 60 -s res://tests/pipe_climb.gd
 
-const PIPES := ["house_5", "hill_house_1", "danchi_6", "shop_4", "back_8_0", "sento_0"]
+const PIPES := ["house_5", "hill_house_S_1", "danchi_10", "shop_1", "back_11_0", "sento_7"]
 const ANGLES := [-0.6, 0.0, 0.6]
 
 var world: World

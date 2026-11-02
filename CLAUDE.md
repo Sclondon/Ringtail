@@ -454,3 +454,94 @@ Read README.md first. Started 2026-11-01.
   Not done: the opossum hanging by its tail, a chirp sound for the prairie dog.
 - Checks: `tests/grove_animal_shots.gd -- --out=<dir> [lineup] [grove]` (every kind beside him front and side; the
   grove from above and close by; prints counts, what each is doing, and any that fell through).
+
+## 2026-11-02: four faces, four zones (the user's calls; this supersedes the one-street layout above)
+
+- "the grove needs to be bigger and surrounded by trees": the clearing is PLATEAU 20 m across the radius on a mound
+  HILL_TOP 2.3 m to HILL_FOOT 32.5 m (steepest 17 degrees: build_town.py prints it), the pond (deeper: 1.7 m, so he
+  swims) at its east edge; a wood two rows deep round it on the mound's slope (radii 23.5 and 28 m), mostly cedars
+  (a plain cedar is about 4.5k triangles, an oak 17k), oaks in the inner row, the great camphor (north-west) and two
+  climbing oaks; gaps only for the path and torii and the view down the south street. About 40 trees, ~340k
+  triangles in all (build_town.py prints it). Hazards.HAVEN_RADIUS 31 m covers the clearing and the wood.
+- "instead of just one side of the hill having a road down, it should be a 4 sided hill with windy roads down each
+  side, thus breaking the map up into 4 zones. Each zone should be themed a little different and have different kit
+  and food trackers": FACES in build_town.py, each built in its own frame (as if it were the south face) and turned
+  into place (the Blender objects rotated about Z; World reads their global transforms). Zones and themes are
+  Claude's picks: 0 Station (south: houses between the runs, flats and the station at the foot, the race down its
+  first runs), 1 Estate (east: blocks of flats between the runs, more at the foot, the bath house chimney with the
+  "Up the chimney" Bottlecap), 2 Stairs (north: old houses, six long stairways, the billboard with the glide
+  Bottlecap: glide from the hilltop flats, lot 10), 3 Shrine (west: rice paddies stepped down between the runs,
+  bamboo, a thatched farmhouse, a torii and shrine at the foot, cedars, the hollow log with the hidden Bottlecap). The
+  cats' Bottlecap appears in the grove. `zone_<n>_<Name>` marks each face's middle (main's HUD counts by the nearest).
+  The faces meet on plain grass ridges (the cone, walkable); the whole hill to PLAY (about 250 m) is solid ground,
+  hidden_bound a circle round it. ground_global() gives the ground anywhere (the face it lies furthest down).
+- "the roads should be wider": the ring road is 12 m (ROAD 35.6..47.6, pavements PAVE 3), the face roads ROAD_HALF 6
+  with pavements to 8.5, the shelf BENCH 10.5, hairpins BEND 17 m and the top and foot turns TURN 10 m (a 10 m bus
+  turns them), the runs 34 m apart. The ring has 12 lots (SECTORS 12, centred on their angles), four of them `road`
+  where the streets leave (east, south, west, north). Cars: road_0 the ring, road_1..4 each face's down-and-back
+  loop round its foot's turning circle; walk_2..5 each face's pavement.
+- Lost kits (the user: "50 kits to rescue, and they should end up back in the grove after you find them", then "or
+  maybe lets start with 20"): kit_0..19, five a face: in the tall grass between the first runs (easy), on a roof or
+  ridge (up its drainpipe, or the farmhouse's corner post), on the bottom step of the second stairway, at the foot (the
+  station's platform, by the flats, a shop's roof up its pipe, the torii's top beam up its post), out by the third
+  hairpin. tests/kit_spots.gd checks each sits on a surface with room over it, out of the clearing.
+- The trampoline and the ring's race are gone; the ring bath house keeps a chimney (`climb_chimney_ring`, no cap).
+- tests/cap_routes.gd walks the chimney, the glide and the log; tests/pipe_climb.gd names the new buildings.
+
+## The one-hand handstand on points (2026-11-02)
+
+- The user: "you need to be able to handstand on one hand on the top of pointy things like trees and telephone poles".
+- PointPerches.find (from World._grow_lawn, once the physics has the world) collects the points: the tops of the
+  climb_ meshes named for poles or a chimney (each top's middle, from the mesh's highest ring of points) and every tree
+  body's tip (over its trunk, at the top of its drawn bounds).
+- PointStand (a child of the Player, priority -5): coming down within 0.6 m of a point, from above it, he catches it;
+  scurrying up a pole to within 1.8 m of its top (under the crossarm) he springs up onto it. On it the Player takes no
+  input of its own (`takes_input` off): the stick turns him, jump throws him up (`lift` 1.3), duck or scurry drops him
+  off. Hazards.unseen counts him out of reach there (PointStand.perched).
+- The pose (RaccoonRig._pose_handstand): turned over end to end, his left shoulder over the paw on the tip. That arm is
+  drawn out 1.6x along itself (HS_ARM), cartoon-fashion: his arms are short (0.26 m), and at their own length his head
+  came down onto the tip. The other arm is out, the legs together pointing up, a wobble, and the tail curled over.
+- Checks: tests/point_stand_test.gd (drop onto a pole top, out of reach, the pose, jump off, scurry up a pole to the
+  top), tests/handstand_shots.gd (four sides and above).
+- Not checked in play: a tree tip (in its leaves), the chimney, turning on the point with the stick.
+
+## Playing as the crow or the owl (2026-11-02)
+
+- The user: "and add a mode where you can be the crow or owl". The pause screen's "Play as" row (raccoon, crow, owl
+  faces) swaps who is played (`BirdPlayer.play_as(world, &"crow" | &"owl" | &"raccoon")`).
+- `scripts/bird_player.gd` (BirdPlayer): the bird as a controller of its own, on the BIRDS fork's model and BirdBody
+  poser, with `scripts/bird_camera.gd` (BirdCamera) following it. The raccoon is put away meanwhile (hidden, still, no
+  collision, his FollowCamera off) and comes back on the ground under the bird (Claude's pick: under the bird, not
+  where he was). Hops on the ground; jump takes off and each press in the air flaps (held: glides); the stick steers
+  (banking); duck dives (the owl swoops faster); scurry settles on the nearest wire or pole/tree top (PointPerches)
+  within 5 m; tail pecks (knocks what his tail knocks, never a cage: cages are his). Lands on anything it comes down on.
+- Claude's picks: both birds take Crumbs (they count as his; not Bottlecaps); the hunters leave a bird be and nothing
+  hurts the put-away raccoon (World.hurt, Hazards.unseen); the crow agile with quick flaps, the owl slow deep flaps,
+  long glides, a faster swoop, its head following the camera; a ceiling 40 m over where it took over.
+- The HUD's Scurry and Tail buttons show Perch and Peck while a bird is played (same buttons, same keys).
+- Unchecked: the HUD's zone/counts still follow the put-away raccoon's place, not the bird's; touch flying on a phone.
+- Tests: `tests/bird_mode_test.gd` (flap up, glide, settle on a wire, land on a roof, take a Crumb, owl, back),
+  `tests/bird_mode_shots.gd -- --out=<dir>`.
+
+## The grove's animals (2026-11-02)
+
+- The user: "there should be the other animals in the grove too for me to see - skunk and beavers and rats and mice
+  and rabbits and weasels and martens and otters", "gophers, prairie dogs", then "opossums" and "squirrels",
+  "porcupine", "chipmunk" (with what each does: the opossum hangs by its tail or plays dead startled; the squirrel
+  climbs the trees and sits nibbling; the porcupine waddles, raises its quills when he comes too close and climbs
+  slowly; the chipmunk darts about the food pile and up the trees).
+- Models: `tools/build_grove_animals.py` (Blender, on build_critters.py's pipeline; `-- <dir|-> <animal>`, or
+  `burrow` for models/burrow.glb) writes models/<animal>.glb and _lo for beaver, rat, mouse, weasel, marten, otter,
+  gopher, prairie_dog, opossum, squirrel, porcupine, chipmunk (.blends in tools/). The critter builders now paint the
+  raccoon's grit (racc.paint_grit) after export: without it the kit's Paint colours made every body draw black.
+  Porcupine quills ride a `quills` bone the rig grows (CritterRig.bristle). Sizes: Critter.SIZES.
+- `GroveAnimals.place(world, markers, player)` (scripts/grove_animals.gd, from World._grow_lawn): 28 animals round
+  the clearing (beyond 7 m of grove_heart): otters and the beaver swim in the pond and come out on its bank; prairie
+  dogs and gophers by four burrow mounds, the prairie dogs sitting up as sentries; mice, rats and chipmunks nibbling
+  round the FoodPile; skunks, rabbits, weasel, opossum on the rim; squirrels, chipmunks, the marten and the porcupine
+  go up a nearby trunk, sit, and come down. Near him (3.5 m) they turn to look, within 1.6 m back off; prairie dogs
+  and gophers sit up and stare; the porcupine turns its back, quills up; the opossum may flop (ragdoll) and lie still
+  till he goes. Past 38 m they stand still, their rigs off. Counts, places and every look are Claude's picks.
+  Not done: the opossum hanging by its tail, a chirp sound for the prairie dog.
+- Checks: `tests/grove_animal_shots.gd -- --out=<dir> [lineup] [grove]` (every kind beside him front and side; the
+  grove from above and close by; prints counts, what each is doing, and any that fell through).

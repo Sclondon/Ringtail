@@ -68,6 +68,9 @@ w1.COLOURS.update({
     "pampas_leaf": (0.52, 0.62, 0.32),
     "wire_dark": (0.12, 0.12, 0.14),
     "zinc": (0.66, 0.68, 0.70),
+    "bamboo": (0.46, 0.62, 0.30),
+    "bamboo_leaf": (0.36, 0.58, 0.26),
+    "paddy": (0.42, 0.56, 0.52),
     "sky_ridge1": (0.44, 0.60, 0.58),
     "sky_ridge2": (0.56, 0.68, 0.74),
     "sky_ridge3": (0.66, 0.76, 0.86),
@@ -90,32 +93,37 @@ w1.COLOURS.update({
     "far_tree2": (0.28, 0.46, 0.26),
 })
 
-HILL_TOP = 2.0          # the plateau's height: a gentle mound (the user, 2026-11-02: "the grove hill is way too steep")
-PLATEAU = 13.0          # its radius: the open clearing on top (the user, 2026-11-02: "the spawning area is too small and cramped")
-HILL_FOOT = 23.5        # where the mound meets the flat (the inner pavement starts at 23.6)
-ROAD = (26.0, 33.0)     # the ring road, inner and outer edge
-ROAD_MIDDLE = 29.5
-PAVE = 2.4              # the pavements either side of it
-LOT = (36.5, 56.0)      # the terraced lots, from the retaining wall by the road to the brink at the back
-FRONT = 38.5            # where the buildings' fronts stand
-BOUND = 55.6            # the unseen wall that keeps him in (the rail stands just inside it)
-POOL = (9.5, 2.5)       # a pond at the clearing's east edge
-POOL_RADII = (2.4, 1.8)
-SECTORS = 10
+HILL_TOP = 2.3          # the plateau's height: a gentle mound (the user, 2026-11-02: "the grove hill is way too steep")
+PLATEAU = 20.0          # its radius: the open clearing on top (the user, 2026-11-02: "the spawning area is too small and cramped", "the grove needs to be bigger and surrounded by trees")
+HILL_FOOT = 32.5        # where the mound meets the flat (the inner pavement starts at 32.6)
+ROAD = (35.6, 47.6)     # the ring road, inner and outer edge
+ROAD_MIDDLE = 41.6
+PAVE = 3.0              # the pavements either side of it
+LOT = (52.5, 72.0)      # the terraced lots, from the retaining wall by the road to the brink at the back
+FRONT = 54.5            # where the buildings' fronts stand
+BOUND = 71.6            # the unseen wall that keeps him in (the rail stands just inside it)
+POOL = (16.0, 4.0)      # a pond at the clearing's east edge
+POOL_RADII = (2.8, 2.1)
+SECTORS = 12
+# Where the lost kits sit (the user, 2026-11-02: "50 kits to rescue, and they should end up back in the grove after
+# you find them", then "or maybe lets start with 20"): the surface each is on; marked kit_<n> at the end (build())
+KITS = []
 
 # Each lot round the road (sector k spans angles k..k+1 tenths of a turn): what stands on it, and how high it is
 # held above the road. (Claude's picks.)
 LOTS = [
-    ("sento", 0.12, None),
-    ("danchi", 2.4, None),
-    ("road", 0.0, None),          # the street leaves the ring here, down the hill
+    ("road", 0.0, None),          # east: the Estate's street goes down from here
+    ("shop", 0.12, None),
+    ("house", 1.6, "kawara"),
+    ("road", 0.0, None),          # south: the Station's
     ("antique", 0.12, None),
-    ("shop", 0.12, None),
     ("house", 1.8, "kawara2"),
-    ("danchi", 2.8, None),
+    ("road", 0.0, None),          # west: the Shrine's
+    ("sento", 0.12, None),
     ("house_back", 0.12, "kawara3"),
+    ("road", 0.0, None),          # north: the Stairs'
+    ("danchi", 2.4, None),
     ("house", 1.4, "kawara"),
-    ("shop", 0.12, None),
 ]
 
 
@@ -130,7 +138,7 @@ def hill_height(x, z):
     # the pond, sunk in the top
     d = math.hypot((x - POOL[0]) / POOL_RADII[0], (z - POOL[1]) / POOL_RADII[1])
     if d < 1.0:
-        h -= 1.2 * min(1.0, (1.0 - d) / 0.35)
+        h -= 1.7 * min(1.0, (1.0 - d) / 0.35)
     return h
 
 
@@ -198,14 +206,14 @@ def ground():
     """The hill and the flat round it as far as the lots, with the road and pavements laid over."""
     piece = w1.Piece("ground")
     step = 1.0
-    edge = 60.0
+    edge = 76.0
     span = int(edge * 2 / step)
     heights = {}
 
     def h(i, j):
         if (i, j) not in heights:
             x, z = -edge + i * step, -edge + j * step
-            heights[(i, j)] = hill_height(x, z) if math.hypot(x, z) < HILL_FOOT + 0.5 else ground_y(x, z)
+            heights[(i, j)] = hill_height(x, z) if math.hypot(x, z) < HILL_FOOT + 0.5 else ground_global(x, z)
         return heights[(i, j)]
 
     for i in range(span):
@@ -214,10 +222,10 @@ def ground():
             xb, zb = xa + step, za + step
             xm, zm = xa + step / 2, za + step / 2
             r = math.hypot(xm, zm)
-            # (the hilltop's own squares: those whose 2 m square (hill_grid's) has its middle within 58 m; under
+            # (the hilltop's own squares: those whose 2 m square (hill_grid's) has its middle within 67 m; under
             # the lots only by the road, where the street leaves, and behind them)
             parent = (math.floor(xm / 2.0) * 2.0 + 1.0, math.floor(zm / 2.0) * 2.0 + 1.0)
-            if math.hypot(*parent) >= 58.0 or not (r <= LOT[0] + 1.0 or in_gap(xm, zm) or r >= LOT[1] - 1.5):
+            if math.hypot(*parent) >= HILL_EDGE + 1.0 or not (r <= LOT[0] + 1.0 or in_gap(xm, zm) or r >= LOT[1] - 1.5):
                 continue
             pts = [(xa, h(i, j), za), (xa, h(i, j + 1), zb), (xb, h(i + 1, j + 1), zb), (xb, h(i + 1, j), za)]
             if r < HILL_FOOT + 1.0:
@@ -234,8 +242,8 @@ def ground():
         segs = 96
         for k in range(segs):
             a0, a1 = math.tau * k / segs, math.tau * (k + 1) / segs
-            if r0 == ROAD[1] and abs((a0 + a1) / 2 - math.pi / 2) < 0.17:
-                continue  # (the pavement opens where the street goes down the hill)
+            if r0 == ROAD[1] and min(abs(((a0 + a1) / 2 - e + math.pi) % math.tau - math.pi) for e in (0.0, math.pi / 2, math.pi, 3 * math.pi / 2)) < 0.2:
+                continue  # (the pavement opens where each street goes down the hill)
             quad = [(math.cos(a0) * r0, y, math.sin(a0) * r0), (math.cos(a1) * r0, y, math.sin(a1) * r0),
                     (math.cos(a1) * r1, y, math.sin(a1) * r1), (math.cos(a0) * r1, y, math.sin(a0) * r1)]
             rings.face(quad, mat)
@@ -256,7 +264,7 @@ def lots():
     brink of the drop to the town below (a rail along it)."""
     rails = w1.Piece("nocol_rails")
     for k, (kind, height, _roof) in enumerate(LOTS):
-        a0, a1 = math.tau * k / SECTORS, math.tau * (k + 1) / SECTORS
+        a0, a1 = math.tau * (k - 0.5) / SECTORS, math.tau * (k + 0.5) / SECTORS
         top = "grass" if kind.startswith("house") or kind == "danchi" else ("stone" if kind == "antique" else "concrete")
         wall = "blockwall" if height > 0.3 else "concrete"
         piece = w1.Piece("lot_%d" % k)
@@ -534,7 +542,7 @@ def danchi(k, a, height):
     return danchi_at("danchi_%d" % k, Frame(a, FRONT + 1.0, height), 70 + k)
 
 
-def danchi_at(name, frame, seed):
+def danchi_at(name, frame, seed, stairwells=True):
     """A white apartment block (the user, 2026-11-02: "apartment buildings"), five storeys of four flats each: along
     the road side a balcony to every flat with its dividers, solid white parapets and laundry rails; behind, two
     stairwells with open landings rising to little rooftop houses; a flat roof with a parapet and a water tank on
@@ -573,7 +581,7 @@ def danchi_at(name, frame, seed):
                 if rng.random() < 0.6:
                     laundry(frame, line, u - flat / 2 + 0.4, u + flat / 2 - 0.4, -0.9, base + 1.88, rng)
     # the stairwells behind, open at every landing, up to their little houses on the roof
-    for su in (-6.0, 2.0):
+    for su in ((-6.0, 2.0) if stairwells else ()):
         frame.box(piece, su, d + 1.1, 2.8, tall + 2.4, 2.2, "plaster2")
         frame.box(piece, su, d + 1.1, 3.1, 0.15, 2.5, "concrete", base=tall + 2.4)
         for f in range(floors):
@@ -608,12 +616,11 @@ def sento(k, a, height):
         frame.box(piece, wu, -0.04, 2.0, 1.0, 0.1, "glass", base=2.6)
     piece.done()
     # the chimney (anything named climb_ he can scurry up)
-    chimney = w1.Piece("climb_chimney")
+    chimney = w1.Piece("climb_chimney_ring")
     top = 15.0
     frame.box(chimney, 3.5, d + 1.2, 1.4, top, 1.4, "brick")
     frame.box(chimney, 3.5, d + 1.2, 1.9, 0.25, 1.9, "concrete", base=top)
     chimney.done()
-    w1.mark("cap_roof", frame.p(3.5, top + 0.7, d + 1.2))
     inset = max(w / 2 + 0.7 - (d / 2 + 0.7), 0.2)
     w1.crumb_line(frame.p(-inset, ridge + 0.4, v), frame.p(inset, ridge + 0.4, v), 3)
     return frame
@@ -712,7 +719,7 @@ def buildings():
     """What stands on each lot, and the trash cans by the doors and at the steps."""
     haunts = {}
     for k, (kind, height, roof) in enumerate(LOTS):
-        a = math.tau * (k + 0.5) / SECTORS
+        a = math.tau * k / SECTORS
         if kind == "road":
             continue
         if kind == "house":
@@ -754,12 +761,12 @@ def poles_and_wires(frames):
     poles = w1.Piece("climb_poles")
     things = w1.Piece("pole_things")
     lines = w1.Piece("nocol_lines")
-    count = 10
+    count = 12
     r = ROAD[1] + 1.2
     tops = []
     arms = []
     for k in range(count):
-        a = math.tau * k / count
+        a = math.tau * (k + 0.5) / count
         x, z = math.cos(a) * r, math.sin(a) * r
         poles.cylinder((x, 0.0, z), 0.18, 8.2, "pole", 8)
         frame = Frame(a, r)
@@ -797,42 +804,58 @@ def grove():
     """The grove: an open clearing on the hilltop (its middle kept clear: the raccoons gather there, he starts beside
     them), the great tree, the shrine, the torii, the thatched hut and the pond round its edge; climbable trees on the
     slopes below; the hollow log; reeds."""
-    # (a ring of trees round the clearing (the user, 2026-11-02: "the grove should be surrounded by a ring of trees"),
-    # the great camphor on the north-west side, gaps for the pond, the path and torii and the view down the hill, the
-    # hut and the shrine; then a few on the slopes below)
-    ring = [(0, 105), (165, 110), (195, 100), (227, 160), (255, 105), (290, 100), (320, 110), (345, 95)]
-    trees = [(math.cos(math.radians(deg)) * 12.3, math.sin(math.radians(deg)) * 12.3, size) for deg, size in ring]
-    trees += [(17.5, 6.5, 95), (-17.0, -3.0, 100), (-3.0, 18.5, 95), (-19.0, 6.0, 90), (18.0, -9.5, 100)]
-    # (a tree on the slope that stands on the winding path is moved in or out along its radius till it is clear)
-    for k, (x, z, size) in enumerate(trees):
-        if path_distance(x, z) >= 2.5:
+    # A wood round the clearing (the user, 2026-11-02: "the grove needs to be bigger and surrounded by trees"): two
+    # rows of trees on the mound's slope, mostly cedars (the shrine woods of the Ghibli stills; a cedar is about a
+    # quarter of an oak's triangles), oaks among the inner row, the great camphor and two climbing oaks placed for the
+    # routes; gaps only for the path and torii and the view down the hill (55 to 110 degrees).
+    rng_wood = random.Random(17)
+    wood = []   # [x, z, size%, kind, degrees]: kind camphor, climb, oak or cedar
+    for row, (radius, spacing) in enumerate(((23.5, 7.0), (28.0, 6.5))):
+        count = int(math.tau * radius / spacing)
+        for i in range(count):
+            deg = (360.0 * (i + 0.5 * row) / count + rng_wood.uniform(-4.0, 4.0)) % 360.0
+            if 55.0 < deg < 110.0:
+                continue
+            r = radius + rng_wood.uniform(-1.2, 1.2)
+            kind = "oak" if row == 0 and i % 3 == 0 else "cedar"
+            wood.append([math.cos(math.radians(deg)) * r, math.sin(math.radians(deg)) * r, rng_wood.randint(85, 115), kind, deg])
+    # (the climbing trees: the camphor to the north-west, climbing oaks west and north-east: the nearest inner tree)
+    for deg, kind in ((227.0, "camphor"), (165.0, "climb"), (320.0, "climb")):
+        best = min((t for t in wood if math.hypot(t[0], t[1]) < 25.5 and t[3] in ("oak", "cedar")), key=lambda t: abs(((t[4] - deg + 180.0) % 360.0) - 180.0))
+        best[3] = kind
+        best[2] = 160 if kind == "camphor" else 100
+    # (a tree that stands on the winding path is moved in or out along its radius till it is clear, else left out)
+    for t in wood:
+        if path_distance(t[0], t[1]) >= 2.5:
             continue
-        r, a = math.hypot(x, z), math.atan2(z, x)
-        for step in (1.0, -1.0, 2.0, -2.0, 3.0, -3.0, 4.0, -4.0):
-            if path_distance(math.cos(a) * (r + step), math.sin(a) * (r + step)) >= 2.5 and PLATEAU < r + step < HILL_FOOT - 1.0:
-                trees[k] = (math.cos(a) * (r + step), math.sin(a) * (r + step), size)
+        r, a = math.hypot(t[0], t[1]), math.atan2(t[1], t[0])
+        for step in (1.0, -1.0, 2.0, -2.0, 3.0, -3.0):
+            if path_distance(math.cos(a) * (r + step), math.sin(a) * (r + step)) >= 2.5 and PLATEAU + 1.5 < r + step < HILL_FOOT - 0.5:
+                t[0], t[1] = math.cos(a) * (r + step), math.sin(a) * (r + step)
                 break
         else:
-            print("TREE ON THE PATH at", x, z)
-    # (climbing trees, tree_<n>_<seed>_<size%>: the great camphor and two more round the ring, for the glide and
-    # the routes; the rest plain, treep_<n>_<seed>_<size%>_<kind>: World)
-    climbing = {(round(math.cos(math.radians(deg)) * 12.3, 3), round(math.sin(math.radians(deg)) * 12.3, 3)) for deg in (165, 227, 320)}
-    for k, (x, z, size) in enumerate(trees):
+            if t[3] in ("oak", "cedar"):
+                t[3] = None
+    wood = [t for t in wood if t[3]]
+    trees = [(t[0], t[1], t[2]) for t in wood]
+    for k, (x, z, size, kind, _deg) in enumerate(wood):
         at = (x, hill_height(x, z) - 0.05, z)
-        if (round(x, 3), round(z, 3)) in climbing:
+        if kind in ("camphor", "climb"):
             w1.mark("tree_%d_%d_%d" % (k, 101 + k * 7, size), at)
         else:
-            w1.mark("treep_%d_%d_%d_%s" % (k, 101 + k * 7, size, "cedar" if k % 3 == 2 else "oak"), at)
+            w1.mark("treep_%d_%d_%d_%s" % (k, 101 + k * 7, size, kind), at)
+    tris = sum({"camphor": 58036, "climb": 27278, "oak": 16890, "cedar": 4514}[t[3]] for t in wood)
+    print("GROVE TREES %d (%d cedars, %d oaks, 3 climbing), about %d triangles" % (len(wood), sum(t[3] == "cedar" for t in wood), sum(t[3] == "oak" for t in wood), tris))
     steepest = max(math.degrees(math.atan(math.hypot(hill_height(x + 0.25, z) - hill_height(x - 0.25, z), hill_height(x, z + 0.25) - hill_height(x, z - 0.25)) / 0.5))
-                   for x in range(-23, 24) for z in range(-23, 24) if math.hypot(x, z) < 23.3 and math.hypot(x - POOL[0], z - POOL[1]) > 3.0)
+                   for x in range(-32, 33) for z in range(-32, 33) if math.hypot(x, z) < 32.3 and math.hypot(x - POOL[0], z - POOL[1]) > 3.0)
     print("MOUND STEEPEST %.1f deg" % steepest)
     # garden trees behind the houses
-    for n, (k, u, v, size) in enumerate(((0, -2.0, 13.0, 80), (5, 0.0, 12.5, 85), (8, 0.0, 12.0, 75), (7, 8.0, 12.0, 70))):
-        frame = Frame(math.tau * (k + 0.5) / SECTORS, FRONT, LOTS[k][1])
+    for n, (k, u, v, size) in enumerate(((7, -2.0, 13.0, 80), (5, 0.0, 12.5, 85), (11, 0.0, 12.0, 75), (8, 8.0, 12.0, 70))):
+        frame = Frame(math.tau * k / SECTORS, FRONT, LOTS[k][1])
         p = frame.p(u, -0.05, v)
         w1.mark("treep_%d_%d_%d_%s" % (len(trees) + n, 211 + n * 13, size, "oak" if n % 2 == 0 else "cedar"), p)
     # The shrine, at the back of the plateau, facing the clearing (+Z)
-    sx, sz = 0.5, -11.0
+    sx, sz = 0.5, -18.5
     sy = min(hill_height(sx + dx, sz + dz) for dx in (-1.8, 1.8) for dz in (-1.8, 1.8))
     shrine = w1.Piece("shrine")
     shrine.box((sx, sy + 0.3 - 0.4, sz), (3.6, 1.4, 3.6), "stone")
@@ -862,7 +885,7 @@ def grove():
     frame.box(torii, 0.0, 0.0, 4.2, 0.3, 0.42, "black", base=3.3)
     torii.done()
     # The thatched hut at the edge of the top
-    hx, hz = -9.0, 8.5
+    hx, hz = -14.5, 13.0
     hy = min(hill_height(hx + dx, hz + dz) for dx in (-1.8, 1.8) for dz in (-1.6, 1.6)) - 0.1
     hut_frame = Frame(math.atan2(hz, hx), math.hypot(hx, hz), hy)
     hut = w1.Piece("hut")
@@ -875,7 +898,9 @@ def grove():
     # 2026-11-02: "please dont make new reeds check the ones we already have")
     rng = random.Random(5)
     placed = 0
-    while placed < 6:
+    for _try in range(600):
+        if placed >= 6:
+            break
         a = rng.uniform(0.0, math.tau)
         r = rng.uniform(PLATEAU + 2.0, HILL_FOOT - 3.0)
         x, z = math.cos(a) * r, math.sin(a) * r
@@ -887,31 +912,9 @@ def grove():
         placed += 1
     empty = w1.mark("reeds_pond", (POOL[0] + 2.8, hill_height(POOL[0] + 2.8, POOL[1] + 1.8), POOL[1] + 1.8))
     empty.scale = (1.8, 1.8, 1.8)
-    # The hollow log on the slope: crawl in for the hidden Bottlecap
-    lx, lz = -12.0, 9.5
-    ly = hill_height(lx, lz)
-    log = w1.Piece("log")
-    segs = 12
-    turn_log = 0.6
-    log_frame = Frame(0.0, 0.0)
-    c, s = math.cos(turn_log), math.sin(turn_log)
-
-    def rot(p):
-        return (lx + p[0] * c - p[2] * s, p[1], lz + p[0] * s + p[2] * c)
-
-    for i in range(segs):
-        a0, a1 = math.tau * i / segs, math.tau * (i + 1) / segs
-        outer = [(-1.6, ly + 0.62 + math.sin(a0) * 0.62, math.cos(a0) * 0.62), (1.6, ly + 0.62 + math.sin(a0) * 0.62, math.cos(a0) * 0.62),
-                 (1.6, ly + 0.62 + math.sin(a1) * 0.62, math.cos(a1) * 0.62), (-1.6, ly + 0.62 + math.sin(a1) * 0.62, math.cos(a1) * 0.62)]
-        inner = [(px, ly + 0.62 + (py - ly - 0.62) * 0.78, pz * 0.78) for px, py, pz in outer][::-1]
-        log.face([rot(p) for p in outer], "darkwood")
-        log.face([rot(p) for p in inner], "wood")
-    del log_frame
-    log.done()
-    w1.mark("cap_hidden", rot((0.0, ly + 0.25, 0.0)))
     # The pond on top
     w1.mark("pool", (POOL[0], HILL_TOP - 0.25, POOL[1]))
-    w1.mark("pool_size", (POOL_RADII[0] * 2.0, 1.2, POOL_RADII[1] * 2.0))
+    w1.mark("pool_size", (POOL_RADII[0] * 2.0, 1.6, POOL_RADII[1] * 2.0))
     w1.mark("haunt_7", (POOL[0] - 3.2, hill_height(POOL[0] - 3.2, POOL[1] + 0.5), POOL[1] + 0.5))
     # Crumbs up the winding path
     for k in range(18):
@@ -936,7 +939,7 @@ def far_height(r, a):
 def beyond():
     """What he sees past the rail (none of it solid): terraces down from the lots, the town in the valley, the hills."""
     land = w1.Piece("nocol_far_land")
-    rings = [172.0, 195.0, 225.0, 260.0, 300.0, 360.0]
+    rings = [PLAY + 2.0, PLAY + 25.0, PLAY + 60.0, PLAY + 100.0, PLAY + 160.0]
     segs = 64
     for i in range(len(rings) - 1):
         for s in range(segs):
@@ -944,7 +947,7 @@ def beyond():
             r0, r1 = rings[i], rings[i + 1]
             mat = "far_green" if r1 <= 195.0 else ("far_forest" if r1 <= 260.0 else "far_hill")
             # (a little under the hill's own squares where they overlap)
-            sink0, sink1 = (-0.4 if r0 < 180.0 else 0.0), (-0.4 if r1 < 180.0 else 0.0)
+            sink0, sink1 = (-0.4 if r0 < PLAY + 10.0 else 0.0), (-0.4 if r1 < PLAY + 10.0 else 0.0)
             land.face([_ring_point(b0, r0, far_height(r0, b0) + sink0), _ring_point(b1, r0, far_height(r0, b1) + sink0),
                        _ring_point(b1, r1, far_height(r1, b1) + sink1), _ring_point(b0, r1, far_height(r1, b0) + sink1)], mat)
     land.done()
@@ -953,10 +956,8 @@ def beyond():
     rng = random.Random(11)
     for n in range(520):
         a = rng.uniform(0.0, math.tau)
-        r = rng.uniform(60.0, 185.0) if n % 4 else rng.uniform(60.0, 90.0)
+        r = rng.uniform(PLAY + 8.0, PLAY + 130.0) if n % 4 else rng.uniform(PLAY + 8.0, PLAY + 40.0)
         x, z = math.cos(a) * r, math.sin(a) * r
-        if abs(x) < CORRIDOR + 8.0 and z > 10.0:
-            continue
         y = _cone(x, z) - 0.3
         frame = Frame(rng.uniform(0.0, math.tau), 0.0, y)
         frame.out = (math.cos(frame.a), math.sin(frame.a))
@@ -984,10 +985,8 @@ def beyond():
     # cedars and pines among the houses (cones: no round-leaf clumps)
     for n in range(320):
         a = rng.uniform(0.0, math.tau)
-        r = rng.uniform(60.0, 230.0)
+        r = rng.uniform(PLAY + 8.0, PLAY + 160.0)
         x, z = math.cos(a) * r, math.sin(a) * r
-        if abs(x) < CORRIDOR + 8.0 and z > 10.0:
-            continue
         y = _cone(x, z) - 0.2
         tall = rng.uniform(6.0, 12.0)
         wide = tall * rng.uniform(0.22, 0.32)
@@ -1000,15 +999,13 @@ def beyond():
     # rows of white blocks of flats
     for g in range(7):
         a = math.tau * (g + 0.3) / 7 + rng.uniform(-0.2, 0.2)
-        r = rng.uniform(95.0, 170.0)
+        r = rng.uniform(PLAY + 30.0, PLAY + 100.0)
         facing = a + math.pi / 2
         for row in range(rng.randint(3, 5)):
             rr = r + row * 22.0
             for col in (-1, 0, 1):
                 aa = a + col * 36.0 / rr
                 x, z = math.cos(aa) * rr, math.sin(aa) * rr
-                if abs(x) < CORRIDOR + 25.0 and z > 0.0:
-                    continue
                 y = _cone(x, z) - 0.5
                 along = (math.cos(facing), math.sin(facing))
                 out = (-along[1], along[0])
@@ -1063,24 +1060,44 @@ def beyond():
 
 
 # --- The hill. The whole level is one hill (the user, 2026-11-02: "the road shouldnt just be a ring it should be a
-# winding road down a hill. The level should be this whole hill"; "it's the hill grove at the top and ringed area"):
-# the grove and the ring of lots on its top, and down its south face a street switchbacking to the station square at
-# its foot (after Whisper of the Heart's hillside streets: block retaining walls, houses on plinths, long stairways
-# cutting between the bends, poles and wires). The station at the foot is Claude's pick.
+# winding road down a hill. The level should be this whole hill"; "it's the hill grove at the top and ringed area"),
+# then "instead of just one side of the hill having a road down, it should be a 4 sided hill with windy roads down
+# each side, thus breaking the map up into 4 zones. Each zone should be themed a little different": the grove and the
+# ring of lots on its top, and down each of its four faces a street switchbacking to the foot (after Whisper of the
+# Heart's hillside streets: block retaining walls, houses on plinths, long stairways cutting between the bends, poles
+# and wires). The four zones' themes are Claude's picks: Station (south: houses and a station square), Estate (east:
+# blocks of flats, the bath house chimney), Stairs (north: old houses and many long stairways, the billboard), Shrine
+# (west: rice paddies, bamboo, a farmhouse and a shrine at the foot). The faces meet at plain grass ridges, walkable.
+#
+# Each face is built in its own frame, as if it were the south one (x across the face, z down it), and its objects
+# are then turned round the hill's middle into place (Godot's turn about Y is Blender's about Z, the same angle).
 
-HILL_EDGE = 57.0      # the hilltop (the ring and its lots) is level out to here
-HILL_SLOPE = 0.36     # how steeply the hill falls away round its other sides (beyond the play area)
-FOOT_Y = -34.0        # the foot of the hill: the station square
-LEGS = [64.0, 90.0, 116.0, 142.0]   # the winding road's straight runs across the hill (z), top to bottom
+HILL_EDGE = LOT[1] + 1.0   # the hilltop (the ring and its lots) is level out to here
+HILL_SLOPE = 0.36     # how steeply the hill falls away along its ridges (between the faces) and beyond
+FOOT_Y = -34.0        # the foot of the hill
+# (the roads two lanes and pavements: the user, 2026-11-02, "the roads should be wider"; a bus fits a lane and turns
+# round the hairpins)
+ROAD_HALF, PAVE_OUT = 6.0, 8.5
+BENCH = 10.5          # the road's level shelf, half across: the hill is cut or built up to it, block walls at its edges
+TURN = 10.0           # the radius of the bends at the top and the foot
+BEND = 17.0           # the hairpins' radius (half the runs' spacing)
+LEGS = [HILL_EDGE + 1.0 + TURN + 34.0 * k for k in range(4)]   # each face's winding road: its straight runs across it (z)
 LEG_X = 24.0          # how far each run goes either way before it bends back
-BEND = 13.0           # the hairpins' radius (half the runs' spacing)
-CORRIDOR = 48.0       # the play area down the hill: |x| within this
-BOTTOM = 193.0        # its far end (z), past the station
-ROAD_HALF, PAVE_OUT = 3.5, 5.0
-BENCH = 7.6           # the road's level shelf, half across: the hill is cut or built up to it, block walls at its edges
-PLAZA = (0.0, 163.0)  # the turning circle in the station square
-# The long stairways straight down the hill between the bends: (x, from the run above)
-STAIRS = [(14.0, 0), (-12.0, 1), (12.0, 2)]
+CORRIDOR = 56.0       # a face's street and its houses: |x| within this (past it the face turns to the plain ridge)
+FOOT_Z = LEGS[3] + TURN + 2.0   # the foot of the street: level from here down
+PLAZA = (0.0, FOOT_Z + 16.0)    # the turning circle at the foot
+CIRCLE = (3.5, 11.0, 15.0)      # its lawn, its road's outer edge, its pavement's
+PLAY = PLAZA[1] + 36.0          # the play area: everything within this of the middle (the unseen wall round it)
+# The faces: (turn, tag, zone name, the long stairways straight down between the bends: (x, from the run above))
+FACES = [
+    (0.0, "S", "Station", [(14.0, 0), (-12.0, 1), (12.0, 2)]),
+    (math.pi / 2, "E", "Estate", [(14.0, 0), (-12.0, 1), (12.0, 2)]),
+    (math.pi, "N", "Stairs", [(14.0, 0), (-4.0, 0), (-12.0, 1), (6.0, 1), (12.0, 2), (-8.0, 2)]),
+    (3 * math.pi / 2, "W", "Shrine", [(14.0, 0), (-12.0, 1), (12.0, 2)]),
+]
+STAIRS = FACES[0][3]  # the face being built's (set by build_face)
+_tag = "S"
+_count = {"haunt": 20, "dog": 3, "kit": 0, "tree": 300}
 
 _path = []            # the road's centre: (x, z, y), a point about every metre
 _legs = []            # each run's points (x, y), by x
@@ -1106,20 +1123,20 @@ def _make_path():
             t = t0 + (t1 - t0) * i / n
             pts.append((c[0] + math.cos(t) * r, c[1] + math.sin(t) * r))
 
-    line((0.0, 32.5), (0.0, 58.0))
-    arc((6.0, 58.0), 6.0, math.pi, math.pi / 2)
-    line((6.0, LEGS[0]), (LEG_X, LEGS[0]))
+    line((0.0, ROAD[1] - 0.5), (0.0, HILL_EDGE + 1.0))
+    arc((TURN, HILL_EDGE + 1.0), TURN, math.pi, math.pi / 2)
+    line((TURN, LEGS[0]), (LEG_X, LEGS[0]))
     arc((LEG_X, (LEGS[0] + LEGS[1]) / 2), BEND, -math.pi / 2, math.pi / 2)
     line((LEG_X, LEGS[1]), (-LEG_X, LEGS[1]))
     arc((-LEG_X, (LEGS[1] + LEGS[2]) / 2), BEND, -math.pi / 2, -3 * math.pi / 2)
     line((-LEG_X, LEGS[2]), (LEG_X, LEGS[2]))
     arc((LEG_X, (LEGS[2] + LEGS[3]) / 2), BEND, -math.pi / 2, math.pi / 2)
-    line((LEG_X, LEGS[3]), (6.0, LEGS[3]))
-    arc((6.0, LEGS[3] + 6.0), 6.0, -math.pi / 2, -math.pi)
-    line((0.0, LEGS[3] + 6.0), (0.0, 158.0))
-    pts.append((0.0, 158.0))
-    # Heights: level to the hill's edge, then down at an even grade to the square
-    start = next(i for i, p in enumerate(pts) if p[1] >= 57.5)
+    line((LEG_X, LEGS[3]), (TURN, LEGS[3]))
+    arc((TURN, LEGS[3] + TURN), TURN, -math.pi / 2, -math.pi)
+    line((0.0, LEGS[3] + TURN), (0.0, PLAZA[1] - 7.0))
+    pts.append((0.0, PLAZA[1] - 7.0))
+    # Heights: level to the hill's edge, then down at an even grade to the foot
+    start = next(i for i, p in enumerate(pts) if p[1] >= HILL_EDGE + 0.5)
     run = [0.0]
     for i in range(1, len(pts)):
         run.append(run[-1] + math.dist(pts[i - 1], pts[i]))
@@ -1148,27 +1165,27 @@ def leg_y(i, x):
 
 
 def _cone(x, z):
-    """The hill's sides away from the street: falling evenly, then out into the valley's own lie."""
+    """The hill's ridges and beyond: falling evenly, then out into the valley's own lie."""
     r = math.hypot(x, z)
     if r <= HILL_EDGE:
         return 0.0
-    if r <= 150.0:
+    if r <= 159.0:
         return -HILL_SLOPE * (r - HILL_EDGE)
-    edge = -HILL_SLOPE * (150.0 - HILL_EDGE)
-    return edge + (far_height(r, math.atan2(z, x)) - edge) * _smooth(150.0, 178.0, r)
+    edge = -HILL_SLOPE * (159.0 - HILL_EDGE)
+    return edge + (far_height(r, math.atan2(z, x)) - edge) * _smooth(159.0, 187.0, r)
 
 
 def hill_ground(x, z):
-    """The hill's own ground (before the road's shelf and the stairs are cut): level on top; down the south face from
-    each run of the road to the next; the plain sides elsewhere."""
+    """A face's own ground (in its frame; before the road's shelf and the stairs are cut): level on top; down the
+    face from each run of the road to the next; turning to the plain ridge towards the face's sides."""
     r = math.hypot(x, z)
     if r <= HILL_EDGE:
         return 0.0
     outside = _cone(x, z)
-    if z < 15.0 or abs(x) > CORRIDOR + 16.0:
+    if z < HILL_EDGE * 0.35 or abs(x) > CORRIDOR + 4.0:
         return outside
     top = math.sqrt(max(HILL_EDGE * HILL_EDGE - x * x, 0.0))
-    zs = [top] + LEGS + [LEGS[-1] + 12.0]
+    zs = [top] + LEGS + [FOOT_Z]
     ys = [0.0] + [leg_y(i, x) for i in range(len(LEGS))] + [FOOT_Y]
     inner = FOOT_Y
     for k in range(len(zs) - 1):
@@ -1176,11 +1193,12 @@ def hill_ground(x, z):
             t = (z - zs[k]) / max(zs[k + 1] - zs[k], 1e-6)
             inner = ys[k] + (ys[k + 1] - ys[k]) * max(0.0, t)
             break
-    return inner + (outside - inner) * _smooth(CORRIDOR - 4.0, CORRIDOR + 14.0, abs(x))
+    # (on to the ridge before the face's edge, the diagonal, so the faces meet on the same ground)
+    return inner + (outside - inner) * _smooth(CORRIDOR - 14.0, CORRIDOR + 2.0, abs(x))
 
 
 def road_near(x, z):
-    """How far (x, z) is from the road's centre, and the road's height there."""
+    """How far (x, z) (a face's frame) is from the road's centre, and the road's height there."""
     best, height = 1e9, 0.0
     for (x0, z0, y0), (x1, z1, y1) in zip(_path, _path[1:]):
         dx, dz = x1 - x0, z1 - z0
@@ -1192,48 +1210,73 @@ def road_near(x, z):
     return best, height
 
 
-def _stair(k):
-    x, i = STAIRS[k]
+def _stair(k, stairs=None):
+    x, i = (stairs or STAIRS)[k]
     return x, LEGS[i] + BENCH, leg_y(i, x) - 0.05, LEGS[i + 1] - BENCH, leg_y(i + 1, x) - 0.05
 
 
-def ground_y(x, z):
-    """The ground as built: the hill, with the road's shelf and the stairways cut into it, the square level."""
-    if abs(x) < 26.0 and z > 152.0:
+def ground_y(x, z, stairs=None):
+    """The ground as built (a face's frame): the hill, with the road's shelf and the stairways cut into it, the foot
+    level."""
+    stairs = stairs or STAIRS
+    if abs(x) < 30.0 and z > FOOT_Z:
         return FOOT_Y
     h = hill_ground(x, z)
-    if abs(x) < CORRIDOR + 2.0 and 25.0 < z < 165.0:
+    if abs(x) < CORRIDOR + 2.0 and HILL_EDGE - 32.0 < z < PLAZA[1] + 2.0:
         d, ry = road_near(x, z)
         if d < BENCH:
             return ry - 0.05
-        for k in range(len(STAIRS)):
-            sx, z0, y0, z1, y1 = _stair(k)
+        for k in range(len(stairs)):
+            sx, z0, y0, z1, y1 = _stair(k, stairs)
             if abs(x - sx) <= 2.2 and z0 - 0.5 <= z <= z1 + 0.5:
                 t = min(1.0, max(0.0, (z - z0) / (z1 - z0)))
                 return y0 + (y1 - y0) * t - 0.35
     return h
 
 
+def to_face(x, z, turn):
+    """A point of the world in a face's frame (the face turned by `turn`)."""
+    c, s = math.cos(turn), math.sin(turn)
+    return x * c - z * s, x * s + z * c
+
+
+def from_face(x, z, turn):
+    c, s = math.cos(turn), math.sin(turn)
+    return x * c + z * s, -x * s + z * c
+
+
+def face_of(x, z):
+    """The face a point of the world is on: the one it lies furthest down."""
+    return max(range(len(FACES)), key=lambda f: to_face(x, z, FACES[f][0])[1])
+
+
+def ground_global(x, z):
+    """The ground as built anywhere in the world."""
+    f = face_of(x, z)
+    lx, lz = to_face(x, z, FACES[f][0])
+    return ground_y(lx, lz, FACES[f][3])
+
+
 def in_gap(x, z):
-    """Whether (x, z) is in the lot where the road leaves the ring (no lot there)."""
+    """Whether (x, z) is in one of the lots where a road leaves the ring (no lot there)."""
     a = math.atan2(z, x) % math.tau
-    k = LOTS.index(next(lot for lot in LOTS if lot[0] == "road"))
-    return math.tau * k / SECTORS <= a <= math.tau * (k + 1) / SECTORS
+    k = int(round(a / (math.tau / SECTORS))) % SECTORS
+    return LOTS[k][0] == "road"
 
 
 def hill_grid():
-    """The hill's ground in 2 m squares out to the valley: solid down the street's face, only to look at elsewhere.
-    The hilltop's own ground (ground()) has every 2 m square whose middle is within 58 m of the top."""
+    """The hill's ground in 2 m squares: solid over the whole play area (the four faces and the ridges between),
+    only to look at beyond it. The hilltop's own ground (ground()) has every 2 m square whose middle is within 67 m."""
     solid = w1.Piece("hill")
     view = w1.Piece("nocol_hill")
     step = 2.0
-    reach = 176.0
+    reach = PLAY + 6.0
     n = int(reach * 2 / step)
     heights = {}
 
     def h(i, j):
         if (i, j) not in heights:
-            heights[(i, j)] = ground_y(-reach + i * step, -reach + j * step)
+            heights[(i, j)] = ground_global(-reach + i * step, -reach + j * step)
         return heights[(i, j)]
 
     for i in range(n):
@@ -1241,16 +1284,15 @@ def hill_grid():
             xa, za = -reach + i * step, -reach + j * step
             xm, zm = xa + step / 2, za + step / 2
             r = math.hypot(xm, zm)
-            if r > reach or r < 58.0:
+            if r > reach or r < 67.0:
                 continue
             pts = [(xa, h(i, j), za), (xa, h(i, j + 1), za + step), (xa + step, h(i + 1, j + 1), za + step), (xa + step, h(i + 1, j), za)]
-            near = abs(xm) < CORRIDOR + 4.0 and zm > 20.0 and zm < BOTTOM + 2.0
-            if near:
-                d, _ry = road_near(xm, zm) if abs(xm) < CORRIDOR + 2.0 and zm < 165.0 else (99.0, 0.0)
-                mat = "dirt" if d < ROAD_HALF + 1.0 else "grass"
-                solid.face(pts, mat)
+            if r < PLAY + 2.0:
+                lx, lz = to_face(xm, zm, FACES[face_of(xm, zm)][0])
+                d = road_near(lx, lz)[0] if abs(lx) < CORRIDOR + 2.0 and HILL_EDGE - 32.0 < lz < PLAZA[1] + 2.0 else 99.0
+                solid.face(pts, "dirt" if d < ROAD_HALF + 1.0 else "grass")
             else:
-                view.face(pts, "far_green" if r < 120.0 else "far_forest")
+                view.face(pts, "far_green")
     solid.done()
     view.done()
 
@@ -1267,11 +1309,11 @@ def _side(i, sign):
 
 
 def street(plinths):
-    """The road down the hill and its pavements, its retaining walls where the shelf is cut or built up (not where a
-    house's plinth already stands), the stairways."""
-    road = w1.Piece("road_hill")
+    """The road down the face and its pavements, its retaining walls where the shelf is cut or built up (not where a
+    plinth already stands), the stairways."""
+    road = w1.Piece("road_hill_" + _tag)
     for i in range(len(_path) - 1):
-        if _path[i][1] < 32.5:
+        if _path[i][1] < 41.5:
             continue
         for s0, s1, lift, mat in ((-ROAD_HALF, ROAD_HALF, 0.03, "asphalt"), (-PAVE_OUT, -ROAD_HALF, 0.12, "concrete"), (ROAD_HALF, PAVE_OUT, 0.12, "concrete")):
             a0, a1 = _side(i, s0), _side(i, s1)
@@ -1282,28 +1324,29 @@ def street(plinths):
                     p, q = _side(i, s), _side(i + 1, s)
                     road.face([(p[0], p[2] - 0.05, p[1]), (q[0], q[2] - 0.05, q[1]), (q[0], q[2] + lift, q[1]), (p[0], p[2] + lift, p[1])], "concrete", 0.85)
     road.done()
-    drains = w1.Piece("nocol_street_drains")
+    drains = w1.Piece("nocol_street_drains_" + _tag)
     for i in range(30, len(_path) - 1, 18):
         for sign in (-1.0, 1.0):
             x, z, y = _side(i, sign * (ROAD_HALF - 0.3))
             drains.box((x, y + 0.035, z), (0.5, 0.02, 0.5), "black")
     drains.done()
-    walls = w1.Piece("street_walls")
+    walls = w1.Piece("street_walls_" + _tag)
+    ends = [(_stair(k)[1], _stair(k)[3]) for k in range(len(STAIRS))]
     for sign in (-1.0, 1.0):
         prev = None
         for i in range(0, len(_path), 2):
             x, z, y = _path[i]
             px, pz, _py = _side(i, sign * (BENCH + 0.3))
             nx, nz, _ny = _side(i, sign * (BENCH + 2.4))
-            if z < 58.0 or z > 152.0 or abs(px) > CORRIDOR + 1.0:
+            if z < HILL_EDGE + 1.0 or z > FOOT_Z or abs(px) > CORRIDOR + 1.0:
                 prev = None
                 continue
-            # (where a house's plinth stands at the shelf's edge, it is the wall)
+            # (where a plinth stands at the shelf's edge, it is the wall)
             if any(x0 <= px <= x1 and abs(pz - zf) < 2.6 for x0, x1, zf in plinths):
                 prev = None
                 continue
             # (and not across a stairway: it goes on down through)
-            if any(abs(px - sx) < 1.3 for sx, _i in STAIRS) and any(abs(pz - z0) < 1.5 or abs(pz - z1) < 1.5 for z0, z1 in [(_stair(k)[1], _stair(k)[3]) for k in range(len(STAIRS))]):
+            if any(abs(px - sx) < 1.3 for sx, _i in STAIRS) and any(abs(pz - z0) < 1.5 or abs(pz - z1) < 1.5 for z0, z1 in ends):
                 prev = None
                 continue
             lie = hill_ground(nx, nz)
@@ -1320,13 +1363,13 @@ def street(plinths):
 
 
 def _stairway(k):
-    """A long stairway straight down the hill from one run of the road to the next, handrails both sides, crumbs."""
+    """A long stairway straight down the face from one run of the road to the next, handrails both sides, crumbs."""
     sx, z0, y0, z1, y1 = _stair(k)
     count = max(2, math.ceil((y0 - y1) / 0.2))
     rise = (y0 - y1) / count
     run = (z1 - z0) / count
-    steps = w1.Piece("stairway_%d" % k)
-    rail = w1.Piece("nocol_stair_rail_%d" % k)
+    steps = w1.Piece("stairway_%s_%d" % (_tag, k))
+    rail = w1.Piece("nocol_stair_rail_%s_%d" % (_tag, k))
     for s in range(count):
         tread = y0 - (s + 1) * rise
         steps.box((sx, tread - 0.75, z0 + (s + 0.5) * run), (2.0, 1.5, run + 0.02), "concrete")
@@ -1349,6 +1392,20 @@ def _plinth(name, frame, u0, u1, v0, v1, low):
     piece.done()
 
 
+def _steps_up(name, frame, half, pad, road_y):
+    """Steps along a plinth's face, up from the road's shelf to its top."""
+    rise_all = pad - road_y
+    if rise_all <= 0.3:
+        return
+    count = math.ceil(rise_all / 0.2)
+    rise = rise_all / count
+    run = min(0.3, (2 * half - 0.5) / count)
+    steps = w1.Piece(name + "_steps")
+    for s in range(count):
+        frame.box(steps, -half + (s + 0.5) * run, -2.5, run + 0.02, (s + 1) * rise + 0.4, 1.0, "concrete", base=road_y - pad - 0.4)
+    steps.done()
+
+
 def hill_house(name, x, z_front, out_a, roof, seed, plinths):
     """A house on the hillside facing the road below it: on a block plinth level with the ground at its front, the
     hill rising behind it into its back; steps along the plinth's face up from the road."""
@@ -1362,52 +1419,56 @@ def hill_house(name, x, z_front, out_a, roof, seed, plinths):
     frame = Frame.at(x, z_front, out_a, pad)
     _plinth(name + "_plinth", frame, -half, half, -2.0, 1.0, low - pad)
     house_at(name, frame, roof, seed, crumbs=False, w=w, d=d, garden=False, front_pipes=True)
-    # the steps up its face from the road's shelf
-    rise_all = pad - road_y
-    if rise_all > 0.3:
-        count = math.ceil(rise_all / 0.2)
-        rise = rise_all / count
-        run = min(0.3, (2 * half - 0.5) / count)
-        steps = w1.Piece(name + "_steps")
-        for s in range(count):
-            frame.box(steps, -half + (s + 0.5) * run, -2.5, run + 0.02, (s + 1) * rise + 0.4, 1.0, "concrete", base=road_y - pad - 0.4)
-        steps.done()
+    _steps_up(name, frame, half, pad, road_y)
     corner_a, corner_b = probe.p(-half, 0.0, -2.0), probe.p(half, 0.0, -2.0)
     plinths.append((min(corner_a[0], corner_b[0]), max(corner_a[0], corner_b[0]), corner_a[2]))
     return frame
 
 
-def hill_danchi(name, x, z_front, out_a, seed):
-    """A block of flats on a plinth near the foot of the hill."""
+def hill_danchi(name, x, z_front, out_a, seed, plinths=None):
+    """A block of flats on a plinth: near the foot (level with its highest ground), or between the runs facing the
+    road (level with the ground at its front, the hill behind; no stairwells there, steps up its plinth's face)."""
     probe = Frame.at(x, z_front, out_a)
     half = 11.0
-    pad = max(hill_ground(probe.p(u, 0.0, v)[0], probe.p(u, 0.0, v)[2]) for u in (-half, 0.0, half) for v in (0.0, 9.0)) + 0.05
+    between = plinths is not None
+    deep = (0.0,) if between else (0.0, 9.0)
+    pad = max(hill_ground(probe.p(u, 0.0, v)[0], probe.p(u, 0.0, v)[2]) for u in (-half, 0.0, half) for v in deep) + 0.05
     low = min(hill_ground(probe.p(u, 0.0, v)[0], probe.p(u, 0.0, v)[2]) for u in (-half, half) for v in (-2.0, 9.0))
+    if between:
+        _d, road_y = road_near(*_xz(probe.p(0.0, 0.0, -3.0)))
+        low = min(low, road_y)
     frame = Frame.at(x, z_front, out_a, pad)
-    _plinth(name + "_plinth", frame, -half - 0.5, half + 0.5, -2.0, 11.5, low - pad)
-    danchi_at(name, frame, seed)
+    _plinth(name + "_plinth", frame, -half - 0.5, half + 0.5, -2.0, 1.0 if between else 11.5, low - pad)
+    danchi_at(name, frame, seed, stairwells=not between)
+    if between:
+        _steps_up(name, frame, half + 0.5, pad, road_y)
+        corner_a, corner_b = probe.p(-half - 0.5, 0.0, -2.0), probe.p(half + 0.5, 0.0, -2.0)
+        plinths.append((min(corner_a[0], corner_b[0]), max(corner_a[0], corner_b[0]), corner_a[2]))
     return frame
 
 
-def station():
-    """At the foot: the station square (a turning circle round a little lawn), the station, its platform and a
-    train waiting, shops either side (Claude's picks)."""
+def turning_circle():
+    """At the foot: the turning circle round a little lawn, paved round."""
     y = FOOT_Y
-    square = w1.Piece("square")
+    square = w1.Piece("square_" + _tag)
     segs = 32
     cx, cz = PLAZA
     for s in range(segs):
         t0, t1 = math.tau * s / segs, math.tau * (s + 1) / segs
-        for r0, r1, lift, mat in ((0.0, 3.0, 0.15, "grass"), (3.0, 7.5, 0.03, "asphalt"), (7.5, 11.5, 0.12, "concrete")):
+        for r0, r1, lift, mat in ((0.0, CIRCLE[0], 0.15, "grass"), (CIRCLE[0], CIRCLE[1], 0.03, "asphalt"), (CIRCLE[1], CIRCLE[2], 0.12, "concrete")):
             q = [(cx + math.cos(t0) * r0, y + lift, cz + math.sin(t0) * r0), (cx + math.cos(t0) * r1, y + lift, cz + math.sin(t0) * r1),
                  (cx + math.cos(t1) * r1, y + lift, cz + math.sin(t1) * r1), (cx + math.cos(t1) * r0, y + lift, cz + math.sin(t1) * r0)]
             square.face(q, mat)
-        for r, lift in ((3.0, 0.15), (7.5, 0.12)):
+        for r, lift in ((CIRCLE[0], 0.15), (CIRCLE[1], 0.12)):
             square.face([(cx + math.cos(t0) * r, y, cz + math.sin(t0) * r), (cx + math.cos(t1) * r, y, cz + math.sin(t1) * r),
                          (cx + math.cos(t1) * r, y + lift, cz + math.sin(t1) * r), (cx + math.cos(t0) * r, y + lift, cz + math.sin(t0) * r)], "concrete", 0.85)
     square.done()
-    # the station, its front to the square
-    frame = Frame.at(0.0, 175.0, math.pi / 2, y + 0.12)
+
+
+def station():
+    """The Station face's foot: the station, its platform and a train waiting, shops either side (Claude's picks)."""
+    y = FOOT_Y
+    frame = Frame.at(0.0, PLAZA[1] + CIRCLE[2] + 1.0, math.pi / 2, y + 0.12)
     house = w1.Piece("station")
     w, d, eave = 18.0, 8.0, 7.2
     frame.box(house, 0.0, d / 2, w, eave, d, "plaster2")
@@ -1444,23 +1505,25 @@ def station():
             frame.box(train, car + wu, d + 4.83, 1.6, 0.8, 0.04, "glass", base=1.95)
     train.done()
     # shops either side of the square
-    shop_at("foot_shop_0", Frame.at(-14.5, 168.0, math.pi, y + 0.12))
-    shop_at("foot_shop_1", Frame.at(14.5, 160.0, 0.0, y + 0.12))
+    shop_at("foot_shop_S0", Frame.at(-CIRCLE[2] - 4.0, PLAZA[1] + 3.0, math.pi, y + 0.12))
+    shop_at("foot_shop_S1", Frame.at(CIRCLE[2] + 4.0, PLAZA[1] + 3.0, 0.0, y + 0.12))
     return frame
 
 
 def hill_wires():
     """Poles down the downhill side of each run of the road, a phone line from each to the next (wires he walks),
     and the power lines above (wires too)."""
-    poles = w1.Piece("climb_hill_poles")
-    things = w1.Piece("hill_pole_things")
-    lines = w1.Piece("nocol_hill_lines")
-    spots = {0: (8.0, 20.0), 1: (-20.0, -6.0, 6.0, 18.0), 2: (-18.0, -4.0, 4.0, 18.0), 3: (8.0, 20.0)}
+    poles = w1.Piece("climb_hill_poles_" + _tag)
+    things = w1.Piece("hill_pole_things_" + _tag)
+    spots = {0: (12.0, 22.0), 1: (-20.0, -6.0, 6.0, 18.0), 2: (-18.0, -4.0, 4.0, 18.0), 3: (12.0, 22.0)}
     for i, xs in spots.items():
         tops, arms = [], []
         for x in xs:
+            # (not on a stairway's head)
+            if any(abs(x - sx) < 2.5 and si == i for sx, si in STAIRS):
+                x += 3.5
             y = leg_y(i, x) + 0.12
-            z = LEGS[i] + 4.3
+            z = LEGS[i] + ROAD_HALF + 1.3
             poles.cylinder((x, y, z), 0.18, 8.2, "pole", 8)
             poles.cylinder((x, y, z), 0.21, 1.6, "sleeve", 8, cap=False)
             things.box((x, y + 7.67, z), (0.14, 0.14, 1.8), "pole")
@@ -1473,86 +1536,289 @@ def hill_wires():
                 w1.wire(arms[k][side], arms[k + 1][side])
     poles.done()
     things.done()
-    lines.done()
 
 
 def hill_bound():
-    """The unseen wall that keeps him in: round the hilltop's brink, but open down the street's face, round which it
-    runs instead."""
+    """The unseen wall that keeps him in, round the whole hill near its foot."""
     bound = w1.Piece("hidden_bound")
-    meet = math.sqrt(BOUND * BOUND - CORRIDOR * CORRIDOR)
-    a_start = math.atan2(meet, CORRIDOR)
-    a_end = math.pi - a_start - math.tau
-    pts = []
-    segs = 64
-    for s in range(segs + 1):
-        a = a_start + (a_end - a_start) * s / segs
-        pts.append((math.cos(a) * BOUND, math.sin(a) * BOUND))
-    pts += [(-CORRIDOR, BOTTOM), (CORRIDOR, BOTTOM), (CORRIDOR, meet)]
-    for (x0, z0), (x1, z1) in zip(pts, pts[1:]):
-        bound.face([(x0, -60.0, z0), (x1, -60.0, z1), (x1, 45.0, z1), (x0, 45.0, z0)], "concrete")
+    segs = 96
+    for s in range(segs):
+        a0, a1 = math.tau * s / segs, math.tau * (s + 1) / segs
+        bound.face([_ring_point(a0, PLAY, -60.0), _ring_point(a1, PLAY, -60.0), _ring_point(a1, PLAY, 45.0), _ring_point(a0, PLAY, 45.0)], "concrete")
     bound.done()
 
 
-def hill():
-    """Everything down the hill, and its markers."""
+def _mark_count(kind, name_fmt, at):
+    empty = w1.mark(name_fmt % _count[kind], at)
+    _count[kind] += 1
+    return empty
+
+
+def kit(at):
+    """A lost kit sits here (the surface under it)."""
+    _mark_count("kit", "kit_%d", at)
+
+
+def haunt(at):
+    _mark_count("haunt", "haunt_%d", at)
+
+
+def bamboo(name, x, z, rng, count=18, radius=2.4):
+    """A clump of bamboo: tall thin green canes (only to look at)."""
+    piece = w1.Piece("nocol_bamboo_" + name)
+    for _ in range(count):
+        a, r = rng.uniform(0.0, math.tau), rng.uniform(0.0, radius)
+        cx, cz = x + math.cos(a) * r, z + math.sin(a) * r
+        y = ground_y(cx, cz) - 0.1
+        tall = rng.uniform(5.5, 8.5)
+        piece.cylinder((cx, y, cz), rng.uniform(0.05, 0.08), tall, "bamboo", 5, cap=False)
+        # a few leafy sprays near the top
+        for k in range(3):
+            ya = y + tall * rng.uniform(0.65, 0.95)
+            lean = rng.uniform(0.0, math.tau)
+            tip = (cx + math.cos(lean) * 0.9, ya + 0.25, cz + math.sin(lean) * 0.9)
+            side = (-math.sin(lean) * 0.18, math.cos(lean) * 0.18)
+            piece.face([(cx + side[0], ya, cz + side[1]), (cx - side[0], ya, cz - side[1]), tip], "bamboo_leaf")
+    piece.done()
+
+
+def paddies(name, x, z_top, z_bottom, width):
+    """Rice paddies stepped down the slope between two runs: level terraces of water with earth banks (walkable)."""
+    piece = w1.Piece("paddies_" + name)
+    count = 3
+    for k in range(count):
+        za = z_top + (z_bottom - z_top) * k / count
+        zb = z_top + (z_bottom - z_top) * (k + 1) / count
+        level = hill_ground(x, (za + zb) / 2) - 0.05
+        low = min(hill_ground(x + dx, zz) for dx in (-width / 2, width / 2) for zz in (za, zb)) - 0.6
+        piece.box((x, (level + low) / 2, (za + zb) / 2), (width, level - low, zb - za - 0.3), "dirt", top="paddy")
+        # its bank, a low lip all round
+        for sz in (za + 0.15, zb - 0.45):
+            piece.box((x, level + 0.08, sz + 0.15), (width, 0.16, 0.3), "dirt")
+    piece.done()
+
+
+def shrine_at(name, x, z, turn):
+    """A small wooden shrine on a stone base, its rope and streamers, facing `turn` (a face's frame)."""
+    frame = Frame.at(x, z, turn, ground_y(x, z) - 0.2)
+    piece = w1.Piece(name)
+    frame.box(piece, 0.0, 0.0, 3.6, 1.0, 3.6, "stone")
+    frame.box(piece, 0.0, 0.2, 2.8, 2.0, 2.6, "darkwood", base=1.0)
+    frame.hip_roof(piece, 0.0, 0.2, 2.8, 2.6, 3.0, 1.2, "kawara3", over=0.4)
+    frame.box(piece, 0.0, -1.25, 2.6, 0.12, 0.12, "straw", base=2.75)
+    for i in range(3):
+        frame.box(piece, 0.0, -2.1 - i * 0.32, 1.8, 0.8 - i * 0.28, 0.34, "stone")
+    piece.done()
+    return frame
+
+
+def torii_at(name, x, z, turn, climbable=True):
+    """A vermilion torii (its posts climbable: up one and along its top)."""
+    frame = Frame.at(x, z, turn, ground_y(x, z) - 0.1)
+    posts = w1.Piece(("climb_" if climbable else "") + name + "_posts")
+    for side in (-1.6, 1.6):
+        posts.cylinder(frame.p(side, 0.0, 0.0), 0.2, 4.0, "vermilion", 8)
+    posts.done()
+    top = w1.Piece(name)
+    frame.box(top, 0.0, 0.0, 4.0, 0.25, 0.32, "vermilion", base=3.1)
+    frame.box(top, 0.0, 0.0, 5.0, 0.32, 0.5, "black", base=4.0)
+    top.done()
+    return frame
+
+
+def farmhouse(name, x, z, turn):
+    """A thatched farmhouse (a kit on its ridge: up its corner post)."""
+    frame = Frame.at(x, z, turn, ground_y(x, z) - 0.1)
+    piece = w1.Piece(name)
+    frame.box(piece, 0.0, 3.0, 11.0, 2.8, 6.0, "darkwood")
+    frame.box(piece, 0.0, -0.05, 2.4, 2.0, 0.1, "black")
+    frame.hip_roof(piece, 0.0, 3.0, 11.0, 6.0, 2.8, 3.6, "thatch", over=0.9)
+    piece.done()
+    post = w1.Piece("climb_" + name + "_post")
+    frame.box(post, 11.0 / 2 + 0.95, -0.95, 0.3, 2.8 - 0.3, 0.3, "darkwood")
+    post.done()
+    return frame
+
+
+def chimney(name, x, z):
+    """The bath house's tall brick chimney (the "Up the chimney" Bottlecap on top: scurry up it)."""
+    y = ground_y(x, z) - 0.1
+    piece = w1.Piece("climb_" + name)
+    piece.box((x, y + 7.5, z), (1.4, 15.0, 1.4), "brick")
+    piece.box((x, y + 15.12, z), (1.9, 0.25, 1.9), "concrete")
+    piece.done()
+    return y + 15.25
+
+
+def billboard(x, z, top):
+    """A billboard on two tall posts, its walkway's top at `top` (the glide Bottlecap on it)."""
+    y = ground_y(x, z) - 0.1
+    board = w1.Piece("billboard")
+    board.box((x, top - 0.08, z), (4.0, 0.16, 1.6), "metal")
+    for dx in (-1.8, 1.8):
+        board.box((x + dx, (y + top) / 2, z - 0.6), (0.14, top - y, 0.14), "metal")
+    board.box((x, top + 1.7, z - 0.8), (4.6, 3.4, 0.2), "yellow")
+    board.done()
+
+
+def build_face(f):
+    """Everything down one face, in its own frame (to be turned into place)."""
+    global STAIRS, _tag
+    turn, _tag, zone, STAIRS = FACES[f]
+    rng = random.Random(50 + f)
     plinths = []
     yards = []
-    houses = [(1, -18.0, "kawara"), (1, -4.0, "kawara2"), (1, -32.0, "kawara3"), (2, 4.0, "kawara3"), (2, 18.0, "kawara"),
-              (2, 31.0, "kawara2"), (3, -4.0, "kawara2"), (3, -18.0, "kawara"), (3, -32.0, "kawara3")]
+    street_kits = []
+    if zone == "Station":
+        houses = [(1, -18.0, "kawara"), (1, -4.0, "kawara2"), (1, -32.0, "kawara3"), (2, 4.0, "kawara3"), (2, 18.0, "kawara"),
+                  (2, 31.0, "kawara2"), (3, -4.0, "kawara2"), (3, -18.0, "kawara"), (3, -32.0, "kawara3")]
+    elif zone == "Stairs":
+        houses = [(1, -18.0, "kawara3"), (2, 18.0, "kawara"), (2, 31.0, "kawara3"), (3, 0.0, "kawara2"),
+                  (3, -20.0, "kawara"), (3, -33.0, "kawara3")]
+    elif zone == "Estate":
+        houses = [(1, -33.0, "kawara"), (3, -33.0, "kawara2")]
+    else:
+        houses = []
     for n, (i, x, roof) in enumerate(houses):
-        yards.append(hill_house("hill_house_%d" % n, x, LEGS[i] - 10.0, -math.pi / 2, roof, 100 + n, plinths))
-    for n, x in enumerate((-26.0, 27.0)):
-        hill_danchi("hill_danchi_%d" % n, x, LEGS[3] + 9.5, math.pi / 2, 120 + n)
-    hill_grid()
-    street(plinths)
-    station()
+        yards.append(hill_house("hill_house_%s_%d" % (_tag, n), x, LEGS[i] - 13.5, -math.pi / 2, roof, 100 + 10 * f + n, plinths))
+    roof_kit = yards[min(4, len(yards) - 1)].p(0.0, 6.0 + 2.4, 3.75) if yards else None
+    if zone == "Estate":
+        # blocks of flats between the runs, facing the road; more at the foot round a little park; the bath house's
+        # chimney
+        for n, (i, x) in enumerate(((1, -8.0), (2, 8.0), (3, -6.0))):
+            frame = hill_danchi("hill_danchi_%s_%d" % (_tag, n), x, LEGS[i] - 13.5, -math.pi / 2, 130 + n, plinths)
+            if n == 1:
+                roof_kit = frame.p(0.0, 14.0, 4.5)
+        for n, x in enumerate((-34.0, 34.0)):
+            hill_danchi("foot_danchi_%s_%d" % (_tag, n), x, FOOT_Z + 1.0, math.pi / 2, 140 + n)
+        top = chimney("chimney", -10.0, PLAZA[1] + CIRCLE[2] + 4.0)
+        w1.mark("cap_roof", (-10.0, top + 0.5, PLAZA[1] + CIRCLE[2] + 4.0))
+        foot_kit = (20.0, FOOT_Y, PLAZA[1] + 8.0)
+    elif zone == "Station":
+        for n, x in enumerate((-34.0, 34.0)):
+            hill_danchi("foot_danchi_%s_%d" % (_tag, n), x, FOOT_Z + 1.0, math.pi / 2, 120 + n)
+        frame = station()
+        foot_kit = frame.p(10.0, 1.0, 8.0 + 2.2)
+        # The race: down the first runs of this street (the stopwatch at the top)
+        start = next(i for i, p in enumerate(_path) if p[1] >= 48.0)
+        w1.mark("race_start", (_path[start][0], _path[start][2] + 0.17, _path[start][1]))
+        for k in range(8):
+            x, z, y = _path[start + 12 + 14 * k]
+            w1.mark("race_%d" % k, (x, y + 0.4, z))
+        x, z, y = _path[start + 12 + 14 * 8]
+        w1.mark("cap_race", (x, y + 0.6, z))
+    elif zone == "Stairs":
+        shop_at("foot_shop_N0", Frame.at(-CIRCLE[2] - 4.0, PLAZA[1] + 3.0, math.pi, FOOT_Y + 0.12))
+        shop_at("foot_shop_N1", Frame.at(CIRCLE[2] + 4.0, PLAZA[1] + 3.0, 0.0, FOOT_Y + 0.12))
+        foot_kit = Frame.at(CIRCLE[2] + 4.0, PLAZA[1] + 3.0, 0.0, FOOT_Y + 0.12).p(0.0, 6.0, 4.5)
+        # the billboard: glide to it from the flats on the hilltop (the glide Bottlecap)
+        billboard(-34.0, 96.0, 0.0)
+        w1.mark("cap_glide", (-34.0, 0.45, 96.0))
+    else:
+        # Shrine: paddies stepped down between the runs, bamboo, a farmhouse; a torii and shrine at the foot
+        for n, (i, x) in enumerate(((1, -18.0), (1, -32.0), (2, 18.0), (2, 31.0), (3, -18.0), (3, -32.0))):
+            paddies("%s_%d" % (_tag, n), x, LEGS[i - 1] + BENCH + 1.0, LEGS[i] - BENCH - 1.0, 9.0)
+        for n, (x, z) in enumerate(((0.0, (LEGS[0] + LEGS[1]) / 2), (6.0, (LEGS[1] + LEGS[2]) / 2), (0.0, (LEGS[2] + LEGS[3]) / 2), (-30.0, FOOT_Z + 4.0))):
+            bamboo("%s_%d" % (_tag, n), x, z, rng)
+        frame = farmhouse("farmhouse", 26.0, FOOT_Z + 3.0, math.pi / 2)
+        roof_kit = frame.p(0.0, 2.8 + 3.6, 3.0)
+        torii = torii_at("torii_foot", 0.0, PLAZA[1] + CIRCLE[2] + 2.0, math.pi / 2)
+        shrine_at("shrine_foot", 0.0, PLAZA[1] + CIRCLE[2] + 10.0, math.pi / 2)
+        foot_kit = torii.p(0.0, 4.32, 0.0)
+        for n, (x, z) in enumerate(((-9.0, PLAZA[1] + CIRCLE[2] + 10.0), (9.0, PLAZA[1] + CIRCLE[2] + 10.0), (-14.0, PLAZA[1] + CIRCLE[2] + 4.0), (14.0, PLAZA[1] + CIRCLE[2] + 4.0))):
+            w1.mark("treep_%d_%d_%d_cedar" % (_count["tree"], 400 + n, 105), (x, ground_y(x, z) - 0.05, z))
+            _count["tree"] += 1
+        # The hollow log in the bamboo: crawl in for the hidden Bottlecap
+        lx, lz = -30.0, FOOT_Z + 2.0
+        ly = ground_y(lx, lz)
+        log = w1.Piece("log")
+        for k in range(12):
+            a0, a1 = math.tau * k / 12, math.tau * (k + 1) / 12
+            outer = [(lx - 1.6, ly + 0.62 + math.sin(a0) * 0.62, lz + math.cos(a0) * 0.62), (lx + 1.6, ly + 0.62 + math.sin(a0) * 0.62, lz + math.cos(a0) * 0.62),
+                     (lx + 1.6, ly + 0.62 + math.sin(a1) * 0.62, lz + math.cos(a1) * 0.62), (lx - 1.6, ly + 0.62 + math.sin(a1) * 0.62, lz + math.cos(a1) * 0.62)]
+            inner = [(px, ly + 0.62 + (py - ly - 0.62) * 0.78, lz + (pz - lz) * 0.78) for px, py, pz in outer][::-1]
+            log.face(outer, "darkwood")
+            log.face(inner, "wood")
+        log.done()
+        w1.mark("cap_hidden", (lx, ly + 0.25, lz))
+    if zone != "Station":
+        turning_circle()
+    else:
+        turning_circle()
     hill_wires()
-    hill_bound()
+    street(plinths)
     # Crumbs along the uphill pavement, a few metres apart
     for i in range(0, len(_path), 6):
         if _path[i][1] < 60.0:
             continue
-        x, z, y = _side(i, -4.3)
+        x, z, y = _side(i, -(ROAD_HALF + 1.2))
         w1.crumb((x, y + 0.47, z))
-    # Cars down the road and back up it, round the square at the foot; people on its pavement
-    down = [(x, y, z) for x, z, y in _path[::4] if z >= 32.5]
+    # Cars down the road and back up it, round the circle at the foot; people on its pavement
+    down = [(x, y, z) for x, z, y in _path[::4] if z >= 41.5]
     cx, cz = PLAZA
-    round_square = [(cx + math.cos(-math.pi / 2 + math.tau * s / 16) * 5.2, FOOT_Y + 0.03, cz + math.sin(-math.pi / 2 + math.tau * s / 16) * 5.2) for s in range(1, 16)]
+    round_square = [(cx + math.cos(-math.pi / 2 + math.tau * s / 16) * (CIRCLE[0] + CIRCLE[1]) / 2, FOOT_Y + 0.03, cz + math.sin(-math.pi / 2 + math.tau * s / 16) * (CIRCLE[0] + CIRCLE[1]) / 2) for s in range(1, 16)]
     loop = down + round_square + down[::-1][1:-1]
     for i, p in enumerate(loop):
-        w1.mark("road_1_%d" % i, p)
-    walk = [_side(i, 4.3) for i in range(0, len(_path), 8) if _path[i][1] >= 58.0]
+        w1.mark("road_%d_%d" % (1 + f, i), p)
+    walk = [_side(i, ROAD_HALF + 1.2) for i in range(0, len(_path), 8) if _path[i][1] >= HILL_EDGE + 1.0]
     for i, (x, z, y) in enumerate(walk):
-        w1.mark("walk_2_%d" % i, (x, y + 0.12, z))
-    # Checkpoints on each run and at the foot
+        w1.mark("walk_%d_%d" % (2 + f, i), (x, y + 0.12, z))
+    # Checkpoints on each run and at the foot; the zone's marker in the middle of the face
     for i, x in enumerate((15.0, 0.0, 0.0, 15.0)):
-        w1.mark("check_hill_%d" % i, (x, leg_y(i, x) + 0.3, LEGS[i] - 4.3))
-    w1.mark("check_station", (0.0, FOOT_Y + 0.3, 172.0))
-    # Places the wandering raccoons visit down the hill
+        w1.mark("check_%s_%d" % (_tag, i), (x, leg_y(i, x) + 0.3, LEGS[i] - ROAD_HALF - 1.2))
+    w1.mark("check_foot_%s" % _tag, (0.0, FOOT_Y + 0.3, PLAZA[1] - CIRCLE[2] - 2.0))
+    w1.mark("zone_%d_%s" % (f, zone), (0.0, ground_y(0.0, (LEGS[1] + LEGS[2]) / 2), (LEGS[1] + LEGS[2]) / 2))
+    # Places the wandering raccoons visit
     sx, z0, y0, _z1, _y1 = _stair(1)
-    w1.mark("haunt_3", (sx, y0 + 0.1, z0 - 0.6))
-    w1.mark("haunt_9", (8.0, FOOT_Y + 0.15, 171.0))
-    w1.mark("haunt_10", (-LEG_X - BEND - 5.5, leg_y(1, -LEG_X) - 6.0, (LEGS[1] + LEGS[2]) / 2))
-    sx, _z0, _y0, z1, y1 = _stair(2)
-    w1.mark("haunt_11", (sx, y1 + 0.1, z1 + 0.6))
-    # The crows about the square, the hawk over the hillside
-    w1.mark("crows_2", (-6.0, FOOT_Y + 0.12, 171.0))
-    w1.mark("hawk_1", (0.0, -18.0, 105.0))
-    # Tall grass to hide in (the user, 2026-11-02: "tall grass to hide in in spots"; World grows it): beside the
-    # street where it leaves the ring, inside the hairpins, on the slopes between the runs, by the flats at the foot
-    for n, (x, z, size) in enumerate(((9.0, 46.0, 3.0), (-9.0, 48.0, 3.0), (-10.0, 77.0, 4.0), (-30.0, 77.0, 3.5), (LEG_X, (LEGS[0] + LEGS[1]) / 2, 3.5),
-                                      (-LEG_X, (LEGS[1] + LEGS[2]) / 2, 3.5), (LEG_X, (LEGS[2] + LEGS[3]) / 2, 3.5), (-42.0, 140.0, 3.0))):
-        empty = w1.mark("tallgrass_%d" % n, (x, ground_y(x, z), z))
+    haunt((sx, y0 + 0.1, z0 - 0.6))
+    haunt((CIRCLE[2] - 2.0, FOOT_Y + 0.15, PLAZA[1] - 2.0))
+    haunt((-LEG_X - BEND - 5.5, ground_y(-LEG_X - BEND - 5.5, (LEGS[1] + LEGS[2]) / 2), (LEGS[1] + LEGS[2]) / 2))
+    # Crows about the foot; a hawk over the Station face
+    w1.mark("crows_%d" % (2 + f), (-CIRCLE[2] + 2.0, FOOT_Y + 0.12, PLAZA[1] + 2.0))
+    if f == 0:
+        w1.mark("hawk_1", (0.0, -18.0, (LEGS[1] + LEGS[2]) / 2))
+    # Tall grass to hide in (World grows it): between the first runs, inside a hairpin, by the foot
+    for n, (x, z, size) in enumerate(((-10.0, (LEGS[0] + LEGS[1]) / 2, 4.0), (-LEG_X, (LEGS[1] + LEGS[2]) / 2, 3.5), (-46.0, FOOT_Z - 4.0, 3.0))):
+        if zone == "Shrine" and n == 0:
+            x = -8.0
+        empty = w1.mark("tallgrass_%s%d" % (_tag, n), (x, ground_y(x, z), z))
         empty.scale = (size, size, size)
-    # Dogs' yards on the hill: the terraces in front of two hillside houses (the ring's are in markers())
-    for n, frame in enumerate(yards[:2]):
-        w1.mark("dog_%d" % (n + 3), frame.p(3.0, 0.05, -1.0))
     # Reeds on the banks by the bends (Warren's reeds grow there: World)
-    for n, (x, z, size) in enumerate(((LEG_X + BEND + 5.0, (LEGS[0] + LEGS[1]) / 2, 3.0), (-LEG_X - BEND - 5.0, (LEGS[1] + LEGS[2]) / 2 + 3.0, 3.0),
-                                      (LEG_X + BEND + 5.0, (LEGS[2] + LEGS[3]) / 2, 3.5), (-30.0, LEGS[0] + 4.0, 3.0), (-36.0, 150.0, 4.0))):
-        empty = w1.mark("reeds_h%d" % n, (x, ground_y(x, z), z))
+    for n, (x, z, size) in enumerate(((LEG_X + BEND + 5.0, (LEGS[0] + LEGS[1]) / 2, 3.0), (-40.0, FOOT_Z, 4.0))):
+        empty = w1.mark("reeds_%s%d" % (_tag, n), (x, ground_y(x, z), z))
         empty.scale = (size, size, size)
+    # A dog's yard: the terrace in front of a house, or by the foot
+    if yards:
+        _mark_count("dog", "dog_%d", yards[0].p(3.0, 0.05, -1.0))
+    else:
+        _mark_count("dog", "dog_%d", (32.0, FOOT_Y + 0.05, FOOT_Z + 8.0))
+    # Lost kits on this face (5): in the tall grass, on a roof or ridge (its drainpipe or corner post), at the foot of
+    # the second stairway, at the foot (the station's platform, by the flats, a shop's roof, the torii's top beam),
+    # by the second hairpin
+    x = -8.0 if zone == "Shrine" else -10.0
+    kit((x, ground_y(x, (LEGS[0] + LEGS[1]) / 2), (LEGS[0] + LEGS[1]) / 2))
+    if roof_kit:
+        kit(roof_kit)
+    sx, _z0, _y0, z1, _y1 = _stair(1)
+    kit((sx, ground_y(sx, z1 + 1.0), z1 + 1.0))
+    kit(foot_kit)
+    x, z = LEG_X + BEND + ROAD_HALF + 1.2, (LEGS[2] + LEGS[3]) / 2
+    kit((x, road_near(x, z)[1] + 0.12, z))   # (on the pavement round the outside of the third hairpin)
+    return turn
+
+
+def hill():
+    """Everything down the hill: the ground, the wall round it, then each face built in its frame and turned."""
+    hill_grid()
+    hill_bound()
+    for f in range(len(FACES)):
+        before = set(bpy.data.objects)
+        turn = build_face(f)
+        c, s = math.cos(turn), math.sin(turn)
+        for obj in set(bpy.data.objects) - before:
+            bx, by = obj.location.x, obj.location.y
+            obj.location.x, obj.location.y = bx * c - by * s, bx * s + by * c
+            obj.rotation_euler.z += turn
 
 
 def _xz(p):
@@ -1579,16 +1845,16 @@ def markers(frames):
         w1.mark("walk_0_%d" % i, (math.cos(a) * (ROAD[1] + 1.2), 0.0, math.sin(a) * (ROAD[1] + 1.2)))
         a2 = math.pi + math.tau * i / 24
         w1.mark("walk_1_%d" % i, (math.cos(a2) * (ROAD[0] - 1.2), 0.0, math.sin(a2) * (ROAD[0] - 1.2)))
-    # The hawk over the houses to the north-west, crows by the shops, the fox's den in a back garden: all out of
-    # the grove
-    a = math.tau * 6.5 / SECTORS
-    w1.mark("hawk_0", (math.cos(a) * 44.0, 0.0, math.sin(a) * 44.0))
-    for n, k in enumerate((4, 9)):
-        a = math.tau * (k + 0.5) / SECTORS
+    # The hawk over the houses to the north-west, crows by the shop and the flats, the fox's den in a back garden:
+    # all out of the grove
+    a = math.tau * 8 / SECTORS
+    w1.mark("hawk_0", (math.cos(a) * (FRONT + 6.0), 0.0, math.sin(a) * (FRONT + 6.0)))
+    for n, k in enumerate((1, 10)):
+        a = math.tau * k / SECTORS
         w1.mark("crows_%d" % n, (math.cos(a) * (ROAD[1] + 1.8), 0.0, math.sin(a) * (ROAD[1] + 1.8)))
-    w1.mark("den_0", frames[8].p(-1.8, 0.05, 15.5))
+    w1.mark("den_0", frames[11].p(-1.8, 0.05, 15.5))
     # Dogs' yards on the ring: inside the garden walls, behind the gates
-    for n, k in enumerate((5, 8, 7)):
+    for n, k in enumerate((5, 11, 8)):
         w1.mark("dog_%d" % n, frames[k].p(-3.0, 0.05, -1.0))
     w1.mark("tallgrass_ring", frames[5].p(-10.0, 0.0, 3.0)).scale = (2.0, 2.0, 2.0)
     # Yard cats about the town, on the outer pavement
@@ -1596,35 +1862,17 @@ def markers(frames):
         r = ROAD[1] + 1.9
         w1.mark("cat_%d" % k, (math.cos(a) * r, 0.17, math.sin(a) * r))
     w1.mark("cap_cats", (0.0, HILL_TOP + 0.6, 0.0))
-    # The billboard in the front garden of the house set back from the road: glide to it from the great tree
-    frame = Frame(math.tau * 7.5 / SECTORS, 0.0)
-    gb = 39.5
-    w1.mark("cap_glide", (0.0, 9.5, -gb - 0.0))
-    board = w1.Piece("billboard")
-    base_y = LOTS[7][1]
-    board.box((0.0, 9.3, -gb), (4.0, 0.16, 1.6), "metal")
-    for x in (-1.8, 1.8):
-        board.box((x, base_y + (9.2 - base_y) / 2, -gb - 0.6), (0.14, 9.2 - base_y, 0.14), "metal")
-    board.box((0.0, 9.4 + 1.7, -gb - 0.8), (4.6, 3.4, 0.2), "yellow")
-    board.done()
-    del frame
-    # The race: round the road and up the hill
-    w1.mark("race_start", (-2.0, 0.17, ROAD[1] + 1.2))
-    for k in range(8):
-        a = math.pi * 0.5 + math.tau * (k + 1) / 9
-        w1.mark("race_%d" % k, (math.cos(a) * ROAD_MIDDLE, 0.4, math.sin(a) * ROAD_MIDDLE))
-    w1.mark("cap_race", (0.0, 0.6, ROAD[0] - 1.0))
     # Crumbs round the inner pavement
     for k in range(20):
         a = math.tau * k / 20
         w1.crumb((math.cos(a) * (ROAD[0] - 1.2), 0.35, math.sin(a) * (ROAD[0] - 1.2)))
     # Spots round town the wandering raccoons visit (haunt_1, 6, 7 are in the grove: grove())
-    w1.mark("haunt_0", frames[4].p(-6.0, 0.0, -1.0))                    # the shop's bins
-    w1.mark("haunt_2", frames[3].p(0.0, 0.0, -2.2))                     # the antique shop's plaza
+    w1.mark("haunt_0", frames[1].p(-6.0, 0.0, -1.0))                    # the shop's bins
+    w1.mark("haunt_2", frames[4].p(0.0, 0.0, -2.2))                     # the antique shop's plaza
     w1.mark("haunt_4", frames[5].p(2.0, 0.0, 11.5))                     # a back garden
-    w1.mark("haunt_5", frames[9].p(6.6, 0.0, -0.8))                     # the vending machines
-    w1.mark("haunt_8", frames[0].p(-2.0, 0.0, 12.5))                    # behind the bath house
-    w1.mark("haunt_12", frames[1].p(-13.0, 0.0, 5.0))                   # beside the flats
+    w1.mark("haunt_5", frames[1].p(7.0, 0.0, -0.8))                     # the vending machines
+    w1.mark("haunt_8", frames[7].p(-2.0, 0.0, 12.5))                    # behind the bath house
+    w1.mark("haunt_12", frames[10].p(-13.0, 0.0, 5.0))                   # beside the flats
 
 
 def build():
@@ -1638,6 +1886,9 @@ def build():
     hill()
     markers(frames)
     beyond()
+    for n, at in enumerate(KITS):
+        w1.mark("kit_%d" % n, at)
+    print("KITS %d" % len(KITS))
     print("CRUMBS %d WIRES %d CANS %d" % (w1._count["crumb"], w1._count["wire"], w1._count["can"]))
     bpy.ops.wm.save_as_mainfile(filepath=os.path.join(ROOT, "tools", "town.blend"))
     bpy.ops.export_scene.gltf(
@@ -1667,7 +1918,7 @@ def look(folder):
     camera.data.clip_end = 900.0
     scene.collection.objects.link(camera)
     scene.camera = camera
-    for view, at, target in (("above", (0.01, 170.0, 0.0), (0.0, 0.0, 0.0)), ("south", (-30.0, 30.0, 80.0), (0.0, 4.0, 0.0)),
+    for view, at, target in (("above", (0.01, 640.0, 0.0), (0.0, 0.0, 0.0)), ("south", (-30.0, 30.0, 80.0), (0.0, 4.0, 0.0)),
                              ("north", (20.0, 25.0, -75.0), (0.0, 2.0, 0.0)), ("street", (0.0, 2.0, 35.0), (-20.0, 3.0, 40.0)),
                              ("plaza", (8.0, 2.5, 24.0), (frame_x(3), 3.0, frame_z(3))), ("grove", (2.0, 9.0, 12.0), (0.0, 8.0, -6.0)),
                              ("hill_south", (10.0, 25.0, 250.0), (0.0, -12.0, 100.0)), ("hill_side", (130.0, 15.0, 110.0), (0.0, -15.0, 105.0)),
