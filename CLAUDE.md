@@ -346,3 +346,37 @@ Read README.md first. Started 2026-11-01.
   legs itself (all fours, sneak, spin, hang, helicopter) snapped the knee into the solver's plane as it blended in and
   could cave it inward (now `RaccoonRig._set_leg` turns the knee from where it points towards KNEE_OUT, a little
   bow-legged, by the pose's weight). Climbing, ledge hanging and tightropes are not covered by the playground test yet.
+
+## 2026-11-02: the main session's round (the user's calls, in their words)
+
+- Moves: all fours only past a full push ("he still starts running on all 4s before I press all the way": Player
+  `sprint_push` 0.985); "the backflip needs to launch you higher" and "a snappier spin" (flip_lift 2.2, flip_time
+  0.45); "the helicopter tail should only happen if you press A again"; "spin jump needs to be higher and you should
+  keep spinning and slow fall until you land", then "too fast", "spin the stick longer to get him up to speed"
+  (`spin_spinup` 16) and "shouldn't be able to spin faster [or slower] in the air" (SpinJump holds the turn);
+  "spin around once when you start helicoptering"; "his head doesn't hang low enough when helicoptering" (head and
+  body); "hang at the top of your jump a little longer" and "snaps you down a little too strongly" (Player
+  `apex_gravity_scale` 0.35, fall_gravity_scale 1.3); "scurrying should be slower than running" (Player `speed_cap`,
+  3.2 m/s); "a cleaner arc through the air between bounds" and "the all 4s running stride needs to be longer"
+  (BOUND_STRIDE 2.6, one parabola from hind push-off to fore landing); idle and walk "slightly hunched", idle
+  "rubbing his hands together" with hands "pointed down not up"; fingers "shouldn't be splayed" (they are modelled,
+  he has no finger bones: build_raccoon.py hands()).
+- Tail and fur: "his tail is all droopy now" (the fur's downward hang is off for the tail and head); "the tail should
+  spin ... stuck in one direction" (the tail is carried round with his heading, read from the hips' forward); "the fur
+  is too much like springs ... too bouncy" (FUR_DAMPING 17). Head fur: a mane ring plus crown tufts.
+- Effects: dust "a few puffs" became little cloud clusters "in little rings where you step", on the ground; jumping
+  puffs too; the tail spin and helicopter "use the stepping dust" (bigger: "really tiny"). Food "a faint rim light and
+  sparkle" and "burst" when taken (Pickup). Scurry: "little blue sparkles" on climbables, "from farther away and a
+  darker blue" (ClimbGlints, 14 m), and "black bars ... top and bottom" (ScurryBars). Climbing left/right follows the
+  screen ("reversed").
+- Wires "bounce ... time your jumps to jump higher and higher" (Tightrope kick/spring_at, WireBounce); the power lines
+  are wires too ("you phase through half the wires").
+- Look: "a cuter font", "a pixelated one" (Pixelify Sans, README credit); "the pixel filter should be more like close
+  encounters" and then "in the pause screen with a dial" (N64Filter.strength, the Pixels dial; user://settings.cfg).
+- World: "add the gloaming grass" (TownGrass on "grass" faces), "dont make new reeds check the ones we already have"
+  (Warren's reed field at reeds_ markers), "tall grass to hide in" "denser clusters" (tallgrass_ markers,
+  TownGrass.hidden); the skunks, badgers and rabbits on the lawns (Wildlife; their role is still a placeholder); the
+  volcano "cut it about there" (top_cut 0.78); crows "sit on roofs and wires" and "not necessarily be hostile" (every
+  third band dives: Claude's pick).
+- Talk: "like hemlocks tower where they say things rather than a popup", then Gloaming's see-through, typed look;
+  "spamming" (only the nearest talks, 3 lines a visit); "more things to say" (lines are Claude's placeholders).
