@@ -16,6 +16,8 @@ const MAX_HEARTS := 3
 ## Below this nothing is on the world any more (the hill's foot is at -34 m: tools/build_town.py FOOT_Y): he starts
 ## again, a raccoon of the band or the town is dead.
 const KILL_Y := -55.0
+## How many shapes of each kind of the wood's plainer outer trees there are (see _place_things).
+const LO_SHAPES := 6
 const CAP_NAMES := {
 	"roof": "Up the chimney",
 	"glide": "The billboard",
@@ -66,13 +68,43 @@ var _cats_left := 0
 var _checkpoints: Array[Vector3] = []
 var _sun: DirectionalLight3D
 
+## Set by the start (Boot) before the world is added: it is then built a step at a time, a frame between, telling
+## `building` how far it has got so the loading screen can show it (the user, 2026-11-02: "a loading screen is a good
+## idea"). Otherwise (the tests) it is all built at once, as before.
+var stepwise := false
+## How far the building has got (0..1) and what it is doing.
+signal building(done: float, what: String)
+## Everything is in (the lawn, the plants and the streaming last).
+signal built
+var _breath_at := 0
+
+
+## A step of the building: in `stepwise`, says how far it has got and gives the screen a frame.
+func _step(done: float, what: String) -> void:
+	lap("-> " + what)
+	if stepwise:
+		building.emit(done, what)
+		await get_tree().process_frame
+		_breath_at = Time.get_ticks_msec()
+
+
+## Within a long step: in `stepwise`, gives the screen a frame every 50 ms or so.
+func _breathe(done: float) -> void:
+	if stepwise and Time.get_ticks_msec() - _breath_at > 50:
+		building.emit(done, "")
+		await get_tree().process_frame
+		_breath_at = Time.get_ticks_msec()
+
 
 func _ready() -> void:
+	lap("start")
 	add_to_group(&"game")
+	await _step(0.02, "Laying out the hill")
 	_environment()
 	var level := model.instantiate()
 	add_child(level)
 	_dress(level)
+	await _step(0.08, "Growing the trees")
 	for node in level.find_children("*", "Node3D", true, false):
 		if not node is MeshInstance3D:
 			markers[String(node.name)] = (node as Node3D).global_transform
@@ -96,19 +128,23 @@ func _ready() -> void:
 	# (from behind him, looking the way he faces: down the hill from the grove)
 	camera.look_along(Vector3(sin(player.facing_yaw), 0.0, cos(player.facing_yaw)))
 
-	_place_things()
+	await _place_things()
+	await _step(0.6, "Waking the town")
 	# The town's hazards (birds, the fox, people, cars), and his band of raccoons
 	Hazards.place(self, markers, player)
 	# (the owl: on a pole far from the grove, swooping at him; a placeholder role, Claude's pick)
 	HazardOwl.place(self, markers, player)
 	HazardDog.place(self, markers, player)
+	await _step(0.66, "Rolling the clouds in")
 	# Daughter Of The Wind's clouds round the sky (GameCommon puff-clouds; the user: "the clouds should be like
 	# daughter of the wind")
 	PuffClouds.add_to(self, _sun)
 	# The day going round: dawn, day, evening, night (DayNight; the user, 2026-11-02, "there needs to be a day and night cycle")
 	DayNight.place(self)
+	await _step(0.7, "Calling the raccoons home")
 	Squad.place(self, player)
 	Villagers.place(self, markers, player)
+	await _step(0.76, "Hiding the lost kits")
 	# The kits lost about the hill, to find and send home to the grove
 	lost_kits = LostKits.place(self, markers, get_node(^"Villagers") as Villagers, player)
 	# The hill's four sides, each with its own food and kits to find
@@ -254,8 +290,11 @@ var _pad_perches: Array[Vector3] = []
 
 
 func _place_things() -> void:
+	var count := 0
 	for name: String in markers:
 		var at: Vector3 = markers[name].origin
+		count += 1
+		await _breathe(lerpf(0.08, 0.6, float(count) / markers.size()))
 		if name.begins_with("crumb_"):
 			var crumb := Pickup.make(Pickup.Kind.CRUMB, at)
 			crumb.taken.connect(_on_crumb)
@@ -292,6 +331,10 @@ func _place_things() -> void:
 				tree.bark = Color(0.6, 0.58, 0.54)
 			tree.joined = true
 			if parts[4].ends_with("lo"):
+				# (the outer rows' plainer trees come in LO_SHAPES shapes a kind, each turned and sized its own way: some 200
+				# fewer trees to build at the start, which took seconds in a browser; the user, 2026-11-02, "that load time
+				# seems very long")
+				tree.seed = tree.seed % LO_SHAPES
 				tree = tree.simple()
 			var body := tree.body()
 			# (a plain tree has no collision of its own: its trunk is given a solid to bump into and scurry up, up
@@ -523,11 +566,15 @@ func _on_respawned() -> void:
 func _grow_lawn() -> void:
 	await get_tree().physics_frame
 	await get_tree().physics_frame
+	await _step(0.82, "Mowing the lawns")
 	var lawn := TownGrass.place(self, player, markers)
+	await _step(0.88, "Letting the animals out")
 	Wildlife.place(self, lawn, player)
 	GroveAnimals.place(self, markers, player)
+	await _step(0.92, "Planting the woods")
 	GroveMushrooms.place(self, markers, lawn)
 	GrovePlants.place(self, markers, lawn)
+	await _step(0.97, "Filling the pond")
 	# (the spring pool, its waterfall and the pond's look: GroveWater)
 	GroveWater.place(self, markers)
 	# (the points to stand on one hand on: pole tops, tree tips: PointStand)
@@ -545,3 +592,17 @@ func _grow_lawn() -> void:
 	add_child(ribbons)
 	# Only the zone he is in is run (the user, 2026-11-02: "only load stuff in the zone you're in")
 	ZoneStreaming.start(self)
+	lap("ready")
+	built.emit()
+
+
+static var _lap_at := -1
+
+
+## With RINGTAIL_LOAD_TIMES=1 in the environment: how long each step of the start-up took.
+static func lap(what: String) -> void:
+	if OS.get_environment("RINGTAIL_LOAD_TIMES") != "1":
+		return
+	var now := Time.get_ticks_msec()
+	print("LOAD %6d ms  +%5d  %s" % [now, now - (_lap_at if _lap_at >= 0 else now), what])
+	_lap_at = now

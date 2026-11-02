@@ -5,14 +5,30 @@ extends RefCounted
 ## a pavement, a house). Heights are the ground's own, triangle by triangle. Also hands out lawn spots (Wildlife).
 ##
 ##   var lawn := TownGrass.place(world, player)
+##
+## Working the lawn out walks every triangle of the town (seconds natively, much longer in a browser), so it is kept
+## in LAWN_FILE, with a fingerprint of everything it was worked out from; a start whose world matches reads it back
+## instead. A run from the editor (the tests too) writes it whenever it had to work it out: commit it with the world.
 
 ## Cells (metres) the lawn is kept in.
 const CELL := 0.5
+## The lawn kept for the start (see above).
+const LAWN_FILE := "res://models/world1.lawn"
 
-## Cell -> the plane of the grass there (y = x * a + z * b + c, as Vector3(a, b, c)).
-var _planes := {}
-## Cell -> whether something lies over the grass there (found out the first time it is asked).
-var _covered := {}
+## The cells' grid: its first cell and how many across (x) and down (z).
+var _origin := Vector2i.ZERO
+var _size := Vector2i.ZERO
+## Each cell's plane of the grass (y = x * a + z * b + c: a, b, c in turn), c NAN where there is no grass.
+var _plane := PackedFloat32Array()
+## Each cell's state: 0 not yet known, COVERED (something lies over the grass), OPEN (found clear the first time
+## it was asked).
+var _state := PackedByteArray()
+const COVERED := 1
+const OPEN := 2
+## How many cells have grass.
+var _grassy := 0
+## The grassy cells' indices, in the order they were laid (random_spot picks from them, as it always has).
+var _order := PackedInt32Array()
 var _space: PhysicsDirectSpaceState3D
 ## Reed patches: (x, z, radius).
 var _patches: Array[Vector3] = []
@@ -25,13 +41,18 @@ static var current: TownGrass
 static func place(world: Node3D, player: Node3D, markers := {}) -> TownGrass:
 	var lawn := TownGrass.new()
 	lawn._space = world.get_world_3d().direct_space_state
-	var meshes := world.find_children("*", "MeshInstance3D", true, false)
-	for mesh: MeshInstance3D in meshes:
-		lawn._scan(mesh, true)
-	# (then whatever is laid over the lawn: the road and pavement rings, paths, floors)
-	for mesh: MeshInstance3D in meshes:
-		lawn._scan(mesh, false)
-	if lawn._planes.is_empty():
+	# (what can cover the lawn: everything but what moves about)
+	var meshes: Array[MeshInstance3D] = []
+	for mesh: MeshInstance3D in world.find_children("*", "MeshInstance3D", true, false):
+		if mesh.mesh != null and _still(mesh, world):
+			meshes.append(mesh)
+	var print_of := _fingerprint(meshes)
+	if not lawn._read(print_of):
+		lawn._work_out(meshes)
+		if OS.has_feature("editor"):
+			lawn._write(print_of)
+	World.lap("  lawn")
+	if lawn._grassy == 0:
 		return lawn
 	var field := Grass.field(world, lawn._bounds(), 2.0, {
 		"mask": lawn.mask,
@@ -50,6 +71,96 @@ static func place(world: Node3D, player: Node3D, markers := {}) -> TownGrass:
 	current = lawn
 	Grass.push(player)
 	return lawn
+
+
+## Whether `mesh` stays put (not on anything that moves: a creature, a car, a body knocked about).
+static func _still(mesh: Node, world: Node) -> bool:
+	var up := mesh.get_parent()
+	while up != null and up != world:
+		if up is CharacterBody3D or up is RigidBody3D or up is Skeleton3D or up is AnimatableBody3D or up is Area3D:
+			return false
+		up = up.get_parent()
+	return true
+
+
+## What the lawn is worked out from, in short: every mesh's place, size and surfaces.
+static func _fingerprint(meshes: Array[MeshInstance3D]) -> String:
+	var parts := PackedStringArray()
+	for mesh in meshes:
+		var box := mesh.global_transform * mesh.get_aabb()
+		# (small things, settling a little differently each start, matter little to the lawn)
+		if box.get_longest_axis_size() < 1.0:
+			continue
+		var surfaces := mesh.mesh.get_class()
+		if not mesh.mesh is ArrayMesh:
+			parts.append("%s|%s|%s" % [str(box.position.snappedf(0.1)), str(box.size.snappedf(0.1)), surfaces])
+			continue
+		for k in mesh.mesh.get_surface_count():
+			var material := mesh.mesh.surface_get_material(k)
+			surfaces += "%d%s," % [(mesh.mesh as ArrayMesh).surface_get_array_len(k), "g" if material != null and material.resource_name == "grass" else ""]
+		parts.append("%s|%s|%s" % [str(box.position.snappedf(0.1)), str(box.size.snappedf(0.1)), surfaces])
+	parts.sort()
+	return "%d:%s" % [CELL * 1000, "\n".join(parts).sha256_text()]
+
+
+## The lawn from LAWN_FILE, if it was worked out from this world (`print_of`).
+func _read(print_of: String) -> bool:
+	var file := FileAccess.open_compressed(LAWN_FILE, FileAccess.READ, FileAccess.COMPRESSION_ZSTD)
+	if file == null:
+		return false
+	var kept: Variant = file.get_var()
+	if not (kept is Dictionary) or kept.get("print", "") != print_of or not kept.has_all(["origin", "size", "plane", "state", "order"]):
+		return false
+	_origin = kept["origin"]
+	_size = kept["size"]
+	_plane = kept["plane"]
+	_state = kept["state"]
+	_order = kept["order"]
+	_grassy = _order.size()
+	return _plane.size() == _size.x * _size.y * 3 and _state.size() == _size.x * _size.y
+
+
+func _write(print_of: String) -> void:
+	var file := FileAccess.open_compressed(LAWN_FILE, FileAccess.WRITE, FileAccess.COMPRESSION_ZSTD)
+	if file == null:
+		push_warning("TownGrass: cannot write %s" % LAWN_FILE)
+		return
+	file.store_var({"print": print_of, "origin": _origin, "size": _size, "plane": _plane, "state": _state, "order": _order})
+
+
+## Works the lawn out from the meshes: their "grass" surfaces lay it, triangle by triangle; then whatever is laid over
+## it (the road and pavement rings, paths, floors) covers it.
+func _work_out(meshes: Array[MeshInstance3D]) -> void:
+	# (the grid: round every mesh with grass)
+	var area := Rect2()
+	var any := false
+	for mesh in meshes:
+		for k in mesh.mesh.get_surface_count():
+			var material := mesh.mesh.surface_get_material(k)
+			if material != null and material.resource_name == "grass":
+				var box := mesh.global_transform * mesh.get_aabb()
+				var flat := Rect2(box.position.x, box.position.z, box.size.x, box.size.z)
+				area = area.merge(flat) if any else flat
+				any = true
+				break
+	if not any:
+		return
+	_origin = Vector2i((area.position / CELL).floor())
+	_size = Vector2i((area.end / CELL).floor()) - _origin + Vector2i.ONE
+	_plane.resize(_size.x * _size.y * 3)
+	for i in _size.x * _size.y:
+		_plane[i * 3 + 2] = NAN
+	_state.resize(_size.x * _size.y)
+	_state.fill(0)
+	for mesh in meshes:
+		_scan(mesh, true)
+	for mesh in meshes:
+		var box := mesh.global_transform * mesh.get_aabb()
+		# (only what reaches over the lawn's grid: the far mountains' and ridges' huge triangles walked millions of
+		# empty cells, 20 s of the start-up)
+		if box.position.x > area.end.x or box.end.x < area.position.x or box.position.z > area.end.y or box.end.z < area.position.y:
+			continue
+		_scan(mesh, false, _ground_top(box))
 
 
 ## Reeds where the world model has `reeds_<n>` markers (scale.x the patch's radius): Warren's, its marsh's reed field
@@ -143,37 +254,54 @@ func reeds_at(p: Vector2) -> float:
 	return most * mask(p) if most > 0.0 else 0.0
 
 
+## The grid's index of `cell`, or -1 off it.
+func _at(cell: Vector2i) -> int:
+	var x := cell.x - _origin.x
+	var z := cell.y - _origin.y
+	if x < 0 or z < 0 or x >= _size.x or z >= _size.y:
+		return -1
+	return z * _size.x + x
+
+
+## Whether `cell` has grass.
+func _grassed(i: int) -> bool:
+	return i >= 0 and not is_nan(_plane[i * 3 + 2])
+
+
 ## 1 where grass grows at `p` (world x, z), else 0.
 func mask(p: Vector2) -> float:
 	var cell := Vector2i((p / CELL).floor())
-	if not _planes.has(cell):
+	var i := _at(cell)
+	if not _grassed(i):
 		return 0.0
-	if not _covered.has(cell):
-		_covered[cell] = _is_covered(cell)
-	return 0.0 if _covered[cell] else 1.0
+	if _state[i] == 0:
+		_state[i] = COVERED if _is_covered(cell) else OPEN
+	return 0.0 if _state[i] == COVERED else 1.0
 
 
 ## The ground's height at `p` (world x, z) where there is grass.
 func height(p: Vector2) -> float:
-	var plane: Vector3 = _planes.get(Vector2i((p / CELL).floor()), Vector3.ZERO)
-	return p.x * plane.x + p.y * plane.y + plane.z
+	var i := _at(Vector2i((p / CELL).floor()))
+	if not _grassed(i):
+		return 0.0
+	return p.x * _plane[i * 3] + p.y * _plane[i * 3 + 1] + _plane[i * 3 + 2]
 
 
 ## A spot on open lawn, or Vector3.INF if none is found.
 func random_spot(rng: RandomNumberGenerator) -> Vector3:
-	var cells := _planes.keys()
+	if _order.is_empty():
+		return Vector3.INF
 	for _try in 40:
-		var cell: Vector2i = cells[rng.randi() % cells.size()]
-		var p := (Vector2(cell) + Vector2(0.5, 0.5)) * CELL
+		var i := _order[rng.randi() % _order.size()]
+		var p := (Vector2(_origin + Vector2i(i % _size.x, i / _size.x)) + Vector2(0.5, 0.5)) * CELL
 		if mask(p) > 0.5:
 			return Vector3(p.x, height(p), p.y)
 	return Vector3.INF
 
 
-## Lays the "grass" surfaces of `mesh` into the lawn (`grass`), or covers the lawn under its other surfaces.
-func _scan(mesh: MeshInstance3D, grass: bool) -> void:
-	if mesh.mesh == null:
-		return
+## Lays the "grass" surfaces of `mesh` into the lawn (`grass`), or covers the lawn under its other surfaces (those
+## of them that come within 2.5 m of `ground_top`, the highest lawn under it).
+func _scan(mesh: MeshInstance3D, grass: bool, ground_top := INF) -> void:
 	var to_world := mesh.global_transform
 	for k in mesh.mesh.get_surface_count():
 		var material := mesh.mesh.surface_get_material(k)
@@ -187,6 +315,9 @@ func _scan(mesh: MeshInstance3D, grass: bool) -> void:
 			var a := to_world * points[order[t] if not order.is_empty() else t]
 			var b := to_world * points[order[t + 1] if not order.is_empty() else t + 1]
 			var c := to_world * points[order[t + 2] if not order.is_empty() else t + 2]
+			# (nothing more than 2.5 m over the lawn covers it: most of a tree's crown)
+			if minf(a.y, minf(b.y, c.y)) > ground_top + 2.5:
+				continue
 			_lay(a, b, c, grass)
 
 
@@ -199,21 +330,29 @@ func _lay(a: Vector3, b: Vector3, c: Vector3, grass: bool) -> void:
 	# (the plane through them: y = x * px + z * pz + k)
 	var plane := Vector3(-normal.x / normal.y, -normal.z / normal.y, 0.0)
 	plane.z = a.y - a.x * plane.x - a.z * plane.y
-	var low := Vector2i((Vector2(minf(a.x, minf(b.x, c.x)), minf(a.z, minf(b.z, c.z))) / CELL).floor())
-	var high := Vector2i((Vector2(maxf(a.x, maxf(b.x, c.x)), maxf(a.z, maxf(b.z, c.z))) / CELL).floor())
+	var low := Vector2i((Vector2(minf(a.x, minf(b.x, c.x)), minf(a.z, minf(b.z, c.z))) / CELL).floor()).max(_origin)
+	var high := Vector2i((Vector2(maxf(a.x, maxf(b.x, c.x)), maxf(a.z, maxf(b.z, c.z))) / CELL).floor()).min(_origin + _size - Vector2i.ONE)
+	if low.x > high.x or low.y > high.y:
+		return
 	var a2 := Vector2(a.x, a.z)
 	var b2 := Vector2(b.x, b.z)
 	var c2 := Vector2(c.x, c.z)
 	for x in range(low.x, high.x + 1):
 		for z in range(low.y, high.y + 1):
 			var cell := Vector2i(x, z)
+			var i := _at(cell)
 			var p := (Vector2(x, z) + Vector2(0.5, 0.5)) * CELL
 			if grass:
 				if Geometry2D.point_is_inside_triangle(p, a2, b2, c2):
-					_planes[cell] = plane
+					if is_nan(_plane[i * 3 + 2]):
+						_grassy += 1
+						_order.append(i)
+					_plane[i * 3] = plane.x
+					_plane[i * 3 + 1] = plane.y
+					_plane[i * 3 + 2] = plane.z
 				continue
 			# (anything else covers a cell it touches at all: its middle or a corner, so no tufts stand at a road's edge)
-			if not _planes.has(cell):
+			if not _grassed(i) or _state[i] == COVERED:
 				continue
 			var touches := false
 			for corner: Vector2 in [p, p + Vector2(-0.24, -0.24), p + Vector2(0.24, -0.24), p + Vector2(-0.24, 0.24), p + Vector2(0.24, 0.24)]:
@@ -224,7 +363,22 @@ func _lay(a: Vector3, b: Vector3, c: Vector3, grass: bool) -> void:
 				var over := p.x * plane.x + p.y * plane.y + plane.z - height(p)
 				# (over it, or let into the ground below where the lawn would be: a road cut lower than the ground grid)
 				if over > -0.6 and over < 2.5:
-					_covered[cell] = true
+					_state[i] = COVERED
+
+
+## The highest lawn under `box` (world), or INF over a big one (too many cells to look at: not worth it).
+func _ground_top(box: AABB) -> float:
+	var low := Vector2i((Vector2(box.position.x, box.position.z) / CELL).floor())
+	var high := Vector2i((Vector2(box.end.x, box.end.z) / CELL).floor())
+	if (high.x - low.x + 1) * (high.y - low.y + 1) > 6400:
+		return INF
+	var top := -INF
+	for x in range(low.x, high.x + 1):
+		for z in range(low.y, high.y + 1):
+			var p := (Vector2(x, z) + Vector2(0.5, 0.5)) * CELL
+			if _grassed(_at(Vector2i(x, z))):
+				top = maxf(top, height(p))
+	return top
 
 
 ## Whether anything solid lies over the grass in `cell` (a road ring laid over it, a house, a wall).
@@ -240,12 +394,7 @@ func _is_covered(cell: Vector2i) -> bool:
 
 
 func _bounds() -> Rect2:
-	var low := Vector2(INF, INF)
-	var high := Vector2(-INF, -INF)
-	for cell: Vector2i in _planes:
-		low = low.min(Vector2(cell))
-		high = high.max(Vector2(cell))
-	return Rect2(low * CELL, (high - low + Vector2.ONE) * CELL)
+	return Rect2(Vector2(_origin) * CELL, Vector2(_size) * CELL)
 
 
 ## The lawn texture's mean colour, for the blades' roots.
