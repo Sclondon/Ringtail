@@ -285,9 +285,12 @@ def paint_markings(name):
         # (its colour is all markings: a spike's side across it, for the hair textures, goes in the plain UV's x)
         spike = mesh.uv_layers.get(racc.SPIKE)
         plain = mesh.uv_layers.get(kit.PLAIN)
-        if spike and plain:
+        metres = mesh.uv_layers.get(kit.METRES)
+        if metres and plain:
             for index in range(len(mesh.loops)):
-                plain.data[index].uv = (spike.data[index].uv.y, 0.0)
+                # (which side it is: UV2.x's twentieths past its region and group, tag_spikes)
+                tenths = (metres.data[index].uv.x % 1.0) * 10.0
+                plain.data[index].uv = (1.0 if tenths - math.floor(tenths + 0.25) > 0.25 else 0.0, 0.0)
         if spike:
             mesh.uv_layers.remove(spike)
         tags = mesh.uv_layers.get(kit.METRES)

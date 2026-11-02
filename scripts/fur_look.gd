@@ -124,12 +124,14 @@ void vertex() {
 	if (UV2.y > 1.0005) {
 		float flex = UV2.y - 1.001;
 		int region = clamp(int(UV2.x + 0.5), 0, 16);
-		int group = int(round(fract(UV2.x) * 10.0));
+		// (its group in UV2.x's tenths, and in its twentieths which side of its spike it is: tools/build_raccoon.py tag_spikes)
+		int group = int(floor(fract(UV2.x) * 10.0 + 0.25));
+		float side = fract(UV2.x) * 10.0 - float(group) > 0.25 ? 1.0 : 0.0;
 		// (a spike's tip; on a lock (a fur shape) every point out from its root)
 		bool tipped = locks ? flex > 0.0 : flex > 0.99;
 		fur_along = flex;
 		// (across a spike: a tip is in the middle; the points either side of it, and its roots, are one side or the other)
-		fur_across = tipped ? 0.5 : (masked ? UV.x : COLOR.b);
+		fur_across = tipped ? 0.5 : (masked ? UV.x : side);
 		fur_seed = float(region) * 7.0 + float(group);
 		// (at the bending joints, elbows and knees, the fur springs half as far)
 		float give = (region == 3 || region == 5 || region == 7 || region == 9) ? 0.5 : 1.0;
@@ -140,6 +142,7 @@ void vertex() {
 			vec3 now = turn * vec3(UV.x, 1.0 - UV.y, (COLOR.g - 0.5) * 0.5);
 			vec3 root = VERTEX - now;
 			vec3 off = now;
+			bool gone = false;
 			if (shaped) {
 				// (length, angle, density, width: all of it, times its part's size, width and density)
 				vec4 fur = group == 1 ? mane_fur : body_fur;
@@ -147,7 +150,11 @@ void vertex() {
 				fur.x *= part.x;
 				fur.w *= part.y;
 				fur.z *= part.z;
-				off = now * fur.w;
+				// (above the density the whole spike, every point of it, is folded into its root, inside him: its rank is
+				// on every point; the user, 2026-11-02, "I turned down the density but there's still a bunch of little spiky
+				// fur")
+				gone = fur.z < 0.999 && COLOR.b >= fur.z;
+				off = gone ? vec3(0.0) : now * fur.w;
 				if (flex > 0.0) {
 					float len = length(now) * fur.x;
 					vec3 dir = len > 0.0001 ? normalize(now) : vec3(0.0, 1.0, 0.0);
@@ -161,10 +168,10 @@ void vertex() {
 							dir = axis * c2 + side / s * sqrt(1.0 - c2 * c2);
 						}
 					}
-					off = tipped && COLOR.b > fur.z ? vec3(0.0) : dir * len;
+					off = gone ? vec3(0.0) : dir * len;
 				}
 			}
-			if (flex > 0.0) {
+			if (flex > 0.0 && !gone) {
 				off += lag;
 				// Kept out of his body (the user, 2026-11-02: "they clip into the body a lot"): never closer to the
 				// surface at its root than a little way out from it. Out is from the limb's line (the body, arms

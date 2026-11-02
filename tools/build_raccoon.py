@@ -226,7 +226,7 @@ def whiskers(_b):
                 for j in range(4):
                     a = math.tau * j / 4
                     vert = made.verts.new(kit.to_blender(reshape(at + (u * math.cos(a) + w * math.sin(a)) * r)))
-                    tags[vert] = (REGION["head"], t, None, WHISKERS, 0.0)
+                    tags[vert] = (REGION["head"], t, None, WHISKERS, 0.0, 0.0)
                     ring.append(vert)
                 rings.append(ring)
             for a, b in zip(rings, rings[1:]):
@@ -355,6 +355,11 @@ SPIKE = "Spike"
 _ranks = random.Random(99)
 
 
+def _rank():
+    """A spike's rank, kept off 0 and 1 (the colour holds it in 8 bits): above the density, it folds away."""
+    return 0.004 + 0.992 * _ranks.random()
+
+
 def tag_spikes(made, tags):
     """Writes each point's tag from `tags` (BMVert -> (region, flex[, root as drawn, group, blue])) into the Metres
     coordinates (region and group, flex), the plain ones (its offset from its root, x and y) and the Spike ones (the
@@ -366,8 +371,8 @@ def tag_spikes(made, tags):
         for loop in face.loops:
             tag = tags.get(loop.vert, (0, 0.0))
             region, flex = tag[0], tag[1]
-            root, group, blue = tag[2:5] if len(tag) >= 5 else (None, BODY, 0.0)
-            loop[layer].uv = (float(region) + 0.1 * group, -flex - 0.001)
+            root, group, blue, across = tag[2:6] if len(tag) >= 6 else (None, BODY, 0.0, 0.0)
+            loop[layer].uv = (float(region) + 0.1 * group + 0.05 * across, -flex - 0.001)
             off = kit.from_blender(loop.vert.co) - reshape(root) if root is not None else Vector()
             loop[plain].uv = (off.x, off.y)
             loop[spike].uv = (off.z, blue)
@@ -396,7 +401,7 @@ def cones(dark):
             p = tail_point(along) + (X * math.cos(a) + up * math.sin(a)) * r
             vert = made.verts.new(kit.to_blender(reshape(p)))
             # (its root the tail's line there: the fur shader fattens the tail out from it, FurLook's tail_girth)
-            tags[vert] = (region, (1.0 if j % 2 == 0 else 0.45) if spiky else 0.0, tail_point(t), TAIL_FUR, (0.0 if j % 2 == 0 else float((j // 2) % 2)) if spiky else float(j % 2))
+            tags[vert] = (region, (1.0 if j % 2 == 0 else 0.45) if spiky else 0.0, tail_point(t), TAIL_FUR, 0.0, (0.0 if j % 2 == 0 else float((j // 2) % 2)) if spiky else float(j % 2))
             loop.append(vert)
         return loop
 
@@ -425,7 +430,7 @@ def cones(dark):
         join(base, rim)
         if last:
             tip = made.verts.new(kit.to_blender(reshape(tail_point(1.06))))
-            tags[tip] = (region, 1.0, tail_point(1.0), TAIL_FUR, 0.0)
+            tags[tip] = (region, 1.0, tail_point(1.0), TAIL_FUR, 0.0, 0.0)
             for j in range(len(rim)):
                 made.faces.new((rim[j], rim[(j + 1) % len(rim)], tip))
         else:
@@ -500,9 +505,11 @@ def body_cones(dark):
             vert = made.verts.new(kit.to_blender(reshape(p)))
             if spiky:
                 root = base[0] + (base[1] * math.cos(a) + base[2] * math.sin(a)) * base[3]
-                tags[vert] = (region, 1.0 if tip else 0.45, root, BODY, _ranks.random() if tip else float((j // 2) % 2))
+                # (a tip draws its spike's rank, and the points after it, its sides, take it too: they fold away with it)
+                rank = _rank() if tip else rank
+                tags[vert] = (region, 1.0 if tip else 0.45, root, BODY, rank, 0.0 if tip else float((j // 2) % 2))
             else:
-                tags[vert] = (region, 0.0, None, BODY, float(j % 2))
+                tags[vert] = (region, 0.0, None, BODY, 0.0, float(j % 2))
             loop.append(vert)
         return loop
 
@@ -591,9 +598,11 @@ def ruffs(_b):
             vert = made.verts.new(kit.to_blender(reshape(p)))
             if spiky:
                 root = base[0] + (u * math.cos(a) * wide + v * math.sin(a)) * base[1]
-                tags[vert] = (region, 1.0 if tip else 0.45, root, BODY, _ranks.random() if tip else float((j // 2) % 2))
+                # (a tip draws its spike's rank, and the points after it, its sides, take it too: they fold away with it)
+                rank = _rank() if tip else rank
+                tags[vert] = (region, 1.0 if tip else 0.45, root, BODY, rank, 0.0 if tip else float((j // 2) % 2))
             else:
-                tags[vert] = (region, 0.0, None, BODY, float(j % 2))
+                tags[vert] = (region, 0.0, None, BODY, 0.0, float(j % 2))
             loop.append(vert)
         return loop
 
@@ -699,20 +708,22 @@ def tuft(made, tags, root, direction, length, width, region, rng, group=BODY, si
     else:
         u = direction.cross(Y if abs(direction.y) < 0.9 else X).normalized()
     v = direction.cross(u).normalized()
+    # (its rank, on every point of it: above the density the whole spike folds into its root)
+    rank = _rank()
     base = []
     for j in range(4):
         a = math.tau * j / 4 + 0.4
         p = root - direction * 0.012 + (u * math.cos(a) * 1.4 + v * math.sin(a) * 0.6) * width * 0.5
         vert = made.verts.new(kit.to_blender(reshape(p)))
-        tags[vert] = (region, 0.0, root, group, float(j % 2))
+        tags[vert] = (region, 0.0, root, group, rank, float(j % 2))
         base.append(vert)
     bend = Vector((rng.uniform(-1, 1), rng.uniform(-1, 1), rng.uniform(-1, 1))) * 0.25
     if SHAPE != "triangle":
         made.faces.new(base[::-1])
-        lock(made, tags, root, base, (direction + bend).normalized(), u, v, length, width, region, group)
+        lock(made, tags, root, base, (direction + bend).normalized(), u, v, length, width, region, group, rank)
         return
     tip = made.verts.new(kit.to_blender(reshape(root + (direction + bend).normalized() * length)))
-    tags[tip] = (region, 1.0, root, group, _ranks.random())
+    tags[tip] = (region, 1.0, root, group, rank, 0.0)
     for j in range(4):
         made.faces.new((base[j], base[(j + 1) % 4], tip))
     made.faces.new(base[::-1])
@@ -735,13 +746,13 @@ _PROFILES = {
 }
 
 
-def lock(made, tags, root, base, direction, u, v, length, width, region, group):
+def lock(made, tags, root, base, direction, u, v, length, width, region, group, rank):
     """A lock of fur of SHAPE from the four-point `base` ring, `direction` its way out, (u, v) across it."""
     if SHAPE == "forked":
         # (two narrow points splayed from the base)
         for side in (1.0, -1.0):
             way = (direction + u * side * 0.35).normalized()
-            _lock_tube(made, tags, root, base, lambda a, way=way: way * length * a, u, v, width, region, group)
+            _lock_tube(made, tags, root, base, lambda a, way=way: way * length * a, u, v, width, region, group, rank)
         return
     if SHAPE == "ribbon":
         length *= 1.35
@@ -752,19 +763,18 @@ def lock(made, tags, root, base, direction, u, v, length, width, region, group):
         line = lambda a: direction * length * a * 0.75 + (u * math.cos(a * 9.4) - u + v * math.sin(a * 9.4)) * length * 0.22 * a
     else:
         line = lambda a: direction * length * a
-    _lock_tube(made, tags, root, base, line, u, v, width, region, group)
+    _lock_tube(made, tags, root, base, line, u, v, width, region, group, rank)
 
 
-def _lock_tube(made, tags, root, base, line, u, v, width, region, group):
+def _lock_tube(made, tags, root, base, line, u, v, width, region, group, rank):
     alongs, wides = _PROFILES[SHAPE]
-    rank = _ranks.random()
     previous = base
     for k in range(1, len(alongs)):
         a = alongs[k]
         centre = root + line(a)
         if wides[k] <= 0.0:
             tip = made.verts.new(kit.to_blender(reshape(centre)))
-            tags[tip] = (region, 1.0, root, group, rank)
+            tags[tip] = (region, 1.0, root, group, rank, 0.0)
             for j in range(4):
                 made.faces.new((previous[j], previous[(j + 1) % 4], tip))
             return
@@ -773,7 +783,7 @@ def _lock_tube(made, tags, root, base, line, u, v, width, region, group):
             t = math.tau * j / 4 + 0.4
             p = centre + (u * math.cos(t) * 1.4 + v * math.sin(t) * 0.6) * width * 0.5 * wides[k]
             vert = made.verts.new(kit.to_blender(reshape(p)))
-            tags[vert] = (region, max(a, 0.01), root, group, rank)
+            tags[vert] = (region, max(a, 0.01), root, group, rank, float(j % 2))
             ring.append(vert)
         for j in range(4):
             made.faces.new((previous[j], previous[(j + 1) % 4], ring[(j + 1) % 4], ring[j]))

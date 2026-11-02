@@ -305,3 +305,9 @@ Read README.md first. Started 2026-11-01.
 - Unverified: the five Bottlecap routes re-walked on the new hilltop (the billboard glide from the great camphor, now
   north-west of the clearing); cars and people on the long route in play; the sky_ colours against the N64 filter in
   play (shots were dimmed by the pause menu, which opens when the shot window loses focus).
+- "I turned down the density but there's still a bunch of little spiky fur — that isn't controlled by the length or
+  angle either" (2026-11-02): only a ruff's tips carried a rank, so its zigzag stayed, and a tuft's base was left as a
+  fleck. Now every point of a spike carries its spike's rank (colour blue) and the side bit moved to UV2.x's
+  twentieths (group in tenths; a cat's side still in UV x), and above the density the whole spike folds into its root
+  (inside him) and takes no spring. tests/fur_bare.gd checks every one of his models: every body-fur point out from
+  its root has its offset (0 that cannot fold). `look_shots.gd ... bare` shoots density 0, short, laid flat, stood out.
