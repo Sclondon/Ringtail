@@ -201,7 +201,18 @@ Read README.md first. Started 2026-11-01.
     the paused game, after Gloaming's CharacterEditor: turntable, drag/arrows to turn, Face/Whole, a panel of fur
     type, marks, markings and colour sliders; Own look; Done). Looks are kept in user://looks.json (FurLook.FILE) and
     worn from the start. Alone: `godot --path . res://scenes/fur_editor.tscn`.
-  - Checks: `tests/look_shots.gd -- --out=<dir> [cats] [furs] [menus]` (window; menus at 1280x720 and 390x844).
+  - Then "I should be able to control the angle of the fur and how dense, and the ring mane as well — and why aren't
+    there the different textures from Gloaming?", "and the fur length", "I should be able to control tail length and
+    thickness as well". Live, no rebuild: tag_spikes bakes each spike point's offset from its root (UV x, y and the
+    colour's green, his grit now in red only), a rank at the tip (blue; above the density it folds away), which side
+    of the spike a root point is (blue, for the textures; a cat's in UV x) and its group (UV2.x tenths: body, mane,
+    crown, tail, whiskers). The fur shader (FurLook._SHAPED) re-lays body and crown spikes by look "body" [length,
+    angle, density] and mane ones by "mane" [length, angle, count, width], each offset turned with its region's bone
+    (FurLook.shape, per frame, only while shaped); "angle" tips them towards or away from the way the region's fur
+    lies (FurLook.REGION_AXES). Gloaming's hair textures (solid, straight, wavy, curly, soft, thick: its strands(),
+    ported as FurLook._STRANDED) are the look's "texture". The tail: RaccoonRig.tail_length (on the spring chain's
+    segment lengths and the joints' stretch) and tail_thickness (the joints scaled across), from look "tail".
+  - Checks: `tests/look_shots.gd -- --out=<dir> [cats] [furs] [shapes] [menus]` (window; menus at 1280x720 and 390x844).
 - Then "the tree trunks jiggle like jelly because the leaf shader I think" and "you need to work on the ledges on the
   branches, it interrupts your climbing, you get near a branch incorrectly": a climbable or joined tree's wood has no
   sway at all (TreeGen._rigid; its collision never moves), its leaves a third as much. Scurry: no ledge catches while

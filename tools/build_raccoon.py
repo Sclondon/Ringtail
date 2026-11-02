@@ -222,7 +222,7 @@ def whiskers(_b):
                 for j in range(4):
                     a = math.tau * j / 4
                     vert = made.verts.new(kit.to_blender(reshape(at + (u * math.cos(a) + w * math.sin(a)) * r)))
-                    tags[vert] = (REGION["head"], t)
+                    tags[vert] = (REGION["head"], t, None, WHISKERS, 0.0)
                     ring.append(vert)
                 rings.append(ring)
             for a, b in zip(rings, rings[1:]):
@@ -341,13 +341,32 @@ REGION = {"hips": 0, "chest": 1, "upper_arm_l": 2, "forearm_l": 3, "upper_arm_r"
           "shin_l": 7, "thigh_r": 8, "shin_r": 9, "tail_0": 10, "head": 16}
 
 
+# What a spike's points also carry, for the fur shader to shape it live (scripts/fur_look.gd; the user, 2026-11-02:
+# "I should be able to control the angle of the fur and how dense, and the ring mane as well", "and the fur length"):
+# which group of fur it is in (UV2.x's tenths, over the region), how far each point is from the spike's root (UV
+# x, y and, through paint_grit, the colour's green), and the colour's blue: at a tip its rank (spikes above the
+# density are folded away), at the root which side of the spike it is (across it, for the hair textures).
+BODY, MANE, CROWN, TAIL_FUR, WHISKERS = range(5)
+SPIKE = "Spike"
+_ranks = random.Random(99)
+
+
 def tag_spikes(made, tags):
-    """Writes each point's (region, flex) from `tags` (BMVert -> (region, flex)) into the Metres coordinates."""
+    """Writes each point's tag from `tags` (BMVert -> (region, flex[, root as drawn, group, blue])) into the Metres
+    coordinates (region and group, flex), the plain ones (its offset from its root, x and y) and the Spike ones (the
+    offset's z, the blue: paint_grit moves them into the colour)."""
     layer = made.loops.layers.uv.new(kit.METRES)
+    plain = made.loops.layers.uv.get(kit.PLAIN) or made.loops.layers.uv.new(kit.PLAIN)
+    spike = made.loops.layers.uv.new(SPIKE)
     for face in made.faces:
         for loop in face.loops:
-            region, flex = tags.get(loop.vert, (0, 0.0))
-            loop[layer].uv = (float(region), -flex - 0.001)
+            tag = tags.get(loop.vert, (0, 0.0))
+            region, flex = tag[0], tag[1]
+            root, group, blue = tag[2:5] if len(tag) >= 5 else (None, BODY, 0.0)
+            loop[layer].uv = (float(region) + 0.1 * group, -flex - 0.001)
+            off = kit.from_blender(loop.vert.co) - reshape(root) if root is not None else Vector()
+            loop[plain].uv = (off.x, off.y)
+            loop[spike].uv = (off.z, blue)
 
 
 # The rings are spiky cones, one after another down the tail, each flaring out towards the tip in a zigzag of
@@ -372,7 +391,7 @@ def cones(dark):
             along = t + (0.035 if spiky and j % 2 == 0 else 0.0)
             p = tail_point(along) + (X * math.cos(a) + up * math.sin(a)) * r
             vert = made.verts.new(kit.to_blender(reshape(p)))
-            tags[vert] = (region, (1.0 if j % 2 == 0 else 0.45) if spiky else 0.0)
+            tags[vert] = (region, (1.0 if j % 2 == 0 else 0.45) if spiky else 0.0, None, TAIL_FUR, (0.0 if j % 2 == 0 else float((j // 2) % 2)) if spiky else float(j % 2))
             loop.append(vert)
         return loop
 
@@ -401,7 +420,7 @@ def cones(dark):
         join(base, rim)
         if last:
             tip = made.verts.new(kit.to_blender(reshape(tail_point(1.06))))
-            tags[tip] = (region, 1.0)
+            tags[tip] = (region, 1.0, None, TAIL_FUR, 0.0)
             for j in range(len(rim)):
                 made.faces.new((rim[j], rim[(j + 1) % len(rim)], tip))
         else:
@@ -464,7 +483,8 @@ def body_cones(dark):
     made = bmesh.new()
     tags = {}
 
-    def ring(centre, u, v, radius, spiky=False, region=0, lean=Vector()):
+    def ring(centre, u, v, radius, spiky=False, region=0, lean=Vector(), base=None):
+        # (`base`: the cone's base ring (centre, u, v, radius), where each of the rim's points grows from)
         loop = []
         count = SPIKES * 2 if spiky else SPIKES
         for j in range(count):
@@ -473,7 +493,11 @@ def body_cones(dark):
             r = radius * (1.0 if not spiky or tip else 0.68)
             p = centre + (lean if tip else Vector()) + (u * math.cos(a) + v * math.sin(a)) * r
             vert = made.verts.new(kit.to_blender(reshape(p)))
-            tags[vert] = (region, (1.0 if tip else 0.45) if spiky else 0.0)
+            if spiky:
+                root = base[0] + (base[1] * math.cos(a) + base[2] * math.sin(a)) * base[3]
+                tags[vert] = (region, 1.0 if tip else 0.45, root, BODY, _ranks.random() if tip else float((j // 2) % 2))
+            else:
+                tags[vert] = (region, 0.0, None, BODY, float(j % 2))
             loop.append(vert)
         return loop
 
@@ -501,7 +525,7 @@ def body_cones(dark):
             region = region_of((s0 + s1) * 0.5)
             lean = (at(s1) - at(s0)).normalized() * abs(step) * 0.45
             base = ring(at(s0), u0, v0, 0.7, region=region)
-            rim = ring(at(s1), u1, v1, 1.6, True, region, lean)
+            rim = ring(at(s1), u1, v1, 1.6, True, region, lean, (at(s0), u0, v0, 0.7))
             back = ring(at(s1) + (at(s1) - at(s0)).normalized() * 0.006, u1, v1, 0.62, region=region)
             join(base, rim)
             join(back, rim)
@@ -549,7 +573,8 @@ def ruffs(_b):
     tags = {}
     rng = random.Random(11)
 
-    def ring(centre, axis, u, v, radius, lean=0.0, spiky=False, wide=1.0, region=0):
+    def ring(centre, axis, u, v, radius, lean=0.0, spiky=False, wide=1.0, region=0, base=None):
+        # (`base`: the ruff's base ring (centre, radius), where each of the rim's points grows from)
         loop = []
         count = SPIKES * 2 if spiky else SPIKES
         twist = rng.uniform(0.0, math.tau)
@@ -559,7 +584,11 @@ def ruffs(_b):
             r = radius * (rng.uniform(0.72, 1.4) if tip else (0.62 * rng.uniform(0.9, 1.1) if spiky else 1.0))
             p = centre + axis * (lean * rng.uniform(0.4, 1.7) if tip else 0.0) + (u * math.cos(a) * wide + v * math.sin(a)) * r
             vert = made.verts.new(kit.to_blender(reshape(p)))
-            tags[vert] = (region, (1.0 if tip else 0.45) if spiky else 0.0)
+            if spiky:
+                root = base[0] + (u * math.cos(a) * wide + v * math.sin(a)) * base[1]
+                tags[vert] = (region, 1.0 if tip else 0.45, root, BODY, _ranks.random() if tip else float((j // 2) % 2))
+            else:
+                tags[vert] = (region, 0.0, None, BODY, float(j % 2))
             loop.append(vert)
         return loop
 
@@ -580,7 +609,7 @@ def ruffs(_b):
         u = axis.cross(Z if abs(axis.z) < 0.9 else X).normalized()
         v = axis.cross(u).normalized()
         base = ring(centre - axis * 0.035, axis, u, v, radius * 0.7, wide=wide, region=region)
-        rim = ring(centre, axis, u, v, radius * _flare(flare), lean, True, wide, region)
+        rim = ring(centre, axis, u, v, radius * _flare(flare), lean, True, wide, region, (centre - axis * 0.035, radius * 0.7))
         back = ring(centre + axis * 0.01, axis, u, v, radius * 0.7, wide=wide, region=region)
         join(base, rim)
         join(back, rim)
@@ -642,7 +671,7 @@ def ruffs(_b):
     return mesh
 
 
-def tuft(made, tags, root, direction, length, width, region, rng):
+def tuft(made, tags, root, direction, length, width, region, rng, group=BODY):
     """One loose spike of fur: a flat-ish four-sided point from `root` along `direction`, its tip springing."""
     # (the fur type: FUR_TYPES)
     length *= FUR_NOW["length"]
@@ -656,11 +685,11 @@ def tuft(made, tags, root, direction, length, width, region, rng):
         a = math.tau * j / 4 + 0.4
         p = root - direction * 0.012 + (u * math.cos(a) * 1.4 + v * math.sin(a) * 0.6) * width * 0.5
         vert = made.verts.new(kit.to_blender(reshape(p)))
-        tags[vert] = (region, 0.0)
+        tags[vert] = (region, 0.0, root, group, float(j % 2))
         base.append(vert)
     bend = Vector((rng.uniform(-1, 1), rng.uniform(-1, 1), rng.uniform(-1, 1))) * 0.25
     tip = made.verts.new(kit.to_blender(reshape(root + (direction + bend).normalized() * length)))
-    tags[tip] = (region, 1.0)
+    tags[tip] = (region, 1.0, root, group, _ranks.random())
     for j in range(4):
         made.faces.new((base[j], base[(j + 1) % 4], tip))
     made.faces.new(base[::-1])
@@ -687,7 +716,7 @@ def head_fur(_b):
             # (under the jaw it is short, so it doesn't stick into his chest)
             under = max(0.0, -math.sin(t))
             length = rng.uniform(0.04, 0.062) * reach * (1.0 - 0.55 * under)
-            tuft(made, tags, root, (radial - Z * 0.45).normalized(), length, 0.058, REGION["head"], rng)
+            tuft(made, tags, root, (radial - Z * 0.45).normalized(), length, 0.058, REGION["head"], rng, MANE)
     # And short fur over the rest of his head besides: the crown, the back and the sides, laid back (none on the
     # face) (the user, 2026-11-02: "he should have head fur besides the mane ring")
     placed = 0
@@ -699,7 +728,7 @@ def head_fur(_b):
             continue
         root = HEAD_CENTRE + Vector((n.x * HEAD_RADII.x, n.y * HEAD_RADII.y, n.z * HEAD_RADII.z)) * 0.97
         out = Vector((n.x / HEAD_RADII.x, n.y / HEAD_RADII.y, n.z / HEAD_RADII.z)).normalized()
-        tuft(made, tags, root, (out - Z * 0.4 - Y * 0.6).normalized(), rng.uniform(0.03, 0.05), 0.028, REGION["head"], rng)
+        tuft(made, tags, root, (out - Z * 0.4 - Y * 0.6).normalized(), rng.uniform(0.03, 0.05), 0.028, REGION["head"], rng, CROWN)
         placed += 1
     bmesh.ops.recalc_face_normals(made, faces=made.faces[:])
     tag_spikes(made, tags)
@@ -939,8 +968,8 @@ def reshaped_weights(part, p):
 # --- Grit: gritty gradients over him, baked into the vertex colours ---
 # (the user, 2026-11-01: "there needs to be gritty gradients on his body"). Darker low down and lighter over his
 # top, mottled at two sizes, and each spike of fur darker at its root and paler at its tip. Written as a float
-# colour layer (glTF COLOR_0, linear, at most 1: so the value over GRIT_SCALE), its alpha 1 to say it is there; the
-# fur shader multiplies by it (scripts/raccoon_rig.gd). Eyes and nose are left clean.
+# colour layer's red (glTF COLOR_0, linear, at most 1: so the value over GRIT_SCALE), its alpha 1 to say it is there; the
+# fur shader multiplies by it (scripts/fur_look.gd). Green and blue shape the spikes (tag_spikes). Eyes and nose are left clean.
 GRIT_SCALE = 1.3
 CLEAN = ("eye", "pupil")
 
@@ -963,6 +992,7 @@ def paint_grit(name):
         mesh = obj.data
         layer = mesh.color_attributes.new("Grit", "FLOAT_COLOR", "CORNER")
         tags = mesh.uv_layers.get(kit.METRES)
+        spike = mesh.uv_layers.get(SPIKE)
         clean = {k for k, m in enumerate(mesh.materials) if m and m.name.split(".")[0] in CLEAN}
         for poly in mesh.polygons:
             for index in poly.loop_indices:
@@ -973,7 +1003,11 @@ def paint_grit(name):
                 v = tags.data[index].uv.y if tags else 0.0
                 flex = -v - 0.001 if v < -0.0005 else -1.0
                 g = grit_at(p, flex) / GRIT_SCALE
-                layer.data[index].color = (g, g, g, 1.0)
+                # (red the grit; green and blue what the fur shader shapes a spike by: tag_spikes)
+                shaping = spike.data[index].uv if spike else (0.0, 0.0)
+                layer.data[index].color = (g, min(1.0, max(0.0, shaping[0] * 2.0 + 0.5)), shaping[1], 1.0)
+        if spike:
+            mesh.uv_layers.remove(spike)
         mesh.color_attributes.active_color = layer
         mesh.color_attributes.render_color_index = mesh.color_attributes.find("Grit")
     bpy.ops.wm.save_as_mainfile(filepath=os.path.join(kit.ROOT, "tools", name + ".blend"))

@@ -114,6 +114,10 @@ var _hearts_were := 3
 var _caps_were := 0
 
 var _tail: Array[Node3D] = []
+## How long and how thick his tail is, of its own (the model editor's; the user, 2026-11-02: "I should be able to
+## control tail length and thickness as well"): every segment drawn out along itself, and the joints fattened across.
+var tail_length := 1.0
+var tail_thickness := 1.0
 var _tail_dir: Array[Vector3] = []
 var _tail_len: Array[float] = []
 var _points := PackedVector3Array()
@@ -442,6 +446,8 @@ func _spring_fur(delta: float) -> void:
 		_fur_uniform[r] = mesh_basis * _fur_lag[r]
 	for material in _fur_materials:
 		material.set_shader_parameter(&"lags", _fur_uniform)
+	# (the turns the model editor's fur shaping lays the spikes by: FurLook)
+	FurLook.shape(self)
 
 
 ## The joint each fur region follows, in the order the model's tags count them (tools/build_raccoon.py REGION).
@@ -924,7 +930,7 @@ func _pose_tail(delta: float, speed: float, spin: float) -> void:
 	# weight at the end of the tail so when he spins his tail gets flung outward")
 	var flung := _spin_w * smoothstep(SPIN_WIND - 0.05, SPIN_WIND + 0.05, spin) if spin < 1.0 else 0.0
 	flung = maxf(flung, _tj_w)
-	stretch = lerpf(stretch, SPIN_STRETCH, flung)
+	stretch = lerpf(stretch, SPIN_STRETCH, flung) * tail_length
 	# (which way he faces, from his hips' forward laid level: their Euler angles jump about when they are pitched,
 	# hunched or on all fours, and left the tail stuck pointing one way as he spun: the user, 2026-11-02)
 	var ahead := _hips.global_basis.z
@@ -984,8 +990,8 @@ func _pose_tail(delta: float, speed: float, spin: float) -> void:
 	for k in TAIL_BONES:
 		var want := turned.inverse() * (_points[k + 1] - _points[k]).normalized()
 		var turn := Basis(Quaternion(_tail_dir[k], want.normalized()))
-		var undo := Basis.IDENTITY if k == 0 else _along(_tail_dir[k - 1], 1.0 / stretch)
-		_tail[k].basis = undo * turn * _along(_tail_dir[k], stretch)
+		var undo := Basis.IDENTITY if k == 0 else _shaped(_tail_dir[k - 1], 1.0 / stretch, 1.0 / tail_thickness)
+		_tail[k].basis = undo * turn * _shaped(_tail_dir[k], stretch, tail_thickness)
 		turned = turned * turn
 
 
@@ -993,6 +999,13 @@ func _pose_tail(delta: float, speed: float, spin: float) -> void:
 static func _along(axis: Vector3, by: float) -> Basis:
 	var extra := by - 1.0
 	return Basis(Vector3.RIGHT + axis * axis.x * extra, Vector3.UP + axis * axis.y * extra, Vector3.BACK + axis * axis.z * extra)
+
+
+## A basis that scales by `along` along `axis` (unit) and by `across` square to it.
+static func _shaped(axis: Vector3, along: float, across: float) -> Basis:
+	var extra := along - across
+	return Basis(Vector3.RIGHT * across + axis * axis.x * extra, Vector3.UP * across + axis * axis.y * extra,
+			Vector3.BACK * across + axis * axis.z * extra)
 
 
 static func _slerp(from: Basis, to: Basis, w: float) -> Basis:

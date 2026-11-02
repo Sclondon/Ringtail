@@ -39,6 +39,8 @@ var _turning := true
 var _dragging := false
 var _own_colours := {}
 var _hero_changed := false
+## A slider moved and not yet let go of (kept on letting go, choosing another, or Done).
+var _pending := false
 var _cats_changed := {}
 var _root: Control
 var _panel: PanelContainer
@@ -135,6 +137,8 @@ func _stage() -> void:
 
 ## Puts a raccoon or cat number `index` on the turntable, in its look.
 func _choose(what: String, index: int) -> void:
+	if _pending and _rig:
+		_keep()
 	kind = what
 	cat_index = index
 	if what == "cat":
@@ -312,7 +316,24 @@ func _fill() -> void:
 			_choose("cat", (cat_index + 1) % count)
 			_fill())
 	_choices("Fur", FurLook.CAT_TYPES if kind == "cat" else FurLook.TYPES, "fur", "spiky")
+	_choices("Texture", FurLook.TEXTURES, "texture", "solid")
 	_choices("Drawn on the fur", FurLook.MARKS, "marks", "plain")
+	if kind == "raccoon":
+		# (live, in the fur shader: FurLook; the user, "I should be able to control the angle of the fur and how
+		# dense, and the ring mane as well", "and the fur length")
+		_list.add_child(_label("Fur shape", 22, ACCENT))
+		_shape_slider("body", FurLook.BODY_SHAPE, 0, "Length", 0.3, 2.2)
+		_shape_slider("body", FurLook.BODY_SHAPE, 1, "Angle", -0.9, 0.9)
+		_shape_slider("body", FurLook.BODY_SHAPE, 2, "Density", 0.0, 1.0)
+		_list.add_child(_label("Mane", 22, ACCENT))
+		_shape_slider("mane", FurLook.MANE_SHAPE, 2, "Count", 0.0, 1.0)
+		_shape_slider("mane", FurLook.MANE_SHAPE, 0, "Length", 0.3, 2.6)
+		_shape_slider("mane", FurLook.MANE_SHAPE, 3, "Width", 0.3, 2.6)
+		_shape_slider("mane", FurLook.MANE_SHAPE, 1, "Angle", -0.9, 0.9)
+	# ("I should be able to control tail length and thickness as well")
+	_list.add_child(_label("Tail", 22, ACCENT))
+	_shape_slider("tail", FurLook.TAIL_SHAPE, 0, "Length", 0.5, 1.8)
+	_shape_slider("tail", FurLook.TAIL_SHAPE, 1, "Thickness", 0.5, 2.0)
 	if kind == "cat":
 		_choices("Markings", FurLook.PATTERNS, "pattern", "none")
 	_list.add_child(_label("Colours", 22, ACCENT))
@@ -379,9 +400,44 @@ func _colour_row(material: String, named: String) -> void:
 			_changed())
 
 
-func _changed() -> void:
+## One number of the look's `key` (an Array, `own` where it has none), at `index`, on a slider; changed live (only the
+## shader's numbers and the tail's: no new mesh), kept when let go.
+func _shape_slider(key: String, own: Array, index: int, named: String, low: float, high: float) -> void:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override(&"separation", 8)
+	_list.add_child(row)
+	var name := _label(named, 15, Color(1, 1, 1, 0.7))
+	name.custom_minimum_size.x = 92
+	row.add_child(name)
+	var slider := HSlider.new()
+	slider.min_value = low
+	slider.max_value = high
+	slider.step = 0.01
+	slider.custom_minimum_size = Vector2(120, 32)
+	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	slider.focus_mode = Control.FOCUS_NONE
+	slider.value = float((look.get(key, own) as Array)[index])
+	row.add_child(slider)
+	slider.value_changed.connect(func(value: float) -> void:
+		var now: Array = (look.get(key, own) as Array).duplicate()
+		now[index] = value
+		look[key] = now
+		_changed(true))
+	slider.drag_ended.connect(func(_moved: bool) -> void: _keep())
+
+
+func _changed(light := false) -> void:
 	_rig.look = look.duplicate(true)
-	_rig.restyle()
+	if light:
+		FurLook.paint(_rig)
+		_pending = true
+	else:
+		_rig.restyle()
+		_keep()
+
+
+func _keep() -> void:
+	_pending = false
 	if kind == "cat":
 		FurLook.set_cat(cat_index, look)
 		_cats_changed[cat_index] = true
@@ -409,6 +465,8 @@ func _cat_count() -> int:
 
 
 func _done() -> void:
+	if _pending:
+		_keep()
 	if world:
 		_wear_in(world)
 	if embedded:

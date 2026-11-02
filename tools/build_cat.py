@@ -252,6 +252,14 @@ def paint_markings(name):
             continue
         mesh = obj.data
         layer = mesh.color_attributes.new("Markings", "FLOAT_COLOR", "CORNER")
+        # (its colour is all markings: a spike's side across it, for the hair textures, goes in the plain UV's x)
+        spike = mesh.uv_layers.get(racc.SPIKE)
+        plain = mesh.uv_layers.get(kit.PLAIN)
+        if spike and plain:
+            for index in range(len(mesh.loops)):
+                plain.data[index].uv = (spike.data[index].uv.y, 0.0)
+        if spike:
+            mesh.uv_layers.remove(spike)
         tags = mesh.uv_layers.get(kit.METRES)
         clean = {k for k, m in enumerate(mesh.materials) if m and m.name.split(".")[0] in ("eye", "pupil", "pink")}
         for poly in mesh.polygons:

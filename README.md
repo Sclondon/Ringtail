@@ -14,6 +14,7 @@ Banjo-style painted textures. Desktop first. Local repo only for now.
 | Duck: **duck-walk on all fours**, crawl under low things; at a full run, **slide** | C / Ctrl | X | ⤓ |
 | **Long jump** (Mario 64): sliding (or ducking at a run), jump | duck, then Space | X, then A | ⤓ then ⤒ |
 | Tail: a **spin** (crouch, wind up, whip round), hitting all round him; **in the air, a second jump** | E / K | B | spiral |
+| **Pause**: go on, or **Fur & looks**, the model editor (his and each cat's fur type, Gloaming's hair textures, marks, markings, fur and mane length/angle/density, tail length/thickness, colours) | Esc / P | Start | ⏸ top right |
 
 Also: leap on all fours when jumping from a bound; a big leap out of water; **wires to walk along and bounce on**
 (jump at the bottom of a bounce to go higher); everything GameCommon's character controller does (ledge catching,

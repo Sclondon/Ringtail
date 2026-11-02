@@ -16,12 +16,28 @@ const TYPES := ["spiky", "soft", "shaggy", "sleek", "wiry", "cones"]
 const CAT_TYPES := ["spiky", "sleek", "shaggy", "soft"]
 ## What is drawn on the fur.
 const MARKS := ["plain", "frosted", "dark_tips", "streaked", "stippled"]
+## What each spike is made of: Gloaming's hair textures (its LockHair.TEXTURES; the user, 2026-11-02: "why aren't
+## there the different textures from Gloaming?"): solid as drawn, or fine strands, straight, wavy, curly, soft, thick.
+const TEXTURES := ["solid", "straight", "wavy", "curly", "soft", "thick"]
+## The fur's shape, live (the user: "I should be able to control the angle of the fur and how dense, and the ring mane
+## as well", "and the fur length"): [length, angle, density] for the body's, [length, angle, density (count), width]
+## for the mane; and the tail's [length, thickness] ("I should be able to control tail length and thickness as well").
+const BODY_SHAPE := [1.0, 0.0, 1.0]
+const MANE_SHAPE := [1.0, 0.0, 1.0, 1.0]
+const TAIL_SHAPE := [1.0, 1.0]
+## The bone each fur region (tools/build_raccoon.py REGION) grows on, and the way its fur lies back (at rest).
+const REGION_BONES := [&"hips", &"chest", &"upper_arm_l", &"forearm_l", &"upper_arm_r", &"forearm_r", &"thigh_l",
+	&"shin_l", &"thigh_r", &"shin_r", &"tail_0", &"tail_1", &"tail_2", &"tail_3", &"tail_4", &"tail_5", &"head"]
+const REGION_AXES := [Vector3.DOWN, Vector3.DOWN, Vector3.RIGHT, Vector3.RIGHT, Vector3.LEFT, Vector3.LEFT,
+	Vector3.DOWN, Vector3.DOWN, Vector3.DOWN, Vector3.DOWN, Vector3.FORWARD, Vector3.FORWARD, Vector3.FORWARD,
+	Vector3.FORWARD, Vector3.FORWARD, Vector3.FORWARD, Vector3.FORWARD]
 ## A cat's markings (drawn from what tools/build_cat.py bakes into its vertex colours).
 const PATTERNS := ["none", "tabby", "tuxedo", "calico", "bicolour", "tabby_white"]
 const NAMES := {"spiky": "Spiky", "soft": "Soft", "shaggy": "Shaggy", "sleek": "Sleek", "wiry": "Wiry",
 	"cones": "Tail cones", "plain": "Plain", "frosted": "Frosted tips", "dark_tips": "Dark tips",
 	"streaked": "Streaked", "stippled": "Stippled", "none": "Solid", "tabby": "Tabby", "tuxedo": "Tuxedo",
-	"calico": "Calico", "bicolour": "Patches", "tabby_white": "Tabby & white"}
+	"calico": "Calico", "bicolour": "Patches", "tabby_white": "Tabby & white", "solid": "Solid", "straight": "Straight",
+	"wavy": "Wavy", "curly": "Curly", "thick": "Thick"}
 ## The colours the editor offers, by material name, for each kind.
 const COLOURS := {
 	"raccoon": [["fur", "Fur"], ["light", "Light"], ["limb", "Legs"], ["tan", "Tail bands"], ["ring", "Tail rings"]],
@@ -59,13 +75,87 @@ static func kind_of(rig: Node) -> String:
 	return "cat" if rig is CatRig else "raccoon"
 
 
-## The fur shader's code: `code` (Toon's, with RaccoonRig's springing fur) drawing the marks and markings too.
+## The fur shader's code: `code` (Toon's, with RaccoonRig's springing fur) shaping the spikes live (their length,
+## angle, density and width at the root, the mane apart), drawing the marks, a cat's markings and Gloaming's hair
+## textures too.
 static func patterned(code: String) -> String:
 	code = code.replace("uniform vec3 lags[17];", "uniform vec3 lags[17];\n" + _UNIFORMS)
+	code = code.replace(_SPRUNG, _SHAPED)
 	return code.replace(
 			"ALBEDO = albedo * (1.0 - stripe * line) * mix(vec3(1.0), COLOR.rgb * GRIT_SCALE, COLOR.a);",
-			"ALBEDO = fur_marked(fur_pattern(albedo, COLOR), UV2) * (1.0 - stripe * line) * fur_grit(COLOR);").replace(
+			"ALBEDO = fur_marked(fur_pattern(albedo, COLOR), UV2) * (1.0 - stripe * line) * fur_grit(COLOR);\n" + _STRANDED).replace(
 			"void fragment() {", _FUNCTIONS + "\nvoid fragment() {")
+
+
+## RaccoonRig's vertex stage (FUR_VERTEX), as patterned() takes it out.
+const _SPRUNG := """void vertex() {
+	if (UV2.y > 1.0005) {
+		float flex = UV2.y - 1.001;
+		int region = clamp(int(UV2.x + 0.5), 0, 16);
+		VERTEX += lags[region] * flex * flex;
+	}
+}"""
+
+## ...and what it puts in: the spring as before, after each spike is shaped (tools/build_raccoon.py tag_spikes: its
+## group in UV2.x's tenths; its offset from its root in UV x, y and the colour's green; its rank, or which side of it
+## the point is, in blue). `turns` turns a rest offset as its region's bone has turned.
+const _SHAPED := """varying float fur_along;
+varying float fur_across;
+varying float fur_seed;
+void vertex() {
+	fur_along = -1.0;
+	fur_across = 0.5;
+	fur_seed = 0.0;
+	if (UV2.y > 1.0005) {
+		float flex = UV2.y - 1.001;
+		int region = clamp(int(UV2.x + 0.5), 0, 16);
+		int group = int(round(fract(UV2.x) * 10.0));
+		fur_along = flex;
+		// (across a spike: a tip is in the middle; the points either side of it, and its roots, are one side or the other)
+		fur_across = flex > 0.99 ? 0.5 : (masked ? UV.x : COLOR.b);
+		fur_seed = float(region) * 7.0 + float(group);
+		if (shaped && group <= 2) {
+			vec4 fur = group == 1 ? mane_fur : body_fur;
+			if (distance(fur, vec4(1.0, 0.0, 1.0, 1.0)) > 0.0001) {
+				mat3 turn = turns[region];
+				// (glTF flips V: the y offset comes as 1 - y)
+				vec3 now = turn * vec3(UV.x, 1.0 - UV.y, (COLOR.g - 0.5) * 0.5);
+				vec3 root = VERTEX - now;
+				vec3 off = now * fur.w;
+				if (flex > 0.0) {
+					float len = length(now) * fur.x;
+					vec3 dir = len > 0.0001 ? normalize(now) : vec3(0.0, 1.0, 0.0);
+					if (abs(fur.y) > 0.0001) {
+						vec3 axis = normalize(turn * axes[region]);
+						float c = dot(dir, axis);
+						vec3 side = dir - axis * c;
+						float s = length(side);
+						if (s > 0.001) {
+							float c2 = clamp(c + fur.y, -0.3, 0.995);
+							dir = axis * c2 + side / s * sqrt(1.0 - c2 * c2);
+						}
+					}
+					off = flex > 0.99 && COLOR.b > fur.z ? vec3(0.0) : dir * len;
+				}
+				VERTEX = root + off;
+			}
+		}
+		VERTEX += lags[region] * flex * flex;
+	}
+}"""
+
+## Gloaming's hair textures on the fur (its hair_locks shader's strands, as a game's hair cards are): fine strands down
+## each spike, see-through between them, each its own shade, dense at the root and thinning to the tip.
+const _STRANDED := """	if (furry && texture > 0 && fur_along >= 0.0) {
+		float shade;
+		float strand_edge;
+		float cover = fur_strands(fur_across, fur_along, fur_seed, shade, strand_edge);
+		cover = max(cover, 1.0 - smoothstep(0.0, 0.16, fur_along));
+		if (cover < 0.05 + fur_dither(FRAGCOORD.xy) * 0.6) {
+			discard;
+		}
+		ALBEDO *= (0.68 + 0.6 * shade) * strand_edge * mix(0.62, 1.08, smoothstep(0.0, 0.7, fur_along));
+	}"""
 
 
 const _UNIFORMS := """
@@ -76,6 +166,14 @@ uniform int marks = 0;
 uniform int pattern = 0;
 uniform vec3 white_colour : source_color = vec3(0.96, 0.94, 0.9);
 uniform vec3 dark_colour : source_color = vec3(0.1, 0.09, 0.1);
+// (shaping: length, angle, density, width at the root; the body's and the mane's)
+uniform bool shaped = false;
+uniform mat3 turns[17];
+uniform vec3 axes[17];
+uniform vec4 body_fur = vec4(1.0, 0.0, 1.0, 1.0);
+uniform vec4 mane_fur = vec4(1.0, 0.0, 1.0, 1.0);
+// (Gloaming's hair textures: TEXTURES)
+uniform int texture = 0;
 """
 
 const _FUNCTIONS := """
@@ -84,8 +182,38 @@ float fur_flex(vec2 uv2) { return uv2.y > 1.0005 ? uv2.y - 1.001 : -1.0; }
 float fur_hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 vec3 fur_grit(vec4 tint) {
 	// (a cat's vertex colours hold its markings, its grit in red only)
+	// (his, its red only: green and blue shape the spikes)
 	if (masked) { return vec3(tint.r * GRIT_SCALE); }
-	return mix(vec3(1.0), tint.rgb * GRIT_SCALE, tint.a);
+	return mix(vec3(1.0), vec3(tint.r) * GRIT_SCALE, tint.a);
+}
+float fur_dither(vec2 at) {
+	return fract(52.9829189 * fract(dot(at, vec2(0.06711056, 0.00583715))));
+}
+// (Gloaming's strands(): how much of this point is hair, the strand's own shade and its edge's darkening)
+float fur_strands(float across01, float along, float seed, out float shade, out float strand_edge) {
+	float n = texture == 5 ? 4.0 : (texture == 4 ? 7.0 : (texture == 3 ? 9.0 : 13.0));
+	float q0 = across01 * n;
+	float h = fur_hash(vec2(floor(q0), seed * 31.0));
+	float run = along * 12.0;
+	float q = q0;
+	if (texture == 2) {
+		q += sin(run * 1.2 + seed * 6.28) * 2.4 + sin(run * 3.1 + h * 6.28) * 0.15;
+	} else if (texture == 3) {
+		q += sin(run * 4.2 + h * 6.28) * 1.1 + sin(run * 9.5 + h * 3.0) * 0.3;
+	} else if (texture == 4) {
+		q += sin(run * 0.9 + h * 6.28) * 0.35;
+	}
+	float own = fur_hash(vec2(floor(q), seed * 31.0 + 7.0));
+	shade = own;
+	float d = abs(fract(q) - 0.5) * 2.0;
+	float thick = texture == 5 ? 0.78 : (texture == 4 ? 1.0 : 0.66);
+	float hair = 1.0 - smoothstep(thick - 0.06, thick + 0.06, d);
+	strand_edge = mix(1.0, texture == 4 ? 0.85 : 0.55, smoothstep(0.15, thick, d));
+	if (texture == 4) {
+		hair = (1.0 - smoothstep(0.0, 1.0, d)) * 0.92;
+	}
+	float ends = 1.0 - smoothstep(0.7 + 0.28 * own - 0.04, 0.7 + 0.28 * own, along);
+	return hair * ends;
 }
 vec3 fur_pattern(vec3 base, vec4 tint) {
 	if (!furry || !masked || pattern == 0) { return base; }
@@ -158,6 +286,10 @@ static func paint(rig: RaccoonRig) -> void:
 	var look: Dictionary = rig.look
 	var colours: Dictionary = look.get("colours", {})
 	var masked := kind_of(rig) == "cat"
+	var shapes := _shapes(rig)
+	var body: Array = shapes[0]
+	var mane: Array = shapes[1]
+	var shaped: bool = shapes[2]
 	for part: MeshInstance3D in rig._figure.find_children("*", "MeshInstance3D", true, false):
 		if part.mesh == null:
 			continue
@@ -173,6 +305,44 @@ static func paint(rig: RaccoonRig) -> void:
 			material.set_shader_parameter(&"pattern", maxi(PATTERNS.find(look.get("pattern", "none")), 0))
 			material.set_shader_parameter(&"white_colour", colours.get("light", Color(0.96, 0.94, 0.9)))
 			material.set_shader_parameter(&"dark_colour", colours.get("stripe", Color(0.42, 0.18, 0.07)))
+			material.set_shader_parameter(&"texture", maxi(TEXTURES.find(look.get("texture", "solid")), 0))
+			material.set_shader_parameter(&"shaped", shaped)
+			material.set_shader_parameter(&"body_fur", Vector4(body[0], body[1], body[2], 1.0))
+			material.set_shader_parameter(&"mane_fur", Vector4(mane[0], mane[1], mane[2], mane[3]))
+			material.set_shader_parameter(&"axes", PackedVector3Array(REGION_AXES))
+	rig.set_meta(&"shaped", shaped)
+	if shaped:
+		shape(rig)
+	var tail: Array = look.get("tail", TAIL_SHAPE)
+	rig.tail_length = float(tail[0])
+	rig.tail_thickness = float(tail[1])
+
+
+## The fur's shape from the look: the body's and the mane's (their defaults where it has none), and whether it is
+## shaped at all (only his models carry what it takes: a cat's colours are its markings).
+static func _shapes(rig: RaccoonRig) -> Array:
+	var look: Dictionary = rig.look
+	var body: Array = look.get("body", BODY_SHAPE)
+	var mane: Array = look.get("mane", MANE_SHAPE)
+	var shaped := kind_of(rig) == "raccoon" and (body != BODY_SHAPE or mane != MANE_SHAPE)
+	return [body, mane, shaped]
+
+
+## Each frame, while the fur is shaped: how each region's bone has turned from rest, for the shader to lay the
+## spikes' rest offsets by.
+static func shape(rig: RaccoonRig) -> void:
+	if not rig.get_meta(&"shaped", false) or rig._skeleton == null:
+		return
+	var skeleton: Skeleton3D = rig._skeleton
+	var turns := []
+	for bone: StringName in REGION_BONES:
+		var index := skeleton.find_bone(bone)
+		var turn := Basis.IDENTITY
+		if index >= 0:
+			turn = (skeleton.get_bone_global_pose(index) * skeleton.get_bone_global_rest(index).affine_inverse()).basis
+		turns.append(turn)
+	for material in rig._fur_materials:
+		material.set_shader_parameter(&"turns", turns)
 
 
 # --- Kept looks ---

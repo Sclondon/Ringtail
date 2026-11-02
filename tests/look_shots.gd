@@ -1,11 +1,15 @@
 extends SceneTree
 ## Pictures of the looks: the town's cats in a row (FurLook.CAT_LOOKS) from four sides, his fur types in a row, and
 ## (in World 1) the pause screen and the model editor over it. Needs a window (kept off the screen):
-##   godot --path . --audio-driver Dummy --fixed-fps 60 --resolution 1280x720 -s res://tests/look_shots.gd -- --out=<dir> [cats] [furs] [menus]
+##   godot --path . --audio-driver Dummy --fixed-fps 60 --resolution 1280x720 -s res://tests/look_shots.gd -- --out=<dir> [cats] [furs] [shapes] [menus]
 ## (menus also at --resolution 390x844 for a phone)
 
 var out := "user://look_shots"
 var only: Array[String] = []
+## The "shapes" row: his own, then the fur laid back, stood out, thinned, long, a big wide mane, a long thick tail,
+## and Gloaming's wavy and curly textures.
+const SHAPES := [{}, {"body": [1.0, 0.7, 1.0]}, {"body": [1.0, -0.7, 1.0]}, {"body": [1.0, 0.0, 0.35]},
+	{"body": [1.9, 0.0, 1.0]}, {"mane": [2.2, -0.3, 1.0, 2.2]}, {"tail": [1.6, 1.8]}, {"texture": "wavy"}, {"texture": "curly", "fur": "shaggy"}]
 
 
 func _initialize() -> void:
@@ -35,6 +39,8 @@ func _run() -> void:
 		await _row("cats")
 	if only.is_empty() or "furs" in only:
 		await _row("furs")
+	if only.is_empty() or "shapes" in only:
+		await _row("shapes")
 	if only.is_empty() or "menus" in only:
 		await _menus()
 	print("LOOK SHOTS DONE ", out)
@@ -57,7 +63,7 @@ func _row(what: String) -> void:
 	sun.rotation_degrees = Vector3(-45.0, 30.0, 0.0)
 	sun.shadow_enabled = true
 	stage.add_child(sun)
-	var count := FurLook.CAT_LOOKS.size() if what == "cats" else FurLook.TYPES.size()
+	var count := FurLook.CAT_LOOKS.size() if what == "cats" else (SHAPES.size() if what == "shapes" else FurLook.TYPES.size())
 	var gap := 0.9 if what == "cats" else 1.1
 	for k in count:
 		var stand := FurEditor.Stand.new()
@@ -73,7 +79,7 @@ func _row(what: String) -> void:
 			rig.model = load("res://models/raccoon.glb")
 			rig.key_poses = false
 			rig.cap_hand = false
-			rig.look = {"fur": FurLook.TYPES[k]}
+			rig.look = SHAPES[k].duplicate(true) if what == "shapes" else {"fur": FurLook.TYPES[k]}
 		rig.dusty = false
 		stand.add_child(rig)
 		stand.position = Vector3((k - (count - 1) * 0.5) * gap, 0.0, 0.0)
@@ -116,6 +122,8 @@ func _menus() -> void:
 	editor._choose("raccoon", 0)
 	editor.look["fur"] = "cones"
 	editor.look["marks"] = "frosted"
+	editor.look["texture"] = "straight"
+	editor.look["mane"] = [1.6, -0.2, 0.8, 1.6]
 	editor._rig.look = editor.look.duplicate(true)
 	editor._rig.restyle()
 	editor._fill()
