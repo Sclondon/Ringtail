@@ -502,9 +502,11 @@ func _swoosh(spin: float) -> void:
 		if sweeping and _points.size() > TAIL_BONES:
 			var tip := _points[TAIL_BONES]
 			var from: Vector3 = _trail_tip if _trail_tip != Vector3.INF else tip
-			for k in 2:
-				var at := from.lerp(tip, (k + 1) * 0.5)
-				dust.puff(at - Vector3.UP * 0.04, (at - _points[2]).normalized() * 0.3 + Vector3.UP * 0.1, 0.075)
+			# (one small puff a frame where its end passes, thrown on out a little; none rising: they stacked into a
+			# column over the tail, the user: "the tail spin is broken now")
+			if tip.distance_to(from) > 0.04:
+				var out := Vector3(tip.x - _points[0].x, 0.0, tip.z - _points[0].z).normalized()
+				dust.puff(tip - Vector3.UP * 0.03, out * 0.4, 0.05)
 			_trail_tip = tip
 		else:
 			_trail_tip = Vector3.INF
@@ -777,8 +779,8 @@ func _pose_sneak(w: float, speed: float) -> void:
 ## slightly hunched as well"); standing still he rubs his paws together before his chest ("his idle should be
 ## slightly hunched and rubbing his hands together"). `still` is how still he is (1 standing).
 func _pose_hunch(w: float, still: float) -> void:
-	_hips.basis = _slerp(_hips.basis, Basis(Vector3.RIGHT, 0.1) * _hips.basis, w)
-	_spine.basis = _slerp(_spine.basis, Basis(Vector3.RIGHT, 0.2 + 0.08 * still) * _spine.basis, w)
+	# (from the waist up: the hips and legs stay as they are, the feet planted)
+	_spine.basis = _slerp(_spine.basis, Basis(Vector3.RIGHT, 0.26 + 0.08 * still) * _spine.basis, w)
 	if _chest:
 		_chest.basis = _slerp(_chest.basis, Basis(Vector3.RIGHT, 0.1 + 0.06 * still) * _chest.basis, w)
 	# (his head kept looking ahead, not at the ground)
@@ -793,8 +795,8 @@ func _pose_hunch(w: float, still: float) -> void:
 	for i in 2:
 		var side := 1.0 if i == 0 else -1.0
 		var shoulder := to_local(_shoulders[i].global_position)
-		var round := Vector3(cos(turn + PI * i) * 0.018, sin(turn + PI * i) * 0.014, 0.0)
-		var paw := Vector3(side * 0.028, shoulder.y - 0.11, shoulder.z + 0.15) + round
+		var circling := Vector3(cos(turn + PI * i) * 0.018, sin(turn + PI * i) * 0.014, 0.0)
+		var paw := Vector3(side * 0.028, shoulder.y - 0.11, shoulder.z + 0.15) + circling
 		_solve_arm(i, side, to_global(paw), _forearm, rub)
 		_lay_hand(i, side, forward, (forward * 0.6 + Vector3.UP * 0.5 - global_basis.x.normalized() * side * 0.6).normalized(), rub * 0.8)
 
@@ -827,7 +829,9 @@ func _pose_glide(w: float) -> void:
 	# rump is the top of him and the rest hangs below it, swaying, arms and legs dangling.
 	var pivot := _hips.transform * _tail[0].position if not _tail.is_empty() else _hips.position
 	var sway := sin(_time * 4.2) * 0.08
-	var hang := Basis(Vector3.RIGHT, (1.15 + sway) * w) * Basis(Vector3.BACK, sin(_time * 3.1) * 0.08 * w)
+	# (hanging well down, head and body: the user, 2026-11-02, "his head doesnt hang low enough when helicoptering",
+	# "head and body")
+	var hang := Basis(Vector3.RIGHT, (1.75 + sway) * w) * Basis(Vector3.BACK, sin(_time * 3.1) * 0.08 * w)
 	_hips.transform = Transform3D(hang, pivot) * Transform3D(Basis.IDENTITY, -pivot) * _hips.transform
 	var hips_inverse := _hips.transform.affine_inverse()
 	for i in 2:

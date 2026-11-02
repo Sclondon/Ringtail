@@ -86,11 +86,14 @@ func _ready() -> void:
 	_place_things()
 	# The town's hazards (birds, the fox, people, cars), and his band of raccoons
 	Hazards.place(self, markers, player)
+	# (the owl: on a pole far from the grove, swooping at him; a placeholder role, Claude's pick)
+	HazardOwl.place(self, markers, player)
 	# Daughter Of The Wind's clouds round the sky (GameCommon puff-clouds; the user: "the clouds should be like
 	# daughter of the wind")
 	PuffClouds.add_to(self, _sun)
 	Squad.place(self, player)
 	Villagers.place(self, markers, player)
+	_grow_lawn()
 	add_child(N64Filter.new())
 	hud = Hud.new()
 	hud.world = self
@@ -371,3 +374,12 @@ func _on_respawned() -> void:
 		# (a fall out of the world)
 		hearts = maxi(hearts - 1, 1)
 	hearts_changed.emit(hearts)
+
+
+## Gloaming's grass on the lawns, and the skunks, badgers and rabbits out on them (TownGrass, Wildlife). Once the
+## physics has the world's bodies in it: the grass asks it what lies over the ground.
+func _grow_lawn() -> void:
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	var lawn := TownGrass.place(self, player)
+	Wildlife.place(self, lawn, player)

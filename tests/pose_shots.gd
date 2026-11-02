@@ -109,7 +109,10 @@ func _do(move: String) -> void:
 		"glide":
 			_press(&"jump")
 			player._queue_jump()
-			await _frames(45)
+			# (pressed again in the air: the twirl)
+			await _frames(15)
+			player._queue_jump()
+			await _frames(30)
 		"spin":
 			_press(&"tail")
 			await _frames(9)
@@ -122,7 +125,9 @@ func _do(move: String) -> void:
 		"heli":
 			_press(&"jump")
 			player._queue_jump()
-			await _frames(40)
+			await _frames(15)
+			player._queue_jump()
+			await _frames(25)
 			await _filmstrip(move, 2)
 			_release()
 			return
