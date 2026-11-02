@@ -601,7 +601,7 @@ Read README.md first. Started 2026-11-01.
   give the colours: dawn, the summer midday the town was built in, golden evening, a blue moonlit night. It sets the
   world's sun (the moon by night), ambient, fog, the far hills' `sky_` materials, the puff clouds' light, and lights
   the windows: the far town's "window" material, and the houses' "glass" in about two houses in three (a lit copy,
-  warm by night). Lamps on the poles at night (one emissive head per pole, under its lowest wire; 4 real OmniLights
+  warm by night). Lamps on the poles at night (one emissive head per pole, under its lowest wire; the real lights
   moved to the ones nearest him), fireflies over the grove. The HUD dial (top right, under the pause button): the sun
   or a crescent moon over a day/night disc turning with the hour. No shrine lanterns exist to light (removed earlier).
 - Danger is one value, `DayNight.current.danger` (1 by day, 0 at night, between at dawn and dusk; `night` is the
@@ -616,6 +616,13 @@ Read README.md first. Started 2026-11-01.
 - Checks: `tests/day_night_test.gd` (headless: the clock runs; noon, midnight, dawn and dusk values; windows, lamps,
   fireflies), `tests/day_night_shots.gd -- --out=<dir>` (dawn, noon, evening, night from the grove, the ring road and
   facing a house).
+- Street lights (the user, 2026-11-02: "there needs to be street lights"; the town work models them): DayNight
+  `find_street_lamps()` takes every `streetlamp_<n>` marker (under a lens) and every surface of material `streetlamp`.
+  At night the heads glow sodium orange (SODIUM), a pool of light (shaders/light_pool.gdshader, one MultiMesh of
+  additive discs laid on the ground by raycast, POOL_RADIUS 3.4 m) lies under each, and the LIT_LAMPS 5 real lights
+  (SpotLights shining down, 9 m, shared with the pole lamps) go to whichever lamps are nearest him. None found: none
+  made. Not in ZoneStreaming (lights and the MultiMesh are not kept by it). `tests/street_light_test.gd` (headless; it
+  makes three lamps up if the town has none; `-- --out=<dir>` in a window takes a night picture).
 
 ## The town's people brought low (2026-11-02)
 

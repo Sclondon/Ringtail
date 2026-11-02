@@ -43,7 +43,7 @@ func _run(world: World) -> void:
 	_check(day.night > 0.95 and day.danger < 0.05, "midnight: night (%.2f), safe (%.2f)" % [day.night, day.danger])
 	_check(sun.light_energy > 0.25 and sun.light_energy < noon_energy * 0.6, "moonlight: dimmer (%.2f) but not black" % sun.light_energy)
 	_check(not day._windows.is_empty() and night_window > noon_window + 0.4 and day.lit_houses > 5, "windows lit at night (%.2f -> %.2f, %d houses)" % [noon_window, night_window, day.lit_houses])
-	_check(day._lamp_glow != null and day._lamp_glow.visible and day._lamps.any(func(l: OmniLight3D) -> bool: return l.visible), "lamps on (%d along the poles)" % day._lamp_spots.size())
+	_check(day._lamp_glow != null and day._lamp_glow.visible and day._lamps.any(func(l: Light3D) -> bool: return l.visible), "lamps on (%d along the poles)" % day._lamp_spots.size())
 	_check(day._flies == null or day._flies.emitting, "fireflies in the grove")
 	_check(DayNight.is_night() and DayNight.by_day(1.8, 0.0) < 0.05, "at night the owl hunts, the hawk does not")
 	day.set_hour(6.5)

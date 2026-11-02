@@ -29,9 +29,16 @@ const KEYS := [
 	[19.0, Color(0.03, 0.06, 0.16), Color(0.12, 0.17, 0.32), Color(0.62, 0.72, 1.0), 0.32, Color(0.28, 0.36, 0.64), 0.8, Color(0.34, 0.4, 0.62)],
 	[24.0, Color(0.03, 0.06, 0.16), Color(0.12, 0.17, 0.32), Color(0.62, 0.72, 1.0), 0.32, Color(0.28, 0.36, 0.64), 0.8, Color(0.34, 0.4, 0.62)],
 ]
-## Lamps along the poles that really light (the nearest to him; the rest only glow), and how far each reaches.
-const LIT_LAMPS := 4
-const LAMP_REACH := 7.0
+## Lamps (on the poles, and the street lights) that really light, shining down: the nearest to him; the rest only
+## glow, the street lights with a pool on the ground. How far each reaches.
+const LIT_LAMPS := 5
+const LAMP_REACH := 9.0
+const POLE_LAMP := Color(1.0, 0.82, 0.55)
+## The street lights' sodium orange, and their pools: how wide (m round) and how bright.
+const SODIUM := Color(1.0, 0.64, 0.28)
+const POOL_RADIUS := 3.4
+const POOL_STRENGTH := 0.42
+const POOL_SHADER := preload("res://shaders/light_pool.gdshader")
 
 ## The day now, for anything that asks (null: there is no day going round, as in a test yard).
 static var current: DayNight
@@ -58,7 +65,13 @@ var _lit_glass: ShaderMaterial
 var lit_houses := 0
 var _lamp_spots := PackedVector3Array()
 var _lamp_glow: GeometryInstance3D
-var _lamps: Array[OmniLight3D] = []
+var _lamps: Array[Light3D] = []
+## The street lights: each lens (its `streetlamp_<n>` marker), the heads' materials and their own colours, the pools.
+var _street_spots := PackedVector3Array()
+var _street_heads: Array[Material] = []
+var _street_head_colour: Array[Color] = []
+var _pools: MultiMeshInstance3D
+var _pools_wait := -1
 var _lamp_look := 0.0
 var _flies: CPUParticles3D
 var _dial: DayDial
@@ -107,6 +120,10 @@ func _process(delta: float) -> void:
 	if not held:
 		hour = fposmod(hour + delta * 24.0 / DAY_SECONDS, 24.0)
 	_apply()
+	if _pools_wait >= 0:
+		_pools_wait -= 1
+		if _pools_wait < 0:
+			_make_pools()
 	_lamp_look -= delta
 	if _lamp_look <= 0.0:
 		_lamp_look = 0.5
@@ -127,6 +144,7 @@ func _take_over() -> void:
 	_sky.set_shader_parameter(&"ground", Color(0.36, 0.5, 0.4))
 	if _environment:
 		_environment.sky.sky_material = _sky
+	find_street_lamps()
 	var seen := {}
 	for mesh: MeshInstance3D in world.find_children("*", "MeshInstance3D", true, false):
 		if mesh.mesh == null:
@@ -134,6 +152,8 @@ func _take_over() -> void:
 		for k in mesh.mesh.get_surface_count():
 			var material := mesh.get_surface_override_material(k)
 			var original := mesh.mesh.surface_get_material(k)
+			if material in _street_heads:
+				continue
 			if material is ShaderMaterial and original != null and original.resource_name == "glass" and hash(String(mesh.name)) % 3 != 0:
 				if _lit_glass == null:
 					_lit_glass = material.duplicate()
@@ -220,6 +240,19 @@ func _apply() -> void:
 		_windows[k].set_shader_parameter(&"emission", lerpf(_window_glow[k], 1.4, night))
 	if _lamp_glow:
 		_lamp_glow.visible = night > 0.35
+	# (the street lights' heads, sodium orange by night, and the pools of light under them)
+	for k in _street_heads.size():
+		var head := _street_heads[k]
+		if head is ShaderMaterial:
+			head.set_shader_parameter(&"albedo", _street_head_colour[k].lerp(SODIUM.lightened(0.35), night))
+			head.set_shader_parameter(&"emission", 2.0 * night)
+		elif head is BaseMaterial3D:
+			(head as BaseMaterial3D).emission_enabled = night > 0.0
+			(head as BaseMaterial3D).emission = SODIUM
+			(head as BaseMaterial3D).emission_energy_multiplier = 2.0 * night
+	if _pools:
+		_pools.visible = night > 0.35
+		(_pools.multimesh.mesh.surface_get_material(0) as ShaderMaterial).set_shader_parameter(&"strength", POOL_STRENGTH * night)
 	if _flies:
 		_flies.emitting = night > 0.6
 
@@ -263,28 +296,105 @@ func _make_lamps() -> void:
 	heads.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	world.add_child(heads)
 	_lamp_glow = heads
+
+
+## The few real lights, shining down from whichever lamps (on the poles, or the street lights) are nearest him.
+func _make_lights() -> void:
 	for n in LIT_LAMPS:
-		var lamp := OmniLight3D.new()
-		lamp.light_color = Color(1.0, 0.82, 0.55)
-		lamp.light_energy = 1.4
-		lamp.omni_range = LAMP_REACH
+		var lamp := SpotLight3D.new()
+		lamp.spot_range = LAMP_REACH
+		lamp.spot_angle = 62.0
+		lamp.spot_attenuation = 0.8
+		lamp.light_energy = 3.0
+		lamp.rotation_degrees = Vector3(-90.0, 0.0, 0.0)
 		lamp.visible = false
 		world.add_child(lamp)
 		_lamps.append(lamp)
 
 
-## The lamps nearest him really light (at night).
+## The lamps nearest him really light (at night): the street lights sodium orange, the pole lamps warm.
 func _light_nearest_lamps() -> void:
 	if _lamps.is_empty() or world.player == null:
 		return
 	var him := world.player.global_position
-	var order := Array(_lamp_spots)
-	order.sort_custom(func(p: Vector3, q: Vector3) -> bool: return p.distance_squared_to(him) < q.distance_squared_to(him))
+	var order := []
+	for at in _lamp_spots:
+		order.append([at, POLE_LAMP])
+	for at in _street_spots:
+		order.append([at, SODIUM])
+	order.sort_custom(func(p: Array, q: Array) -> bool: return (p[0] as Vector3).distance_squared_to(him) < (q[0] as Vector3).distance_squared_to(him))
 	for n in _lamps.size():
 		var on := night > 0.35 and n < order.size()
 		_lamps[n].visible = on
 		if on:
-			_lamps[n].global_position = order[n] + Vector3.DOWN * 0.2
+			_lamps[n].global_position = (order[n][0] as Vector3) + Vector3.DOWN * 0.2
+			_lamps[n].light_color = order[n][1]
+
+
+## Street lights (the user, 2026-11-02: "there needs to be street lights"): the town's lamp heads (material
+## `streetlamp`) glow sodium orange at night, a soft pool of light lies on the ground under each `streetlamp_<n>`
+## marker (set under its lens), and the few nearest him throw real light down (the pole lamps' lights). With no
+## markers or heads in the world there are none. Called again after the world gains some (the tests' yard).
+func find_street_lamps() -> void:
+	_street_spots.clear()
+	for name: String in world.markers:
+		if name.begins_with("streetlamp_"):
+			_street_spots.append((world.markers[name] as Transform3D).origin)
+	_street_heads.clear()
+	_street_head_colour.clear()
+	for mesh: MeshInstance3D in world.find_children("*", "MeshInstance3D", true, false):
+		if mesh.mesh == null:
+			continue
+		for k in mesh.mesh.get_surface_count():
+			var original := mesh.mesh.surface_get_material(k)
+			if original == null or not original.resource_name.begins_with("streetlamp"):
+				continue
+			var material := mesh.get_surface_override_material(k)
+			if material == null:
+				material = original
+			if material in _street_heads:
+				continue
+			_street_heads.append(material)
+			var colour: Variant = material.get_shader_parameter(&"albedo") if material is ShaderMaterial \
+					else (material as BaseMaterial3D).albedo_color if material is BaseMaterial3D else null
+			_street_head_colour.append(colour if colour is Color else Color.WHITE)
+	if _pools:
+		_pools.queue_free()
+		_pools = null
+	# (the pools are laid once the physics has the ground: a few frames on)
+	_pools_wait = 3 if not _street_spots.is_empty() else -1
+	if _lamps.is_empty():
+		_make_lights()
+
+
+## A pool of light on the ground under each street light: a disc added over what is there, faded to its edge.
+func _make_pools() -> void:
+	var space := world.get_world_3d().direct_space_state
+	var disc := PlaneMesh.new()
+	disc.size = Vector2(2.0, 2.0)
+	var glow := ShaderMaterial.new()
+	glow.shader = POOL_SHADER
+	disc.material = glow
+	var many := MultiMesh.new()
+	many.transform_format = MultiMesh.TRANSFORM_3D
+	many.mesh = disc
+	many.instance_count = _street_spots.size()
+	var skip := [] if world.player == null else [world.player.get_rid()]
+	for n in _street_spots.size():
+		var at := _street_spots[n]
+		var hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(at + Vector3.DOWN * 0.3, at + Vector3.DOWN * 15.0, 1, skip))
+		var ground: Vector3 = hit.position if not hit.is_empty() else at + Vector3.DOWN * 6.0
+		var up: Vector3 = hit.normal if not hit.is_empty() else Vector3.UP
+		var across := up.cross(Vector3.FORWARD if absf(up.z) < 0.9 else Vector3.RIGHT).normalized()
+		var basis := Basis(across, up, across.cross(up)).scaled(Vector3.ONE * POOL_RADIUS)
+		many.set_instance_transform(n, Transform3D(basis, ground + up * 0.04))
+	_pools = MultiMeshInstance3D.new()
+	_pools.name = "StreetLightPools"
+	_pools.multimesh = many
+	_pools.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_pools.visible = night > 0.35
+	glow.set_shader_parameter(&"strength", POOL_STRENGTH * night)
+	world.add_child(_pools)
 
 
 ## Fewer about at night (the user, 2026-11-02, "day is more dangerous, more cars ... and more people"): by day every
