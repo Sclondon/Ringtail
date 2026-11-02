@@ -1027,7 +1027,7 @@ def look_at(folder, name):
 # (the hands as they were), the head bigger about the top of the neck. `weights` is asked about points as drawn.
 
 LEG_SCALE = 0.82
-ARM_SCALE = 0.8
+ARM_SCALE = 0.7  # (a little shorter again: the user, 2026-11-02, "his limbs are a little too long, his arms")
 HEAD_SCALE = 1.2
 HEAD_PIVOT = HEAD.y  # (as drawn)
 DROP = (HIP_Y - ANKLE_Y) * (1.0 - LEG_SCALE)

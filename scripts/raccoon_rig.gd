@@ -724,7 +724,7 @@ func _pose_quad(w: float, speed: float, stride: float) -> void:
 	# 0 stretched out.
 	var gather := 0.5 + 0.5 * cos(TAU * (_qphase - 0.93))
 	var low_flight := (_bump(_qphase, 0.3, 0.5) + 0.6 * _bump(_qphase, 0.86, 1.0)) * SCURRY_FLIGHT * _hip_height
-	var hips_y := _hip_height * lerpf(0.72, lerpf(0.77, 0.69, s), _gallop) + sin(2.0 * cycle) * 0.01 * moving * (1.0 - _gallop) \
+	var hips_y := _hip_height * lerpf(0.72, lerpf(0.77, 0.64, s), _gallop) + sin(2.0 * cycle) * 0.01 * moving * (1.0 - _gallop) \
 			+ flight * leaping + low_flight * galloping
 	# (rump up, shoulders down, as a raccoon goes: his arms are short)
 	# (bounding, his back stretches out flat in the air and rounds as his hind feet come up under him)

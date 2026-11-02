@@ -38,9 +38,17 @@ func _run(world: World) -> void:
 	for _i in 240:
 		await physics_frame
 	_check(kit.global_position.distance_to(spot) < 1.5, "a lost kit keeps to its spot (%.2f m off)" % kit.global_position.distance_to(spot))
-	player.global_position = kit.global_position + Vector3(0.6, 0.2, 0.0)
+	# (shut in a cage: going up to it is not enough; three hits of his tail break it open)
+	player.global_position = kit.global_position + Vector3(0.0, 0.2, 0.9)
 	for _i in 10:
 		await physics_frame
+	_check(kit in kits.lost and kit.has_meta(&"cage"), "caged, it is not found by going up to it")
+	var cage: Cage = kit.get_meta(&"cage")
+	for _hit in Cage.HITS:
+		cage.tail_hit(player.global_position, Vector3(0.0, 2.0, -6.0))
+	for _i in 10:
+		await physics_frame
+	_check(not is_instance_valid(cage), "three hits break the cage")
 	_check(kit in kits.following and kit.leader == player and kits.found == 0 and told.is_empty(), "found, it follows him (not home yet)")
 	# (he walks it home: it comes after him, and counts once it is in the grove)
 	player.global_position = heart + Vector3(0.0, 0.3, 0.0)

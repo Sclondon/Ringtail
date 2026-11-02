@@ -243,7 +243,7 @@ func _process(delta: float) -> void:
 ## pause screen's Pixels dial.)
 func _dev_panel(root: Control) -> void:
 	_dev = VBoxContainer.new()
-	_dev.position = Vector2(22, 150)
+	_dev.position = Vector2(22, 215)
 	root.add_child(_dev)
 	for name: String in World.CAP_NAMES:
 		var go := Button.new()

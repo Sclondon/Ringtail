@@ -1,8 +1,11 @@
 class_name LostKits
 extends Node
-## The kits lost about the hill, to find and send home (the user, 2026-11-02: "there should be [20] kits to rescue,
-## and they should end up back in the grove after you find them"). One at each `kit_<n>` marker: a kit (Villager)
-## that keeps to its spot, and says it is lost when he comes near (Chatter). Reach it and it cheers and follows him:
+## The raccoons lost about the hill, to find and lead home (the user, 2026-11-02: "there should be [20] kits to rescue,
+## and they should end up back in the grove after you find them", then "it shouldn't just be kits to rescue, adult
+## raccoons too": every `ADULT_EVERY`th is a grown-up). One at each `kit_<n>` marker: a kit or a grown-up (Villager)
+## that keeps to its spot, and says it is lost when he comes near (Chatter). Each is shut in a Cage he has to break
+## with his tail (the user, 2026-11-02, "they should be in cages you have to break like in rayman"); out, it cheers
+## and follows him:
 ## he has to lead it home (the user, 2026-11-02, "you should have to guide the kits back to the grove"). In the grove
 ## it stays, and plays with the others from then on. `changed` tells the HUD how many are home.
 ##
@@ -16,6 +19,10 @@ const REACH := 1.2
 const NAMES := ["Bean", "Socks", "Pebble", "Twig", "Mochi", "Button", "Clover", "Sprout", "Biscuit", "Fig",
 		"Pippin", "Mitten", "Acorn", "Puddle", "Noodle", "Scamp", "Thistle", "Wren", "Dumpling", "Tuft"]
 const LOST := ["I'm lost!", "I can't find the grove...", "Can you take me home?"]
+const LOST_ADULT := ["Oh! Am I glad to see you.", "I went looking for one of the little ones and got turned round.", "Lead on, I'll keep up."]
+## Every so many lost ones is a grown-up (Claude's pick).
+const ADULT_EVERY := 4
+const ADULT_NAMES := ["Old Moss", "Bramble", "Juniper", "Clem", "Rook"]
 const FOLLOWING := ["You found me!", "Take me home? I'll stay right behind you."]
 const HOME := ["Home again! Thank you!", "Let's play!"]
 ## How near the grove's heart a kit is home.
@@ -41,10 +48,23 @@ static func place(world: Node3D, markers: Dictionary, band: Villagers, hero: Pla
 	var k := 0
 	while markers.has("kit_%d" % k):
 		var at: Vector3 = (markers["kit_%d" % k] as Transform3D).origin
-		var kit := band._add(true, k + 3, at + Vector3.UP * 0.3)
+		var grown := k % ADULT_EVERY == ADULT_EVERY - 1
+		var kit := band._add(not grown, k + 3, at + Vector3.UP * 0.3)
 		kit.stays = true
 		kit.home = at
-		kit.say([NAMES[k % NAMES.size()]] + LOST)
+		# (shut in a cage, to be broken open)
+		var cage := Cage.new()
+		cage.position = at
+		cage.dust = hero.get_node_or_null(^"CloudDust") as CloudDust
+		world.add_child(cage)
+		# (it stays in the cage: the cage's walls are not in its way)
+		kit.add_collision_exception_with(cage)
+		cage.broken.connect(kits._found.bind(kit))
+		kit.set_meta(&"cage", cage)
+		if grown:
+			kit.say([ADULT_NAMES[(k / ADULT_EVERY) % ADULT_NAMES.size()]] + LOST_ADULT)
+		else:
+			kit.say([NAMES[k % NAMES.size()]] + LOST)
 		kits.lost.append(kit)
 		k += 1
 	kits.total = kits.lost.size()
@@ -57,7 +77,8 @@ func _physics_process(_delta: float) -> void:
 	for kit in lost.duplicate():
 		if not is_instance_valid(kit) or kit.dead:
 			continue
-		if kit.global_position.distance_to(player.global_position) < REACH:
+		# (one with no cage, found by going up to it)
+		if not kit.has_meta(&"cage") and kit.global_position.distance_to(player.global_position) < REACH:
 			_found(kit)
 	for kit in following.duplicate():
 		if not is_instance_valid(kit) or kit.dead:
@@ -69,6 +90,9 @@ func _physics_process(_delta: float) -> void:
 
 ## Found: a cheer, and it follows him.
 func _found(kit: Villager) -> void:
+	if not kit in lost:
+		return
+	kit.remove_meta(&"cage")
 	lost.erase(kit)
 	following.append(kit)
 	_puff_at(kit.global_position)
@@ -91,7 +115,7 @@ func _home(kit: Villager) -> void:
 	kit.say([kit.display_name] + HOME)
 	# (a playmate among the grove's kits)
 	for other in villagers.members:
-		if other != kit and other.kit and other.home == heart and not other in lost and not other in following:
+		if kit.kit and other != kit and other.kit and other.home == heart and not other in lost and not other in following:
 			kit.playmate = other
 			break
 	kit._choose()
