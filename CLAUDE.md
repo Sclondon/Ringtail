@@ -819,8 +819,14 @@ Read README.md first. Started 2026-11-01.
   BirdCamera (`lift`), closer for small ones, swinging round behind as it runs.
 - Claude's picks: every animal's speeds and jump (AnimalPlayer.FEEL, else from its size); the tail button's thing (skunk
   spray, porcupine quills, opossum plays dead till the stick or jump, frog croaks, dogs bark, the snake rears and
-  coils); Crumbs count as his, cages are his alone; the hunters leave a played animal be (as a bird). Not done: climbing
-  for the squirrels and the like, swimming poses.
+  coils); Crumbs count as his, cages are his alone; the hunters leave a played animal be (as a bird). Not done:
+  swimming poses.
+- Climbing (the user: "add climbing for climbers"): AnimalPlayer.CLIMBERS (squirrel, chipmunk, marten, ringtail,
+  opossum, porcupine slowly, weasel, the cats; which and how fast are Claude's picks) go up anything `climbable` as
+  his Scurry does: pushed into it (scurry held, or a firm push), up the screen climbs, down comes down, across goes
+  round to the screen's side, round a limb overhead (on to it if stuck), over the top on to it, jump off backwards;
+  the rig takes its climbing pose (`climbing_npc`). play_as_test climbs a trunk and a pole (squirrel) and a drainpipe
+  on to a roof (cat) in a yard of its own; play_as_shots `climb` shoots a squirrel and a marten up the grove's tree.
 - The pause screen's Play as row has an Animals button: a page of their pictures (ui/faces/<animal>.png, made by
   `godot --path . --audio-driver Dummy -s res://tools/make_animal_faces.gd`), seven across, four on a tall screen.
 - Checks: `tests/play_as_test.gd` (headless: each walks, runs, jumps, its tail button, back to the raccoon),

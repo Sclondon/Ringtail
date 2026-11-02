@@ -28,6 +28,10 @@ const FEEL := {
 }
 ## Those that hop along rather than walk.
 const HOPPERS := ["rabbit", "frog"]
+## Those that climb (the user, 2026-11-02: "add climbing for climbers"), and how fast (m/s): up anything climbable
+## (trees, poles, drainpipes) as the raccoon scurries up it. Which and how fast are Claude's picks.
+const CLIMBERS := {"squirrel": 2.4, "chipmunk": 2.0, "marten": 2.2, "ringtail": 2.2, "opossum": 1.2, "porcupine": 0.6,
+		"weasel": 1.6, "cat": 2.0}
 const GRAVITY := 20.0
 
 ## For the rig, as a Critter gives it.
@@ -52,6 +56,16 @@ var _special := 0.0
 var _limp := false
 var _fall_from := 0.0
 var _puff: CPUParticles3D
+## Climbing: on something climbable, how fast it climbs (0: it cannot), the surface's outward way, a moment's rest
+## before it can catch on again, and going round a limb over its head.
+var climbing := false
+var surface_normal := Vector3.ZERO
+var _climb_speed := 0.0
+var _off_climb := 0.0
+var _round_way := 1.0
+var _round_time := 0.0
+var _round_from := Vector3.ZERO
+var _round_flips := 0
 
 
 ## The part of `kind` that names the model (a cat's look number off).
@@ -115,6 +129,7 @@ func _ready() -> void:
 	run_speed = feel[1]
 	_jump = feel[2]
 	_hops = species(what) in HOPPERS
+	_climb_speed = float(CLIMBERS.get(species(what), 0.0))
 	_cfg = {"walk": walk_speed, "camera": clampf(1.0 + 2.2 * size, 1.5, 4.5)}
 	# (as he is: on the second layer, so the Crumbs see it; the world, cars, roofs and wires stop it)
 	collision_layer = 2
@@ -165,6 +180,11 @@ func _physics_process(delta: float) -> void:
 			(figure as CritterRig).recover()
 		velocity = Vector3(0.0, velocity.y - GRAVITY * delta if not grounded else -0.1, 0.0)
 		move_and_slide()
+		return
+	_off_climb = maxf(_off_climb - delta, 0.0)
+	if _climb_speed > 0.0 and _climb(delta, stick):
+		_face(delta)
+		_drive_figure(delta, false)
 		return
 	# Walking at a light push, running as it is pushed further (slower swimming)
 	var push := stick.length()
@@ -221,6 +241,7 @@ func _drive_figure(_delta: float, grounded: bool) -> void:
 		snake.lift = 0.6 if _special > 0.0 else 0.0
 	elif figure is CritterRig:
 		var rig := figure as CritterRig
+		rig.climbing_npc = climbing
 		rig.bristle = 1.0 if species(String(kind)) == "porcupine" and _special > 0.0 else 0.0
 		rig.puff = sin(_special * 12.0) * 0.5 + 0.5 if species(String(kind)) == "frog" and _special > 0.0 else 0.0
 
@@ -269,6 +290,147 @@ func _spray() -> void:
 		_puff.position = Vector3(0.0, 0.3 * size, -0.25 * size)
 		add_child(_puff)
 	_puff.restart()
+
+
+## Climbing (a climber: CLIMBERS), as the raccoon's Scurry climbs: pushed into anything climbable (a trunk, a pole, a
+## drainpipe), scurry held or not, it goes on to it; the stick up the screen climbs, down comes down, across goes round
+## (to the screen's side); a limb over its head it goes round, and steps up on to it if stuck; over the top it hops on
+## to it; jump pushes off backwards. Whether it climbed this step.
+func _climb(delta: float, stick: Vector3) -> bool:
+	var ahead := Vector3(sin(facing_yaw), 0.0, cos(facing_yaw))
+	var middle := global_position + Vector3.UP * maxf(0.25, 0.4 * size)
+	var reach := 0.3 * size + 0.3
+	var hit := _probe(middle, ahead, reach)
+	if not climbing:
+		var into := stick.length() > 0.3 and not hit.is_empty() and stick.normalized().dot(-_level(hit.normal)) > 0.5
+		if _off_climb > 0.0 or not into or not (_down(&"scurry") or stick.length() > 0.7):
+			return false
+		climbing = true
+		surface_normal = _level(hit.normal)
+	for lift: float in [0.0, 0.25 * size, -0.2 * size]:
+		if hit.is_empty():
+			# (pushed out a little by a limb it is passing, or its middle inside one: looked for from a little back)
+			hit = _probe(middle - ahead * 0.3 * size + Vector3.UP * lift, ahead, reach + 0.5)
+	if hit.is_empty():
+		# Over the top: a hop up and on to it
+		climbing = false
+		_off_climb = 0.4
+		velocity = -surface_normal * 1.8 + Vector3.UP * 4.0
+		return false
+	surface_normal = _level(hit.normal)
+	if _just(&"jump"):
+		# Off backwards
+		climbing = false
+		_off_climb = 0.5
+		velocity = surface_normal * 3.5 + Vector3.UP * 4.5
+		facing_yaw = atan2(surface_normal.x, surface_normal.z)
+		jumped.emit()
+		return false
+	if _down(&"duck") and is_on_floor():
+		climbing = false
+		_off_climb = 0.5
+		return false
+	# (the stick as on a ladder: up the screen climbs; across goes to the screen's side, whichever side of it the camera is)
+	var raw := _raw()
+	var along := raw.x
+	if is_instance_valid(camera) and surface_normal.cross(Vector3.UP).dot(camera.global_basis.x) < 0.0:
+		along = -along
+	var up := _climb_speed * clampf(-raw.y, -1.0, 1.0)
+	if up > 0.0 and _overhead(middle, size * 0.6):
+		# (a limb over its head: round it, and on to it if that gets nowhere)
+		if absf(along) > 0.2 and _round_flips == 0:
+			_round_way = signf(along)
+		along = _round_way
+		up = 0.0
+		_round_time += delta
+		if _round_time > 0.5:
+			if global_position.distance_to(_round_from) < 0.1:
+				_round_flips += 1
+				_round_way = -_round_way
+				if _round_flips >= 3 and _mount(middle):
+					return false
+			_round_time = 0.0
+			_round_from = global_position
+	else:
+		_round_time = 0.0
+		_round_flips = 0
+		_round_from = global_position
+	if up < 0.0 and is_on_floor():
+		# (down at the foot: off it)
+		climbing = false
+		_off_climb = 0.4
+		return false
+	var gap: float = (hit.position as Vector3).distance_to(middle) - (0.2 * size + 0.06)
+	velocity = -surface_normal * clampf(gap * 6.0, -1.0, 1.0) + surface_normal.cross(Vector3.UP) * along * _climb_speed * 0.6 \
+			+ Vector3.UP * up
+	move_and_slide()
+	facing_yaw = atan2(-surface_normal.x, -surface_normal.z)
+	air_time = 0.0
+	return true
+
+
+## The nearest climbable ahead of `from` within `reach`: a fan of rays, its normal straight out from it to `from`.
+func _probe(from: Vector3, ahead: Vector3, reach: float) -> Dictionary:
+	var best := {}
+	var nearest := INF
+	for turn: float in [0.0, -0.35, 0.35, -0.7, 0.7]:
+		var query := PhysicsRayQueryParameters3D.create(from, from + ahead.rotated(Vector3.UP, turn) * reach, 1)
+		query.exclude = [get_rid()]
+		var hit := get_world_3d().direct_space_state.intersect_ray(query)
+		if hit.is_empty() or not _climbable(hit.collider):
+			continue
+		var gap := from.distance_to(hit.position)
+		if gap < nearest:
+			nearest = gap
+			best = hit
+			best.normal = from - (hit.position as Vector3)
+	return best
+
+
+func _climbable(body: Node) -> bool:
+	return body != null and (body.is_in_group(&"climbable") or (body.get_parent() != null and body.get_parent().is_in_group(&"climbable")))
+
+
+## Whether something climbable (a limb) is just over its head.
+func _overhead(middle: Vector3, room: float) -> bool:
+	var query := PhysicsRayQueryParameters3D.create(middle, middle + Vector3.UP * maxf(room, 0.3), 1)
+	query.exclude = [get_rid()]
+	var hit := get_world_3d().direct_space_state.intersect_ray(query)
+	return not hit.is_empty() and _climbable(hit.collider)
+
+
+## On to the top of the limb over its head, just out from where it is. Whether there was a top to stand on.
+func _mount(middle: Vector3) -> bool:
+	for out: float in [0.15, 0.4, 0.7]:
+		var above := middle + surface_normal * out * size + Vector3.UP * 1.4
+		var query := PhysicsRayQueryParameters3D.create(above, above + Vector3.DOWN * 1.3, 1)
+		query.exclude = [get_rid()]
+		var hit := get_world_3d().direct_space_state.intersect_ray(query)
+		if hit.is_empty() or (hit.normal as Vector3).y < 0.7:
+			continue
+		climbing = false
+		_off_climb = 0.4
+		_round_flips = 0
+		global_position = (hit.position as Vector3) + Vector3.UP * 0.05
+		velocity = Vector3.ZERO
+		return true
+	return false
+
+
+## The stick as it is pushed (x across, y down the screen), keys, pad or touch.
+func _raw() -> Vector2:
+	if Player.input_blocked:
+		return Vector2.ZERO
+	var raw := Input.get_vector(&"move_left", &"move_right", &"move_up", &"move_down")
+	var touch: TouchControls = world.player._touch if world and world.player else null
+	if touch and touch.move.length_squared() > raw.length_squared():
+		raw = touch.move
+	return raw
+
+
+static func _level(v: Vector3) -> Vector3:
+	var flat := Vector3(v.x, 0.0, v.z)
+	return flat.normalized() if flat.length_squared() > 0.0001 else Vector3.BACK
 
 
 ## How far under the surface of any water its feet are (as the Player asks it).

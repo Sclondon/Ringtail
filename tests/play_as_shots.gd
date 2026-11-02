@@ -67,6 +67,38 @@ func _run(world: World) -> void:
 		await _shoot("%s_tail" % what)
 		animal.press(&"tail", false)
 		await _frames(5)
+	if only.is_empty() or "climb" in only:
+		await _climb_shots(world)
 	BirdPlayer.play_as(world, &"raccoon")
 	await _frames(5)
 	quit()
+
+
+## A squirrel and a marten up the grove's nearest climbing tree (a body in `climbable` with a trunk near the spawn):
+## on the way up, and higher.
+func _climb_shots(world: World) -> void:
+	var from := world.player.global_position
+	var tree: Node3D
+	for node in get_nodes_in_group(&"climbable"):
+		if node is StaticBody3D and (tree == null or from.distance_to((node as Node3D).global_position) < from.distance_to(tree.global_position)):
+			tree = node
+	if tree == null:
+		return
+	for what: String in ["squirrel", "marten"]:
+		BirdPlayer.play_as(world, StringName(what))
+		await _frames(5)
+		var animal := BirdPlayer.active(world) as AnimalPlayer
+		var foot := tree.global_position
+		var way := Vector3(foot.x - from.x, 0.0, foot.z - from.z).normalized()
+		animal.global_position = foot - way * 1.6 + Vector3.UP * 0.3
+		animal.velocity = Vector3.ZERO
+		animal.facing_yaw = atan2(way.x, way.z)
+		await _frames(10)
+		animal.camera.look_along(way)
+		Input.action_press(&"move_up", 1.0)
+		await _frames(70)
+		await _shoot("%s_climb" % what)
+		await _frames(70)
+		await _shoot("%s_climb_high" % what)
+		Input.action_release(&"move_up")
+		print("  %s climbing %s, %.1f m up" % [what, animal.climbing, animal.global_position.y - foot.y])
