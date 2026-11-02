@@ -17,6 +17,8 @@ var _size: Array[float] = []
 var _next := 0
 var _clock := 0.0
 var _step := 0.0
+## How much longer the trail after a jump goes on.
+var _trail_left := 0.0
 var _planted_was: Array[bool] = [true, true]
 
 
@@ -45,7 +47,10 @@ func _ready() -> void:
 	# should spawn dust particles")
 	_player.jumped.connect(func() -> void:
 		if _player.is_on_floor() or _player.air_time < 0.1:
-			_ring(6, 0.35, 0.07))
+			_ring(6, 0.35, 0.07)
+		# (and a trail of it behind him on the way up: the user, 2026-11-02, "jumping should leave a trail of dust
+		# particles")
+		_trail_left = 0.5)
 	_player.landed.connect(func(impact: float) -> void:
 		if impact > 3.0:
 			_ring(clampi(int(impact * 0.8), 4, 9), 0.25 + impact * 0.02, 0.09 + impact * 0.006))
@@ -128,6 +133,10 @@ func _process(delta: float) -> void:
 	var rate := 0.0
 	if _player.state == Player.State.SLIDE:
 		rate = 16.0
+	_trail_left = maxf(_trail_left - delta, 0.0)
+	var trailing := _trail_left > 0.0 and not on_ground
+	if trailing:
+		rate = 26.0 * (_trail_left / 0.5 + 0.3)
 	var moves := _player.get_node_or_null(^"TailMoves") as TailMoves
 	# (only while the tail sweeps round: not during the crouch and wind-up before it)
 	# (no ring of dust as he spins: the tail leaves its trail instead; the user, 2026-11-02)
@@ -141,7 +150,11 @@ func _process(delta: float) -> void:
 			var a := randf() * TAU
 			aside = Vector3(cos(a), 0.0, sin(a)) * 0.35
 			behind = aside * 2.0
-		puff(_player.global_position + behind * 0.25 + aside, behind * 0.6 + Vector3.UP * 0.35, 0.08)
+		if trailing:
+			# (left hanging in the air where he passed, drifting a little and down)
+			puff(_player.global_position + Vector3.UP * 0.1 + aside * 0.6, aside + Vector3.DOWN * 0.15, 0.1 + 0.08 * _trail_left)
+		else:
+			puff(_player.global_position + behind * 0.25 + aside, behind * 0.6 + Vector3.UP * 0.35, 0.08)
 	for k in BLOBS:
 		if not _blobs[k].visible:
 			continue
