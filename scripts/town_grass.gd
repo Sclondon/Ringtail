@@ -96,12 +96,13 @@ func _grow_tall(world: Node3D, markers: Dictionary) -> void:
 	var reach := Rect2(Vector2(_tall[0].x, _tall[0].y), Vector2.ZERO)
 	for patch in _tall:
 		reach = reach.expand(Vector2(patch.x, patch.y) - Vector2.ONE * patch.z).expand(Vector2(patch.x, patch.y) + Vector2.ONE * patch.z)
-	var tall := Grass.field(world, reach, 3.0, {
+	# (thick: dense clumps to vanish into; the user, 2026-11-02, "the tall grass areas need to have denser clusters")
+	var tall := Grass.field(world, reach, 6.5, {
 		"mask": tall_at,
 		"height": height,
 		"ground": _ground_colour(),
 		"blade_height": 0.85,
-		"blade_width": 0.03,
+		"blade_width": 0.036,
 		"lean": 0.18,
 		"dryness": 0.35,
 		"flowers": 0.02,
