@@ -36,10 +36,18 @@ func _draw() -> void:
 			points.append(points[0])
 			draw_polyline(points, ink if kind == Kind.HEART else colour, w * 0.8, true)
 		Kind.CRUMB:
-			draw_circle(c, s * 0.42, ink)
-			draw_circle(c, s * 0.36, colour)
-			for k in 4:
-				draw_circle(c + Vector2.from_angle(k * 1.7) * s * 0.18, s * 0.07, Color(0.3, 0.17, 0.1))
+			# An apple (the Crumbs are food: Pickup.FOODS): two round lobes, a stem and a leaf, drawn in its own red
+			var red := Color(0.88, 0.16, 0.12)
+			var body := c + Vector2(0.0, s * 0.06)
+			for dx in [-0.11, 0.11]:
+				draw_circle(body + Vector2(dx * s, 0.0), s * 0.31, ink)
+			for dx in [-0.11, 0.11]:
+				draw_circle(body + Vector2(dx * s, 0.0), s * 0.25, red)
+			draw_circle(body + Vector2(-0.14 * s, -0.1 * s), s * 0.07, Color(1.0, 0.6, 0.55))
+			draw_line(c + Vector2(0.0, -s * 0.18), c + Vector2(s * 0.05, -s * 0.38), Color(0.4, 0.25, 0.12), maxf(2.0, s * 0.07))
+			var leaf := PackedVector2Array([c + Vector2(s * 0.04, -s * 0.3), c + Vector2(s * 0.2, -s * 0.42),
+				c + Vector2(s * 0.3, -s * 0.34), c + Vector2(s * 0.16, -s * 0.26)])
+			draw_colored_polygon(leaf, Color(0.36, 0.72, 0.2))
 		Kind.CAP:
 			var rim := PackedVector2Array()
 			for k in 28:

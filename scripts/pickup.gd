@@ -1,7 +1,8 @@
 class_name Pickup
 extends Area3D
-## Something to take by running into it: a Crumb or a Bottlecap (placeholder names),
-## or a race crumb. It turns and bobs; taken, it hops up, shrinks and is gone.
+## Something to take by running into it: a Crumb (some bit of food: an apple, an acorn, a slice of pizza,
+## rubbish... tools/build_food.py) or a Bottlecap (placeholder names), or a race crumb. It turns and
+## bobs; taken, it hops up, shrinks and is gone.
 ## (After Gloaming's Pickup.)
 
 signal taken(pickup: Pickup)
@@ -13,6 +14,18 @@ const MODELS := {
 	Kind.CAP: preload("res://models/cap.glb"),
 	Kind.RACE: preload("res://models/crumb.glb"),
 }
+## The foods a Crumb may be (the user, 2026-11-01: "the items to pick up should be different food items - apples,
+## acorns, pizza slices, garbage, etc"): [model, how many in the mix, how far it is tipped to show its top, how big it is drawn].
+const FOODS := [
+	[preload("res://models/food_apple.glb"), 4, 0.0, 1.0],
+	[preload("res://models/food_acorn.glb"), 4, 0.0, 1.0],
+	[preload("res://models/food_pizza.glb"), 2, 0.6, 1.0],
+	[preload("res://models/food_core.glb"), 2, 0.0, 1.0],
+	[preload("res://models/food_cheese.glb"), 2, 0.25, 1.0],
+	[preload("res://models/food_banana.glb"), 1, 0.35, 1.0],
+	[preload("res://models/food_fishbone.glb"), 1, 0.0, 1.3],
+	[preload("res://models/food_donut.glb"), 1, 0.5, 1.35],
+]
 
 var kind := Kind.CRUMB
 ## The cap's name (its marker's: roof, glide, cats, race, hidden).
@@ -46,7 +59,15 @@ func _ready() -> void:
 	_spin = Node3D.new()
 	_spin.position.y = 0.45 if kind == Kind.CAP else 0.25
 	add_child(_spin)
-	var model: Node3D = MODELS[kind].instantiate()
+	var model: Node3D
+	if kind == Kind.CRUMB:
+		var food: Array = _food()
+		model = (food[0] as PackedScene).instantiate()
+		model.rotation.x = food[2]
+		model.scale = Vector3.ONE * float(food[3])
+		model.position.y = -0.12
+	else:
+		model = MODELS[kind].instantiate()
 	_spin.add_child(model)
 	Toon.apply(model)
 	if kind == Kind.CAP:
@@ -63,6 +84,20 @@ func _ready() -> void:
 		light.omni_range = 2.0
 		_spin.add_child(light)
 	body_entered.connect(_on_body)
+
+
+## Which food this Crumb is: the same spot always gives the same one, apples and acorns the likeliest.
+func _food() -> Array:
+	var spot := Vector3i((position * 10.0).round())
+	var total := 0
+	for food: Array in FOODS:
+		total += int(food[1])
+	var pick := absi(hash(spot)) % total
+	for food: Array in FOODS:
+		pick -= int(food[1])
+		if pick < 0:
+			return food
+	return FOODS[0]
 
 
 func _process(delta: float) -> void:
