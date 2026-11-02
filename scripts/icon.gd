@@ -3,7 +3,7 @@ extends Control
 ## A small symbol drawn in code (no font has them all, and none on the web):
 ## for the HUD's counts and the buttons.
 
-enum Kind { HEART, HEART_EMPTY, CRUMB, CAP, JUMP, DUCK, SPRINT, TAIL, CLOCK, SCURRY, PAUSE, PLAY, COMB, CHECK, UNDO, LEFT, RIGHT, KIT }
+enum Kind { HEART, HEART_EMPTY, CRUMB, CAP, JUMP, DUCK, SPRINT, TAIL, CLOCK, SCURRY, PAUSE, PLAY, COMB, CHECK, UNDO, LEFT, RIGHT, KIT, CROW, OWL, PERCH, PECK }
 
 var kind := Kind.HEART
 var colour := Color.WHITE
@@ -48,6 +48,37 @@ func _draw() -> void:
 			var leaf := PackedVector2Array([c + Vector2(s * 0.04, -s * 0.3), c + Vector2(s * 0.2, -s * 0.42),
 				c + Vector2(s * 0.3, -s * 0.34), c + Vector2(s * 0.16, -s * 0.26)])
 			draw_colored_polygon(leaf, Color(0.36, 0.72, 0.2))
+		Kind.CROW:
+			# A crow's head side on: black, a heavy beak, a bright eye (playing as one: BirdPlayer)
+			draw_circle(c + Vector2(-s * 0.06, 0.0), s * 0.3, ink)
+			draw_circle(c + Vector2(-s * 0.06, 0.0), s * 0.26, Color(0.16, 0.16, 0.2))
+			draw_colored_polygon(PackedVector2Array([c + Vector2(s * 0.14, -s * 0.12), c + Vector2(s * 0.46, s * 0.02), c + Vector2(s * 0.14, s * 0.1)]), Color(0.25, 0.25, 0.3))
+			draw_circle(c + Vector2(s * 0.04, -s * 0.06), s * 0.06, Color.WHITE)
+			draw_circle(c + Vector2(s * 0.05, -s * 0.06), s * 0.03, ink)
+		Kind.OWL:
+			# An owl's face: round, two great eyes, ear tufts, a small hooked beak
+			var brown := Color(0.62, 0.45, 0.28)
+			for side in [-1.0, 1.0]:
+				draw_colored_polygon(PackedVector2Array([c + Vector2(side * s * 0.18, -s * 0.24), c + Vector2(side * s * 0.36, -s * 0.46), c + Vector2(side * s * 0.36, -s * 0.18)]), brown)
+			draw_circle(c, s * 0.38, ink)
+			draw_circle(c, s * 0.34, brown)
+			for side in [-1.0, 1.0]:
+				draw_circle(c + Vector2(side * s * 0.15, -s * 0.04), s * 0.13, Color(0.95, 0.9, 0.8))
+				draw_circle(c + Vector2(side * s * 0.15, -s * 0.04), s * 0.08, Color(0.98, 0.62, 0.1))
+				draw_circle(c + Vector2(side * s * 0.15, -s * 0.04), s * 0.045, ink)
+			draw_colored_polygon(PackedVector2Array([c + Vector2(-s * 0.05, s * 0.08), c + Vector2(s * 0.05, s * 0.08), c + Vector2(0.0, s * 0.22)]), Color(0.3, 0.25, 0.2))
+		Kind.PERCH:
+			# A bird's foot gripping a bar: settle on a wire or a post
+			draw_line(c + Vector2(-s * 0.42, s * 0.18), c + Vector2(s * 0.42, s * 0.18), colour, w)
+			draw_line(c + Vector2(0.0, -s * 0.36), c + Vector2(0.0, s * 0.1), colour, w)
+			for dx in [-0.18, 0.0, 0.18]:
+				draw_arc(c + Vector2(dx * s, s * 0.18), s * 0.09, PI, TAU, 8, colour, w * 0.8)
+		Kind.PECK:
+			# A beak striking down, and the knock it makes
+			draw_colored_polygon(PackedVector2Array([c + Vector2(-s * 0.22, -s * 0.34), c + Vector2(s * 0.06, -s * 0.34), c + Vector2(s * 0.02, s * 0.12)]), colour)
+			for k in 3:
+				var a := lerpf(-0.6, 0.6, k / 2.0) + PI * 0.5
+				draw_line(c + Vector2(0.0, s * 0.24) + Vector2.from_angle(a) * s * 0.08, c + Vector2(0.0, s * 0.24) + Vector2.from_angle(a) * s * 0.22, colour, w * 0.7)
 		Kind.KIT:
 			# A kit's face (the lost kits: LostKits): round grey head, ears, the black mask, a pale muzzle and nose
 			var grey := Color(0.62, 0.58, 0.56)

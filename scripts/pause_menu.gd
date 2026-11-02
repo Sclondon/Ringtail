@@ -67,6 +67,17 @@ func _ready() -> void:
 	slider.focus_mode = Control.FOCUS_NONE
 	slider.value_changed.connect(N64Filter.set_strength)
 	dial.add_child(slider)
+	# Who he plays as: the raccoon, the crow or the owl (BirdPlayer; the user, 2026-11-02, "add a mode where you can be
+	# the crow or owl")
+	var who := HBoxContainer.new()
+	who.alignment = BoxContainer.ALIGNMENT_CENTER
+	who.add_theme_constant_override(&"separation", 18)
+	middle.add_child(who)
+	for pick: Array in [[Icon.Kind.KIT, &"raccoon", "Raccoon"], [Icon.Kind.CROW, &"crow", "Crow"], [Icon.Kind.OWL, &"owl", "Owl"]]:
+		var as_one := _big(who, pick[0], pick[2], func() -> void:
+			BirdPlayer.play_as(world, pick[1])
+			close())
+		as_one.custom_minimum_size = Vector2(112, 112)
 	_veil.visible = false
 
 

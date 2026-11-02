@@ -413,3 +413,21 @@ Read README.md first. Started 2026-11-01.
 - Checks: tests/point_stand_test.gd (drop onto a pole top, out of reach, the pose, jump off, scurry up a pole to the
   top), tests/handstand_shots.gd (four sides and above).
 - Not checked in play: a tree tip (in its leaves), the chimney, turning on the point with the stick.
+
+## Playing as the crow or the owl (2026-11-02)
+
+- The user: "and add a mode where you can be the crow or owl". The pause screen's "Play as" row (raccoon, crow, owl
+  faces) swaps who is played (`BirdPlayer.play_as(world, &"crow" | &"owl" | &"raccoon")`).
+- `scripts/bird_player.gd` (BirdPlayer): the bird as a controller of its own, on the BIRDS fork's model and BirdBody
+  poser, with `scripts/bird_camera.gd` (BirdCamera) following it. The raccoon is put away meanwhile (hidden, still, no
+  collision, his FollowCamera off) and comes back on the ground under the bird (Claude's pick: under the bird, not
+  where he was). Hops on the ground; jump takes off and each press in the air flaps (held: glides); the stick steers
+  (banking); duck dives (the owl swoops faster); scurry settles on the nearest wire or pole/tree top (PointPerches)
+  within 5 m; tail pecks (knocks what his tail knocks, never a cage: cages are his). Lands on anything it comes down on.
+- Claude's picks: both birds take Crumbs (they count as his; not Bottlecaps); the hunters leave a bird be and nothing
+  hurts the put-away raccoon (World.hurt, Hazards.unseen); the crow agile with quick flaps, the owl slow deep flaps,
+  long glides, a faster swoop, its head following the camera; a ceiling 40 m over where it took over.
+- The HUD's Scurry and Tail buttons show Perch and Peck while a bird is played (same buttons, same keys).
+- Unchecked: the HUD's zone/counts still follow the put-away raccoon's place, not the bird's; touch flying on a phone.
+- Tests: `tests/bird_mode_test.gd` (flap up, glide, settle on a wire, land on a roof, take a Crumb, owl, back),
+  `tests/bird_mode_shots.gd -- --out=<dir>`.

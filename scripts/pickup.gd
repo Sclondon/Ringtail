@@ -164,7 +164,8 @@ func _process(delta: float) -> void:
 
 
 func _on_body(body: Node) -> void:
-	if not body is Player or _gone >= 0.0:
+	# (a Crumb is taken by a bird he plays as too: BirdPlayer)
+	if not (body is Player or (body is BirdPlayer and kind == Kind.CRUMB)) or _gone >= 0.0:
 		return
 	take()
 

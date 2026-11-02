@@ -422,6 +422,9 @@ func _process(delta: float) -> void:
 
 ## A cat's pounce, or anything else that hurts: a heart gone, and knocked back.
 func hurt(from: Vector3) -> void:
+	# (playing as a bird: the raccoon is put away, and nothing hurts him: BirdPlayer)
+	if BirdPlayer.active(self):
+		return
 	if _hurt_rest > 0.0:
 		return
 	_hurt_rest = 1.4

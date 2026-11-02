@@ -18,6 +18,8 @@ var _message: Label
 var _message_t := 0.0
 var _buttons: HBoxContainer
 var _tail_touch: Button
+## The buttons' symbols, by action (swapped playing as a bird).
+var _icons := {}
 var _dev: VBoxContainer
 var pause: PauseMenu
 
@@ -184,6 +186,7 @@ func _button(what: Icon.Kind, key: String, action: StringName) -> void:
 	symbol.set_anchors_preset(Control.PRESET_FULL_RECT)
 	symbol.offset_bottom = -18
 	button.add_child(symbol)
+	_icons[action] = symbol
 	var shortcut := _label(14, Color(1, 1, 1, 0.7))
 	shortcut.text = key
 	shortcut.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
@@ -199,6 +202,11 @@ func _button(what: Icon.Kind, key: String, action: StringName) -> void:
 
 
 func _press(action: StringName, down: bool) -> void:
+	# (playing as a bird: its own, the same buttons: flap, dive, settle, peck)
+	var bird := BirdPlayer.active(world)
+	if bird:
+		bird.press(action, down)
+		return
 	if action == &"scurry":
 		var scurry := world.player.get_node_or_null(^"Scurry") as Scurry
 		if scurry:
@@ -217,6 +225,10 @@ func _press(action: StringName, down: bool) -> void:
 
 
 func _tail() -> void:
+	var bird := BirdPlayer.active(world)
+	if bird:
+		bird.press(&"tail", true)
+		return
 	var moves := world.player.get_node_or_null(^"TailMoves") as TailMoves
 	if moves:
 		moves.press()
@@ -230,6 +242,14 @@ func say(text: String) -> void:
 func _process(delta: float) -> void:
 	_message_t -= delta
 	_message.modulate.a = clampf(_message_t, 0.0, 1.0)
+	# (the raccoon's scurry and tail are a bird's settle and peck: BirdPlayer)
+	var as_bird := BirdPlayer.active(world) != null
+	for pair: Array in [[&"scurry", Icon.Kind.SCURRY, Icon.Kind.PERCH], [&"tail", Icon.Kind.TAIL, Icon.Kind.PECK]]:
+		var icon: Icon = _icons.get(pair[0])
+		var wanted: Icon.Kind = pair[2] if as_bird else pair[1]
+		if icon and icon.kind != wanted:
+			icon.kind = wanted
+			icon.queue_redraw()
 	var touch := TouchControls.wanted()
 	_buttons.visible = not touch
 	_tail_touch.visible = touch
