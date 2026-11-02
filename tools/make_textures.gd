@@ -22,13 +22,14 @@ func _initialize() -> void:
 	_save("planks", _planks(false))
 	_save("fence", _planks(true))
 	_save("concrete", _concrete(Color(0.62, 0.61, 0.58), 0.07))
-	_save("asphalt", _concrete(Color(0.32, 0.32, 0.35), 0.06))
+	_save("asphalt", _asphalt())
 	_save("metal", _metal())
 	_save("stone", _stone())
 	_save("blockwall", _blockwall())
 	_save("tiles", _tiles())
 	_save("plaster", _concrete(Color(0.93, 0.9, 0.82), 0.03))
 	_save("thatch", _thatch())
+	_save("anime_tree", _anime_tree())
 	print("TEXTURES DONE")
 	quit()
 
@@ -276,4 +277,85 @@ func _thatch() -> Image:
 		for x in SIZE:
 			var shade: float = streak[x] * (1.08 - 0.4 * float(within) / 21.0) + _n(x * 3.0, y) * 0.06
 			image.set_pixel(x, y, _shade(base, shade))
+	return image
+
+
+## Tarmac (the user, 2026-11-02: "less repetitive texture"): fine grit, a patch of newer and one of older surface
+## with their seams, a few branching cracks, an oil stain, two worn tyre tracks. The world shader breaks up its repeat
+## further with a slow variation in world space (World sets `variation` on the roads).
+func _asphalt() -> Image:
+	var base := Color(0.33, 0.33, 0.36)
+	var image := _blank(base)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 41
+	for y in SIZE:
+		for x in SIZE:
+			var tone := 1.0 + _n(x * 2.0, y * 2.0) * 0.07 + rng.randf_range(-0.06, 0.06)
+			# (two worn tracks along it, a little lighter and smoother)
+			var track := absf(fmod(float(x) + 64.0, 32.0) - 16.0)
+			if track < 3.0:
+				tone += 0.05
+			image.set_pixel(x, y, _shade(base, tone))
+	# a newer patch (darker, a seam round it) and an older one (paler)
+	for patch: Array in [[Vector2i(6, 10), Vector2i(22, 16), 0.9], [Vector2i(38, 40), Vector2i(20, 14), 1.07]]:
+		var at: Vector2i = patch[0]
+		var size: Vector2i = patch[1]
+		for y in size.y:
+			for x in size.x:
+				var p := Vector2i((at.x + x) % SIZE, (at.y + y) % SIZE)
+				var seam := x == 0 or y == 0 or x == size.x - 1 or y == size.y - 1
+				image.set_pixel(p.x, p.y, _shade(image.get_pixel(p.x, p.y), 0.82 if seam else float(patch[2])))
+	# cracks, branching
+	for k in 3:
+		var p := Vector2(rng.randi_range(0, SIZE - 1), rng.randi_range(0, SIZE - 1))
+		var way := Vector2.from_angle(rng.randf_range(0.0, TAU))
+		for step in 26:
+			way = way.rotated(rng.randf_range(-0.6, 0.6))
+			p += way
+			image.set_pixel(posmod(int(p.x), SIZE), posmod(int(p.y), SIZE), _shade(base, 0.45))
+	# an oil stain
+	var stain := Vector2(rng.randi_range(0, SIZE - 1), rng.randi_range(0, SIZE - 1))
+	for dy in range(-5, 6):
+		for dx in range(-7, 8):
+			var d := Vector2(dx / 7.0, dy / 5.0).length()
+			if d < 1.0:
+				var p := Vector2i(posmod(int(stain.x) + dx, SIZE), posmod(int(stain.y) + dy, SIZE))
+				image.set_pixel(p.x, p.y, _shade(image.get_pixel(p.x, p.y), 0.7 + 0.3 * d))
+	return image
+
+
+## A tree painted flat, as in a Ghibli background (the user, 2026-11-02: "some 2D anime style trees"): a clumpy
+## rounded crown of overlapping billows, lit along its top edge, shadowed on its lower right, a thin dark trunk, in
+## greys (the far hills' vertex colours give each its hazy green). Transparent round it.
+func _anime_tree() -> Image:
+	var image := Image.create(SIZE, SIZE, false, Image.FORMAT_RGBA8)
+	image.fill(Color(0, 0, 0, 0))
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 23
+	var billows: Array[Vector3] = []
+	for k in 9:
+		var a := TAU * k / 9.0
+		billows.append(Vector3(32.0 + cos(a) * rng.randf_range(12.0, 17.0), 30.0 + sin(a) * rng.randf_range(9.0, 14.0), rng.randf_range(9.0, 12.0)))
+	billows.append(Vector3(32.0, 28.0, 15.0))
+	billows.append(Vector3(29.0, 14.0, 10.0))
+	# the trunk
+	for y in range(44, SIZE):
+		for x in range(30, 34):
+			image.set_pixel(x, y, Color(0.32, 0.3, 0.28, 1.0))
+	for y in SIZE:
+		for x in SIZE:
+			var inside := false
+			var lit := 0.0
+			for b in billows:
+				var d := Vector2(x - b.x, y - b.y)
+				if d.length() < b.z:
+					inside = true
+					# (lit from the upper left: the near edge of each billow towards the light paler)
+					lit = maxf(lit, clampf((-d.x * 0.5 - d.y) / b.z, 0.0, 1.0))
+			if not inside:
+				continue
+			# (the lower right of the crown in shadow)
+			var shadow := clampf(((x - 32.0) * 0.6 + (y - 22.0)) / 18.0, 0.0, 1.0)
+			var tone := 0.78 + 0.22 * smoothstep(0.55, 0.95, lit) - 0.28 * shadow
+			image.set_pixel(x, y, Color(tone, tone, tone, 1.0))
 	return image

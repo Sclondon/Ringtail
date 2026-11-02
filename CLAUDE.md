@@ -615,3 +615,38 @@ Read README.md first. Started 2026-11-01.
 - A dressed person: about 3.8-4.8k triangles (the boy's 15-20k). models/boy_lo.glb is another thing (build_boy.py's
   LOW, a 200-triangle head). Check: `tests/people_lo_shots.gd -- --out=<dir>` (four people high beside low from four
   sides, their heads close, a crowd of 30; prints the triangles and the rests' difference).
+
+## 2026-11-02: the grove's pond, wood and great oak; the far hills; road paint (the user's calls)
+
+- "there should be a pond in the grove and a fishing minigame": POOL (14, 6), about 7 x 6 m, its banks uneven
+  (`_pond_d`, `pond_edge`), 1.7 m deep; a wooden jetty out from the clearing's side; lily pads, four koi, reeds on the
+  far bank. Markers for the fishing work: `fishing_spot` (the jetty's end; its -Z points out over the water) and
+  `fishing_water` (the middle of the water's surface); `pool`/`pool_size` as before.
+- "the grove needs to be surrounded with a denser woods ring": four staggered rows (radii 22.5, 25, 27.5, 30 m, 4.4 to
+  5.4 m apart); the inner rows full cedars and plain oaks, the outer two TreeGen.simple() (`treep_..._cedarlo` /
+  `_oaklo`: World makes them simple). The path spirals round the mound and runs along each row a long way: a tree
+  within 1.8 m of it is moved along its radius or left out. About 112 trees, ~500k triangles (build_town.py prints
+  it). Undergrowth: ferns, three bamboo clumps, five fallen logs (solid), three tall-grass patches.
+- "the main base should be at the base of a great big oak tree with gnarled roots, where the giant raccoon sits and
+  snoozes": the great tree (the Great camphor's build, oak bark: World) stands at OAK (-11, -11), the clearing's
+  north-west edge, the wood cleared round it; eight gnarled roots snake out from its foot (`oak_roots`, solid);
+  `great_oak` marks its trunk's foot. `grove_heart` (the band's base) is just in front of it, the spawn 3 m off;
+  `haven` marks the hill's middle (Hazards.safe measures from it when present).
+- "the hills in the distance need a little more work, and some 2D anime style trees": four ridgelines painted in
+  their vertex colours (PaintPiece; `sky_paint`), dark forest green along the tops fading to a pale mist band at each
+  foot, bluer and paler with distance; fields and little buildings on the nearer two; flat painted trees (`sky_tree`:
+  textures/anime_tree.png from tools/make_textures.gd, a clumpy crown lit along its top and shadowed below right, a
+  thin trunk; World draws it alpha-scissored, unshaded, no fog) along the ridgelines and in copses, tinted per ridge.
+- "the road needs lines painted on it and less repetitive texture": dashed white centre lines, white edge lines, zebra
+  crossings where each street leaves the ring and where each stairway meets a run (`nocol_..._paint`); the ring's
+  outer edge line open at the four junctions. A new asphalt texture (patches, cracks, an oil stain, worn tracks; 5 m
+  tile) and the world shader's `variation` (World sets 1 on asphalt): the texture again at another scale and turned,
+  blended in, and patches of lighter and darker tarmac, by a slow noise in world space.
+- "there should be dumpsters to jump into and trash cans to knock over": `dumpster_<n>` markers (-Z the lid's front;
+  four round the ring, three a face) and more `can_<n>` beside them.
+- **Gotcha:** Blender's bmesh colour layer has no render colour, so the glTF export writes a white COLOR_0 and the real
+  colours as COLOR_1, which Godot does not read: the world's vertex shading (darker low down, uneven face to face)
+  has never reached the game. PaintPiece sets `render_color_index` so the painted sky's colours arrive; turning it on
+  for every Piece (build_world1.py) would darken the whole town: not done, the user's call.
+- `tests/zone_shots.gd -- --out=<dir>` (start, the jetty, the clearing, a street with the filter and without, the
+  ring road, the views from the grove and a street; it shuts the pause screen first: a pad elsewhere can press Start).

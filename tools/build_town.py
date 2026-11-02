@@ -68,6 +68,13 @@ w1.COLOURS.update({
     "pampas_leaf": (0.52, 0.62, 0.32),
     "wire_dark": (0.12, 0.12, 0.14),
     "zinc": (0.66, 0.68, 0.70),
+    "lily": (0.34, 0.56, 0.30),
+    "lily_flower": (0.96, 0.72, 0.82),
+    "koi": (0.95, 0.48, 0.14),
+    "koi2": (0.96, 0.93, 0.88),
+    "fern": (0.28, 0.48, 0.22),
+    "sky_paint": (1.0, 1.0, 1.0),
+    "sky_tree": (1.0, 1.0, 1.0),
     "bamboo": (0.46, 0.62, 0.30),
     "bamboo_leaf": (0.36, 0.58, 0.26),
     "paddy": (0.42, 0.56, 0.52),
@@ -102,8 +109,9 @@ PAVE = 3.0              # the pavements either side of it
 LOT = (52.5, 72.0)      # the terraced lots, from the retaining wall by the road to the brink at the back
 FRONT = 54.5            # where the buildings' fronts stand
 BOUND = 71.6            # the unseen wall that keeps him in (the rail stands just inside it)
-POOL = (16.0, 4.0)      # a pond at the clearing's east edge
-POOL_RADII = (2.8, 2.1)
+OAK = (-11.0, -11.0)     # the great oak at the clearing's north-west edge: the raccoons' base
+POOL = (14.0, 6.0)      # a pond at the clearing's east edge, about 7 m across
+POOL_RADII = (3.6, 2.9)
 SECTORS = 12
 # Where the lost kits sit (the user, 2026-11-02: "50 kits to rescue, and they should end up back in the grove after
 # you find them", then "or maybe lets start with 20"): the surface each is on; marked kit_<n> at the end (build())
@@ -127,6 +135,25 @@ LOTS = [
 ]
 
 
+def _pond_d(x, z):
+    """How far (x, z) is out from the pond's middle, 1 at its bank (uneven, not an ellipse)."""
+    a = math.atan2(z - POOL[1], x - POOL[0])
+    wobble = 1.0 + 0.14 * math.sin(3.0 * a + 0.7) + 0.08 * math.sin(5.0 * a + 2.1)
+    return math.hypot((x - POOL[0]) / POOL_RADII[0], (z - POOL[1]) / POOL_RADII[1]) / wobble
+
+
+def pond_edge(a):
+    """The point of the pond's bank in the way `a` from its middle."""
+    lo, hi = 0.0, 8.0
+    for _ in range(30):
+        mid = (lo + hi) / 2
+        if _pond_d(POOL[0] + math.cos(a) * mid, POOL[1] + math.sin(a) * mid) < 1.0:
+            lo = mid
+        else:
+            hi = mid
+    return POOL[0] + math.cos(a) * lo, POOL[1] + math.sin(a) * lo
+
+
 def hill_height(x, z):
     r = math.hypot(x, z)
     if r >= HILL_FOOT:
@@ -135,11 +162,93 @@ def hill_height(x, z):
     s = 1.0 - (t * t * (3.0 - 2.0 * t) if t > 0.0 else 0.0)
     lumps = 0.2 * noise.noise(Vector((x * 0.13, z * 0.13, 0.5))) * min(1.0, r / PLATEAU) ** 2
     h = HILL_TOP * s + lumps * s
-    # the pond, sunk in the top
-    d = math.hypot((x - POOL[0]) / POOL_RADII[0], (z - POOL[1]) / POOL_RADII[1])
+    # the pond, sunk in the top, its banks uneven
+    d = _pond_d(x, z)
     if d < 1.0:
         h -= 1.7 * min(1.0, (1.0 - d) / 0.35)
     return h
+
+
+def oak_roots():
+    """The great oak's gnarled roots, snaking out from its foot over the ground (solid: to walk along and climb)."""
+    ox, oz = OAK
+    oy = hill_height(ox, oz)
+    w1.mark("great_oak", (ox, oy, oz))
+    roots = w1.Piece("oak_roots")
+    rng = random.Random(4)
+    for k in range(8):
+        a = math.tau * k / 8 + rng.uniform(-0.25, 0.25)
+        reach = rng.uniform(4.5, 7.5)
+        wander = rng.uniform(-0.6, 0.6)
+        steps = 10
+        prev_ring = None
+        for i in range(steps + 1):
+            t = i / steps
+            # (out from the trunk's foot, bending as it goes, arching up off the ground and back down into it)
+            turn = a + wander * t * t
+            dist = 1.2 + reach * t
+            cx, cz = ox + math.cos(turn) * dist, oz + math.sin(turn) * dist
+            radius = 0.55 * (1.0 - t) + 0.12
+            lift = math.sin(t * math.pi) * 0.45 + (1.0 - t) * 0.9
+            cy = hill_height(cx, cz) + lift - radius * 0.6
+            side = (-math.sin(turn), math.cos(turn))
+            ring = [(cx + side[0] * math.cos(math.tau * j / 7) * radius, cy + math.sin(math.tau * j / 7) * radius, cz + side[1] * math.cos(math.tau * j / 7) * radius) for j in range(7)]
+            if prev_ring:
+                for j in range(7):
+                    roots.face([prev_ring[j], prev_ring[(j + 1) % 7], ring[(j + 1) % 7], ring[j]], "darkwood")
+            prev_ring = ring
+    roots.done()
+
+
+def undergrowth(wood):
+    """Among the wood's trunks: ferns, bamboo, a few fallen logs (solid), tall grass to hide in (World grows it)."""
+    rng = random.Random(77)
+    ferns = w1.Piece("nocol_ferns")
+    placed = 0
+    for _try in range(600):
+        if placed >= 70:
+            break
+        a, r = rng.uniform(0.0, math.tau), rng.uniform(PLATEAU + 1.0, HILL_FOOT - 1.5)
+        deg = math.degrees(a) % 360.0
+        x, z = math.cos(a) * r, math.sin(a) * r
+        if 55.0 < deg < 110.0 or path_distance(x, z) < 1.6 or any(math.hypot(x - t[0], z - t[1]) < 1.0 for t in wood):
+            continue
+        placed += 1
+        y = hill_height(x, z) - 0.05
+        for k in range(7):
+            lean = math.tau * k / 7 + rng.uniform(-0.3, 0.3)
+            reach = rng.uniform(0.6, 1.0)
+            d = (math.cos(lean), math.sin(lean))
+            side = (-d[1] * 0.09, d[0] * 0.09)
+            mid = (x + d[0] * reach * 0.5, y + reach * 0.45, z + d[1] * reach * 0.5)
+            tip = (x + d[0] * reach, y + reach * 0.2, z + d[1] * reach)
+            ferns.face([(x, y, z), (mid[0] + side[0], mid[1], mid[2] + side[1]), tip, (mid[0] - side[0], mid[1], mid[2] - side[1])], "fern")
+    ferns.done()
+    for n, (deg, r) in enumerate(((140.0, 26.5), (252.0, 27.5), (300.0, 25.0), (20.0, 29.0), (200.0, 29.5))):
+        a = math.radians(deg)
+        x, z = math.cos(a) * r, math.sin(a) * r
+        if path_distance(x, z) < 2.5:
+            continue
+        log = w1.Piece("fallen_log_%d" % n)
+        along = (-math.sin(a + 0.4), math.cos(a + 0.4))
+        y = hill_height(x, z) + 0.25
+        ring = [(math.cos(math.tau * i / 8) * 0.3, math.sin(math.tau * i / 8) * 0.3) for i in range(8)]
+        def pt(t, c):
+            return (x + along[0] * t + along[1] * c[0], y + c[1], z + along[1] * t - along[0] * c[0])
+        for i in range(8):
+            c0, c1 = ring[i], ring[(i + 1) % 8]
+            log.face([pt(-1.8, c0), pt(1.8, c0), pt(1.8, c1), pt(-1.8, c1)], "darkwood")
+        log.face([pt(-1.8, c) for c in ring], "wood")
+        log.face([pt(1.8, c) for c in ring][::-1], "wood")
+        log.done()
+    for n, (deg, r) in enumerate(((185.0, 27.0), (280.0, 29.0), (345.0, 26.0))):
+        a = math.radians(deg)
+        bamboo("grove_%d" % n, math.cos(a) * r, math.sin(a) * r, rng, count=14, radius=2.0, height=hill_height)
+    for n, (deg, r) in enumerate(((130.0, 24.5), (230.0, 30.0), (10.0, 24.0))):
+        a = math.radians(deg)
+        x, z = math.cos(a) * r, math.sin(a) * r
+        empty = w1.mark("tallgrass_wood%d" % n, (x, hill_height(x, z), z))
+        empty.scale = (2.5, 2.5, 2.5)
 
 
 def path_point(t):
@@ -152,6 +261,26 @@ def path_point(t):
 def path_distance(x, z):
     """How far (x, z) is from the path that winds up the hill."""
     return min(math.dist((x, z), path_point(k / 79.0)) for k in range(80))
+
+
+class PaintPiece(w1.Piece):
+    """A piece whose faces carry colours of their own in their vertex colours (and texture coordinates if given)."""
+
+    def paint(self, points, mat, colours, uvs=None):
+        made = self.face(points, mat)
+        for loop, c in zip(made.loops, colours):
+            loop[self.colour] = (c[0], c[1], c[2], 1.0)
+        if uvs:
+            for loop, uv in zip(made.loops, uvs):
+                loop[self.uv].uv = uv
+        return made
+
+    def done(self):
+        # (its colours are the paint: made the render colour too, or the glTF export writes a white COLOR_0 and the
+        # paint as COLOR_1, which Godot does not read)
+        obj = super().done()
+        obj.data.color_attributes.render_color_index = obj.data.color_attributes.active_color_index
+        return obj
 
 
 class Frame:
@@ -252,6 +381,22 @@ def ground():
                     rings.face([(math.cos(a0) * r, 0.0, math.sin(a0) * r), (math.cos(a1) * r, 0.0, math.sin(a1) * r),
                                 (math.cos(a1) * r, y, math.sin(a1) * r), (math.cos(a0) * r, y, math.sin(a0) * r)], "concrete", 0.85)
     rings.done()
+    # its markings (the user, 2026-11-02: "the road needs lines painted on it"): a dashed centre line, edge lines,
+    # the outer one open where each street leaves (only to look at)
+    paint = w1.Piece("nocol_ring_paint")
+    segs = 240
+    exits = (0.0, math.pi / 2, math.pi, 3 * math.pi / 2)
+    for k in range(segs):
+        a0, a1 = math.tau * k / segs, math.tau * (k + 1) / segs
+        near_exit = min(abs(((a0 + a1) / 2 - e + math.pi) % math.tau - math.pi) for e in exits) < 0.22
+        bands = [(ROAD[0] + 0.3, ROAD[0] + 0.45)]
+        if k % 2 == 0:
+            bands.append((ROAD_MIDDLE - 0.08, ROAD_MIDDLE + 0.08))
+        if not near_exit:
+            bands.append((ROAD[1] - 0.45, ROAD[1] - 0.3))
+        for r0, r1 in bands:
+            paint.face([_ring_point(a0, r0, 0.035), _ring_point(a1, r0, 0.035), _ring_point(a1, r1, 0.035), _ring_point(a0, r1, 0.035)], "white")
+    paint.done()
     return piece.done()
 
 
@@ -810,32 +955,47 @@ def grove():
     # routes; gaps only for the path and torii and the view down the hill (55 to 110 degrees).
     rng_wood = random.Random(17)
     wood = []   # [x, z, size%, kind, degrees]: kind camphor, climb, oak or cedar
-    for row, (radius, spacing) in enumerate(((23.5, 7.0), (28.0, 6.5))):
+    for row, (radius, spacing) in enumerate(((22.5, 4.4), (25.0, 4.6), (27.5, 5.0), (30.0, 5.4))):
         count = int(math.tau * radius / spacing)
         for i in range(count):
-            deg = (360.0 * (i + 0.5 * row) / count + rng_wood.uniform(-4.0, 4.0)) % 360.0
+            deg = (360.0 * (i + 0.5 * (row % 2)) / count + rng_wood.uniform(-5.0, 5.0)) % 360.0
             if 55.0 < deg < 110.0:
                 continue
-            r = radius + rng_wood.uniform(-1.2, 1.2)
-            kind = "oak" if row == 0 and i % 3 == 0 else "cedar"
-            wood.append([math.cos(math.radians(deg)) * r, math.sin(math.radians(deg)) * r, rng_wood.randint(85, 115), kind, deg])
+            r = radius + rng_wood.uniform(-0.9, 0.9)
+            # (the inner two rows full trees, the outer two the plainer, cheaper kind: TreeGen.simple)
+            if row == 0:
+                kind = "oaklo" if i % 4 == 0 else "cedar"
+            elif row == 1:
+                kind = "cedarlo" if i % 2 else "cedar"
+            else:
+                kind = "oaklo" if i % 5 == 0 else "cedarlo"
+            wood.append([math.cos(math.radians(deg)) * r, math.sin(math.radians(deg)) * r, rng_wood.randint(75, 125), kind, deg])
     # (the climbing trees: the camphor to the north-west, climbing oaks west and north-east: the nearest inner tree)
     for deg, kind in ((227.0, "camphor"), (165.0, "climb"), (320.0, "climb")):
-        best = min((t for t in wood if math.hypot(t[0], t[1]) < 25.5 and t[3] in ("oak", "cedar")), key=lambda t: abs(((t[4] - deg + 180.0) % 360.0) - 180.0))
+        best = min((t for t in wood if math.hypot(t[0], t[1]) < 23.5 and t[3] not in ("camphor", "climb")), key=lambda t: abs(((t[4] - deg + 180.0) % 360.0) - 180.0))
         best[3] = kind
         best[2] = 160 if kind == "camphor" else 100
-    # (a tree that stands on the winding path is moved in or out along its radius till it is clear, else left out)
+    # (the great oak, the raccoons' base (the user, 2026-11-02: "the main base should be at the base of a great big oak
+    # tree with gnarled roots, where the giant raccoon sits and snoozes"): out of the row, into the clearing's
+    # north-west edge, the wood cleared round its crown)
+    great = next(t for t in wood if t[3] == "camphor")
+    great[0], great[1] = OAK
     for t in wood:
-        if path_distance(t[0], t[1]) >= 2.5:
+        if t is not great and math.hypot(t[0] - great[0], t[1] - great[1]) < 7.0:
+            t[3] = None
+    # (none on the winding path: a climbing tree moved along its radius till clear, the rest left out)
+    # (the path spirals round the mound, so it runs along each row for a long way: a tree within a metre and a half
+    # of it is moved in or out along its radius till clear, else left out)
+    for t in wood:
+        if t[3] is None or path_distance(t[0], t[1]) >= 1.8:
             continue
         r, a = math.hypot(t[0], t[1]), math.atan2(t[1], t[0])
-        for step in (1.0, -1.0, 2.0, -2.0, 3.0, -3.0):
-            if path_distance(math.cos(a) * (r + step), math.sin(a) * (r + step)) >= 2.5 and PLATEAU + 1.5 < r + step < HILL_FOOT - 0.5:
+        for step in (0.8, -0.8, 1.6, -1.6, 2.4, -2.4):
+            if path_distance(math.cos(a) * (r + step), math.sin(a) * (r + step)) >= 1.8 and PLATEAU + 1.0 < r + step < HILL_FOOT - 0.5:
                 t[0], t[1] = math.cos(a) * (r + step), math.sin(a) * (r + step)
                 break
         else:
-            if t[3] in ("oak", "cedar"):
-                t[3] = None
+            t[3] = None
     wood = [t for t in wood if t[3]]
     trees = [(t[0], t[1], t[2]) for t in wood]
     for k, (x, z, size, kind, _deg) in enumerate(wood):
@@ -844,10 +1004,12 @@ def grove():
             w1.mark("tree_%d_%d_%d" % (k, 101 + k * 7, size), at)
         else:
             w1.mark("treep_%d_%d_%d_%s" % (k, 101 + k * 7, size, kind), at)
-    tris = sum({"camphor": 58036, "climb": 27278, "oak": 16890, "cedar": 4514}[t[3]] for t in wood)
-    print("GROVE TREES %d (%d cedars, %d oaks, 3 climbing), about %d triangles" % (len(wood), sum(t[3] == "cedar" for t in wood), sum(t[3] == "oak" for t in wood), tris))
+    tris = sum({"camphor": 58036, "climb": 27278, "oak": 16890, "cedar": 4514, "oaklo": 6094, "cedarlo": 2350}[t[3]] for t in wood)
+    print("GROVE TREES %d (%s), about %d triangles" % (len(wood), ", ".join("%d %s" % (sum(t[3] == k for t in wood), k) for k in ("cedar", "cedarlo", "oaklo", "camphor", "climb")), tris))
+    undergrowth(wood)
+    oak_roots()
     steepest = max(math.degrees(math.atan(math.hypot(hill_height(x + 0.25, z) - hill_height(x - 0.25, z), hill_height(x, z + 0.25) - hill_height(x, z - 0.25)) / 0.5))
-                   for x in range(-32, 33) for z in range(-32, 33) if math.hypot(x, z) < 32.3 and math.hypot(x - POOL[0], z - POOL[1]) > 3.0)
+                   for x in range(-32, 33) for z in range(-32, 33) if math.hypot(x, z) < 32.3 and math.hypot(x - POOL[0], z - POOL[1]) > 5.5)
     print("MOUND STEEPEST %.1f deg" % steepest)
     # garden trees behind the houses
     for n, (k, u, v, size) in enumerate(((7, -2.0, 13.0, 80), (5, 0.0, 12.5, 85), (11, 0.0, 12.0, 75), (8, 8.0, 12.0, 70))):
@@ -910,12 +1072,53 @@ def grove():
         size = rng.uniform(2.0, 3.5)
         empty.scale = (size, size, size)
         placed += 1
-    empty = w1.mark("reeds_pond", (POOL[0] + 2.8, hill_height(POOL[0] + 2.8, POOL[1] + 1.8), POOL[1] + 1.8))
+    # The pond at the clearing's east edge (the user, 2026-11-02: "there should be a pond in the grove and a fishing
+    # minigame"): its banks uneven (hill_height), a wooden jetty out from the clearing's side to fish from, lily pads,
+    # koi under the surface, reeds on the far bank
+    water_y = HILL_TOP - 0.25
+    w1.mark("pool", (POOL[0], water_y, POOL[1]))
+    w1.mark("pool_size", (POOL_RADII[0] * 2.5, 1.6, POOL_RADII[1] * 2.5))
+    w1.mark("fishing_water", (POOL[0], water_y, POOL[1]))
+    toward = (-POOL[0], -POOL[1])
+    length = math.hypot(*toward)
+    out_a = math.atan2(-toward[1] / length, -toward[0] / length)   # (from the clearing out over the water)
+    bank = pond_edge(out_a + math.pi)
+    jetty = Frame.at(bank[0], bank[1], out_a, water_y + 0.32)
+    deck = w1.Piece("jetty")
+    jetty.box(deck, 0.0, 0.9, 1.3, 0.12, 3.6, "wood")
+    for pu in (-0.55, 0.55):
+        for pv in (-0.6, 1.2, 2.5):
+            post = jetty.p(pu, -1.9, pv)
+            deck.cylinder(post, 0.07, 2.0, "darkwood", 6)
+    deck.done()
+    # (standing at its end, facing out over the water: the marker's -Z points over the water)
+    spot = jetty.p(0.0, 0.12, 2.3)
+    out = (math.cos(out_a), math.sin(out_a))
+    w1.mark("fishing_spot", spot, math.atan2(-out[0], -out[1]))
+    pads = w1.Piece("nocol_lily_pads")
+    rng_p = random.Random(9)
+    for k in range(7):
+        a, r = rng_p.uniform(0.0, math.tau), rng_p.uniform(0.6, 1.0)
+        px, pz = POOL[0] + math.cos(a) * POOL_RADII[0] * 0.75 * r, POOL[1] + math.sin(a) * POOL_RADII[1] * 0.75 * r
+        size = rng_p.uniform(0.25, 0.45)
+        ring = [(px + math.cos(math.tau * i / 9) * size, water_y + 0.015, pz + math.sin(math.tau * i / 9) * size) for i in range(1, 9)]
+        pads.face([(px, water_y + 0.015, pz)] + ring, "lily")
+        if k % 3 == 0:
+            pads.box((px + size * 0.3, water_y + 0.06, pz), (0.12, 0.08, 0.12), "lily_flower")
+    pads.done()
+    koi = w1.Piece("nocol_koi")
+    for k in range(4):
+        a = rng_p.uniform(0.0, math.tau)
+        kx, kz = POOL[0] + math.cos(a) * 1.4, POOL[1] + math.sin(a) * 1.0
+        heading = rng_p.uniform(0.0, math.tau)
+        fish = Frame.at(kx, kz, heading, water_y - 0.3)
+        fish.box(koi, 0.0, 0.0, 0.14, 0.1, 0.5, "koi" if k % 2 else "koi2")
+        fish.box(koi, 0.0, 0.31, 0.02, 0.12, 0.14, "koi")
+    koi.done()
+    far = pond_edge(out_a)
+    empty = w1.mark("reeds_pond", (far[0], hill_height(*far), far[1]))
     empty.scale = (1.8, 1.8, 1.8)
-    # The pond on top
-    w1.mark("pool", (POOL[0], HILL_TOP - 0.25, POOL[1]))
-    w1.mark("pool_size", (POOL_RADII[0] * 2.0, 1.6, POOL_RADII[1] * 2.0))
-    w1.mark("haunt_7", (POOL[0] - 3.2, hill_height(POOL[0] - 3.2, POOL[1] + 0.5), POOL[1] + 0.5))
+    w1.mark("haunt_7", (bank[0] - math.cos(out_a) * 1.5, hill_height(bank[0] - math.cos(out_a) * 1.5, bank[1] - math.sin(out_a) * 1.5), bank[1] - math.sin(out_a) * 1.5))
     # Crumbs up the winding path
     for k in range(18):
         x, z = path_point((k + 0.5) / 18 * 0.94)
@@ -1015,24 +1218,108 @@ def beyond():
                 for q in [(0, 4, 5, 1), (2, 3, 7, 6), (0, 2, 6, 4), (1, 5, 7, 3), (4, 6, 7, 5)]:
                     town.face([c[i] for i in q], "far_wall", 1.08 if q == (4, 6, 7, 5) else 0.95)
     town.done()
-    # Rolling hills in the distance, ridge behind ridge, paler and bluer the further off, and a great snow-capped
-    # volcano on the horizon to the south, framed from the grove and down the street (the user, 2026-11-02: "there
-    # should be rolling hills in the distance for the skybox, and a volcano like Rainier or Fuji"). Their colours
-    # are already hazed (sky_ materials: World draws them unshaded and out of the fog).
-    for layer, (r, base, amp, mat, seed) in enumerate(((430.0, 4.0, 22.0, "sky_ridge1", 1.3), (620.0, 18.0, 34.0, "sky_ridge2", 4.7),
-                                                         (860.0, 30.0, 44.0, "sky_ridge3", 9.1))):
-        ridge = w1.Piece("nocol_ridges_%d" % layer)
-        segs = 160
-        tops = []
-        for k in range(segs + 1):
-            a = math.tau * k / segs
-            roll = noise.noise(Vector((math.cos(a) * 2.2, math.sin(a) * 2.2, seed))) * 0.7 + noise.noise(Vector((math.cos(a) * 5.0, math.sin(a) * 5.0, seed + 3.0))) * 0.3
-            tops.append(base + amp * (0.5 + roll))
+    # Rolling hills in the distance, ridge behind ridge as in a Ghibli background painting (the user, 2026-11-02:
+    # "there should be rolling hills in the distance for the skybox", then "the hills in the distance need a little more
+    # work, and some 2D anime style trees"): each ridge's face painted in its vertex colours (sky_paint: World draws
+    # sky_ unshaded and out of the fog), darker forest green along its top fading to a pale band of mist at its foot,
+    # each farther ridge bluer and paler; fields and little buildings on the nearer ones; flat painted trees (sky_tree,
+    # textures/anime_tree.png) along the ridgelines and in copses down them, tinted by their ridge's haze.
+    layers = [
+        # (radius, height at the foot of its rounded tops, how high they roll, the colour along its top, its mist)
+        (430.0, 4.0, 26.0, (0.24, 0.42, 0.30), (0.70, 0.82, 0.84)),
+        (620.0, 16.0, 36.0, (0.34, 0.50, 0.50), (0.76, 0.85, 0.90)),
+        (860.0, 26.0, 48.0, (0.48, 0.60, 0.70), (0.80, 0.87, 0.94)),
+        (1150.0, 34.0, 62.0, (0.60, 0.70, 0.82), (0.84, 0.89, 0.96)),
+    ]
+    trees = PaintPiece("nocol_painted_trees")
+    rng_s = random.Random(31)
+
+    def lerp3(a, b, t):
+        return tuple(a[i] + (b[i] - a[i]) * t for i in range(3))
+
+    for layer, (r, base, amp, top_colour, mist) in enumerate(layers):
+        ridge = PaintPiece("nocol_ridges_%d" % layer)
+        segs = 180
+        seed = 1.3 + layer * 3.7
+
+        def top_at(a):
+            # (rounded rolling tops: a slow swell and a softer one, eased so the crests are round, not peaked)
+            roll = noise.noise(Vector((math.cos(a) * 1.8, math.sin(a) * 1.8, seed))) * 0.65 + noise.noise(Vector((math.cos(a) * 4.2, math.sin(a) * 4.2, seed + 2.0))) * 0.35
+            t = 0.5 + roll * 0.9
+            t = max(0.0, min(1.0, t))
+            return base + amp * (t * t * (3.0 - 2.0 * t))
+
+        rows = [0.0, 0.18, 0.45, 0.75, 1.0]   # down the face from the top, out to the misty foot
+
+        def at(a, row):
+            top = top_at(a)
+            return _ring_point(a, r - 110.0 * row, top + (-70.0 - top) * row)
+
+        def colour(a, row):
+            tone = 1.0 + 0.07 * noise.noise(Vector((math.cos(a) * 9.0, math.sin(a) * 9.0, seed + 5.0 + row * 3.0)))
+            c = lerp3(top_colour, mist, min(1.0, row * row * 1.3 + row * 0.2))
+            return tuple(min(1.0, v * tone) for v in c)
+
         for k in range(segs):
             a0, a1 = math.tau * k / segs, math.tau * (k + 1) / segs
-            ridge.face([_ring_point(a0, r + 60.0, -80.0), _ring_point(a1, r + 60.0, -80.0), _ring_point(a1, r, tops[k + 1]), _ring_point(a0, r, tops[k])], mat)
-            ridge.face([_ring_point(a0, r, tops[k]), _ring_point(a1, r, tops[k + 1]), _ring_point(a1, r - 70.0, -80.0), _ring_point(a0, r - 70.0, -80.0)], mat, 1.12)
+            for j in range(len(rows) - 1):
+                q = [at(a0, rows[j]), at(a0, rows[j + 1]), at(a1, rows[j + 1]), at(a1, rows[j])]
+                ridge.paint(q, "sky_paint", [colour(a0, rows[j]), colour(a0, rows[j + 1]), colour(a1, rows[j + 1]), colour(a1, rows[j])])
+        # fields and terraces, and little buildings, on the nearer two
+        if layer < 2:
+            for n in range(70 if layer == 0 else 40):
+                a = rng_s.uniform(0.0, math.tau)
+                row = rng_s.uniform(0.25, 0.6)
+                c = at(a, row)
+                inward = (-math.cos(a), -math.sin(a))
+                side = (-math.sin(a), math.cos(a))
+                w, h = rng_s.uniform(14.0, 30.0) * (1.0 + layer), rng_s.uniform(6.0, 12.0) * (1.0 + layer)
+                field = lerp3((0.62, 0.70, 0.42) if n % 3 else (0.72, 0.70, 0.46), mist, 0.25 + 0.3 * layer + row * 0.3)
+                p = (c[0] + inward[0] * 1.5, c[1], c[2] + inward[1] * 1.5)
+                ridge.paint([(p[0] - side[0] * w / 2, p[1] - h / 2, p[2] - side[1] * w / 2), (p[0] + side[0] * w / 2, p[1] - h / 2, p[2] + side[1] * w / 2),
+                             (p[0] + side[0] * w / 2, p[1] + h / 2, p[2] + side[1] * w / 2), (p[0] - side[0] * w / 2, p[1] + h / 2, p[2] - side[1] * w / 2)],
+                            "sky_paint", [field] * 4)
+            for n in range(90 if layer == 0 else 50):
+                a = rng_s.uniform(0.0, math.tau)
+                row = rng_s.uniform(0.45, 0.72)
+                c = at(a, row)
+                inward = (-math.cos(a), -math.sin(a))
+                side = (-math.sin(a), math.cos(a))
+                s = rng_s.uniform(3.0, 6.0) * (1.0 + 0.6 * layer)
+                wall = lerp3((0.92, 0.9, 0.84), mist, 0.3 + 0.3 * layer)
+                roof = lerp3((0.36, 0.40, 0.48) if n % 3 else (0.62, 0.38, 0.30), mist, 0.3 + 0.3 * layer)
+                p = (c[0] + inward[0] * 3.0, c[1], c[2] + inward[1] * 3.0)
+                ridge.paint([(p[0] - side[0] * s, p[1], p[2] - side[1] * s), (p[0] + side[0] * s, p[1], p[2] + side[1] * s),
+                             (p[0] + side[0] * s, p[1] + s, p[2] + side[1] * s), (p[0] - side[0] * s, p[1] + s, p[2] - side[1] * s)], "sky_paint", [wall] * 4)
+                ridge.paint([(p[0] - side[0] * s * 1.2, p[1] + s, p[2] - side[1] * s * 1.2), (p[0] + side[0] * s * 1.2, p[1] + s, p[2] + side[1] * s * 1.2),
+                             (p[0], p[1] + s * 1.6, p[2])], "sky_paint", [roof] * 3)
         ridge.done()
+        # the painted trees: along the ridgeline, and in copses down its face
+        if layer < 3:
+            tint = lerp3((0.44, 0.62, 0.44), mist, 0.15 + 0.3 * layer)
+            dark = lerp3((0.30, 0.46, 0.34), mist, 0.15 + 0.3 * layer)
+            count = (420, 320, 220)[layer]
+            scale = (1.0, 1.5, 2.1)[layer]
+            for n in range(count):
+                a = rng_s.uniform(0.0, math.tau)
+                if n % 3 == 0:
+                    row = rng_s.uniform(0.15, 0.5)
+                else:
+                    row = rng_s.uniform(0.0, 0.05)
+                base_p = at(a, row)
+                copse = 1 + (rng_s.randint(0, 4) if n % 3 == 0 else rng_s.randint(0, 2))
+                for c_ in range(copse):
+                    da = rng_s.uniform(-0.004, 0.004) * (1.0 + c_)
+                    p = at(a + da, row)
+                    tall = rng_s.uniform(12.0, 20.0) * scale
+                    wide = tall * rng_s.uniform(0.75, 1.0)
+                    col = tint if (n + c_) % 3 else dark
+                    for turn in (a, a + math.pi / 2):
+                        ox, oz = -math.sin(turn) * wide / 2, math.cos(turn) * wide / 2
+                        trees.paint([(p[0] - ox, p[1] - tall * 0.08, p[2] - oz), (p[0] + ox, p[1] - tall * 0.08, p[2] + oz),
+                                     (p[0] + ox, p[1] + tall, p[2] + oz), (p[0] - ox, p[1] + tall, p[2] - oz)],
+                                    "sky_tree", [col] * 4, [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)])
+    trees.done()
     # The volcano: a broad gentle foot steepening to a flat top, snow on its upper half running down the ravines in
     # streaks
     vx, vz, foot_y, height, foot_r, top_r = -330.0, 1050.0, -90.0, 420.0, 760.0, 34.0
@@ -1097,7 +1384,7 @@ FACES = [
 ]
 STAIRS = FACES[0][3]  # the face being built's (set by build_face)
 _tag = "S"
-_count = {"haunt": 20, "dog": 3, "kit": 0, "tree": 300}
+_count = {"haunt": 20, "dog": 3, "kit": 0, "tree": 300, "dumpster": 0}
 
 _path = []            # the road's centre: (x, z, y), a point about every metre
 _legs = []            # each run's points (x, y), by x
@@ -1308,6 +1595,38 @@ def _side(i, sign):
     return x + rx * sign, z + rz * sign, y
 
 
+def road_paint():
+    """The face road's markings (the user, 2026-11-02: "the road needs lines painted on it"): a dashed white centre
+    line, solid white edge lines, zebra crossings where the street leaves the ring and where each stairway meets a
+    run (thin strips just over the tarmac, only to look at)."""
+    paint = w1.Piece("nocol_road_paint_" + _tag)
+    lift = 0.045
+    for i in range(len(_path) - 1):
+        if _path[i][1] < ROAD[1] + 1.0:
+            continue
+        lines = [(-ROAD_HALF + 0.3, -ROAD_HALF + 0.45), (ROAD_HALF - 0.45, ROAD_HALF - 0.3)]
+        if (i // 3) % 2 == 0:
+            lines.append((-0.08, 0.08))
+        for s0, s1 in lines:
+            a0, a1, b0, b1 = _side(i, s0), _side(i, s1), _side(i + 1, s0), _side(i + 1, s1)
+            paint.face([(a0[0], a0[2] + lift, a0[1]), (a1[0], a1[2] + lift, a1[1]), (b1[0], b1[2] + lift, b1[1]), (b0[0], b0[2] + lift, b0[1])], "white")
+    def zebra(i):
+        # (bars along the way the traffic goes, across the road's width)
+        for c in range(-5, 6):
+            s0, s1 = c * 1.0 - 0.22, c * 1.0 + 0.22
+            if abs(c * 1.0) > ROAD_HALF - 0.6:
+                continue
+            for j in range(i - 1, i + 2):
+                a0, a1, b0, b1 = _side(j, s0), _side(j, s1), _side(j + 1, s0), _side(j + 1, s1)
+                paint.face([(a0[0], a0[2] + lift + 0.002, a0[1]), (a1[0], a1[2] + lift + 0.002, a1[1]), (b1[0], b1[2] + lift + 0.002, b1[1]), (b0[0], b0[2] + lift + 0.002, b0[1])], "white")
+    zebra(next(i for i, p in enumerate(_path) if p[1] >= HILL_EDGE + 3.0))
+    for sx, leg in STAIRS:
+        for li in (leg, leg + 1):
+            near = min(range(len(_path)), key=lambda i: math.hypot(_path[i][0] - sx, _path[i][1] - LEGS[li]))
+            zebra(near)
+    paint.done()
+
+
 def street(plinths):
     """The road down the face and its pavements, its retaining walls where the shelf is cut or built up (not where a
     plinth already stands), the stairways."""
@@ -1324,6 +1643,7 @@ def street(plinths):
                     p, q = _side(i, s), _side(i + 1, s)
                     road.face([(p[0], p[2] - 0.05, p[1]), (q[0], q[2] - 0.05, q[1]), (q[0], q[2] + lift, q[1]), (p[0], p[2] + lift, p[1])], "concrete", 0.85)
     road.done()
+    road_paint()
     drains = w1.Piece("nocol_street_drains_" + _tag)
     for i in range(30, len(_path) - 1, 18):
         for sign in (-1.0, 1.0):
@@ -1554,6 +1874,12 @@ def _mark_count(kind, name_fmt, at):
     return empty
 
 
+def dumpster(at, facing):
+    """A dumpster stands here (the user, 2026-11-02: "there should be dumpsters to jump into"): the marker's -Z points
+    the way its lid's front faces (`facing`, a way across the ground)."""
+    _mark_count("dumpster", "dumpster_%d", at).rotation_euler = (0.0, 0.0, math.atan2(-facing[0], -facing[1]))
+
+
 def kit(at):
     """A lost kit sits here (the surface under it)."""
     _mark_count("kit", "kit_%d", at)
@@ -1563,13 +1889,13 @@ def haunt(at):
     _mark_count("haunt", "haunt_%d", at)
 
 
-def bamboo(name, x, z, rng, count=18, radius=2.4):
+def bamboo(name, x, z, rng, count=18, radius=2.4, height=None):
     """A clump of bamboo: tall thin green canes (only to look at)."""
     piece = w1.Piece("nocol_bamboo_" + name)
     for _ in range(count):
         a, r = rng.uniform(0.0, math.tau), rng.uniform(0.0, radius)
         cx, cz = x + math.cos(a) * r, z + math.sin(a) * r
-        y = ground_y(cx, cz) - 0.1
+        y = (height or ground_y)(cx, cz) - 0.1
         tall = rng.uniform(5.5, 8.5)
         piece.cylinder((cx, y, cz), rng.uniform(0.05, 0.08), tall, "bamboo", 5, cap=False)
         # a few leafy sprays near the top
@@ -1787,6 +2113,22 @@ def build_face(f):
     for n, (x, z, size) in enumerate(((LEG_X + BEND + 5.0, (LEGS[0] + LEGS[1]) / 2, 3.0), (-40.0, FOOT_Z, 4.0))):
         empty = w1.mark("reeds_%s%d" % (_tag, n), (x, ground_y(x, z), z))
         empty.scale = (size, size, size)
+    # Dumpsters (main builds them) and more trash cans: two at the foot by the turning circle, one on the terrace in
+    # front of the first house up the hill, cans beside each
+    cx, cz = PLAZA
+    for deg in (200.0, 340.0):
+        a = math.radians(deg)
+        p = (cx + math.cos(a) * (CIRCLE[2] + 1.6), cz + math.sin(a) * (CIRCLE[2] + 1.6))
+        dumpster((p[0], FOOT_Y, p[1]), (-math.cos(a), -math.sin(a)))
+        side = (-math.sin(a), math.cos(a))
+        w1.can((p[0] + side[0] * 1.6, FOOT_Y, p[1] + side[1] * 1.6))
+    if yards:
+        frame = yards[0]
+        dumpster(frame.p(10.0 / 2 + 1.2 - 1.3, 0.0, -1.0), (-frame.out[0], -frame.out[1]))
+        for du in (-1.0, -1.8):
+            w1.can(frame.p(du, 0.0, -1.2))
+    elif zone == "Shrine":
+        dumpster(frame.p(6.8, 0.0, -1.5), (-frame.out[0], -frame.out[1]))
     # A dog's yard: the terrace in front of a house, or by the foot
     if yards:
         _mark_count("dog", "dog_%d", yards[0].p(3.0, 0.05, -1.0))
@@ -1828,11 +2170,14 @@ def _xz(p):
 def markers(frames):
     # He starts in the grove, a step from its heart (the user, 2026-11-02: "you should spawn in the center of the
     # grove and there shouldnt be enemies there")
-    heart = (0.0, hill_height(0.0, 0.0), 0.0)
-    w1.mark("grove_heart", heart)
+    # (the band's base, just in front of the great oak; nothing hunts him round the hill's middle)
+    hx, hz = OAK[0] * 0.62, OAK[1] * 0.62
+    w1.mark("grove_heart", (hx, hill_height(hx, hz), hz))
+    w1.mark("haven", (0.0, hill_height(0.0, 0.0), 0.0))
     # (facing south, down the hill: the spawn's turn is his facing_yaw)
-    w1.mark("spawn", (0.0, hill_height(0.0, 3.0) + 0.1, 3.0), 0.0)
-    w1.mark("check_top", (0.0, hill_height(0.0, 3.0) + 0.1, 3.0))
+    sx, sz = hx + 2.2, hz + 2.2
+    w1.mark("spawn", (sx, hill_height(sx, sz) + 0.1, sz), 0.0)
+    w1.mark("check_top", (sx, hill_height(sx, sz) + 0.1, sz))
     w1.mark("check_south", (0.0, 0.17, ROAD[1] + 1.2))
     w1.mark("check_east", (ROAD[1] + 1.2, 0.17, 0.0))
     w1.mark("check_west", (-ROAD[1] - 1.2, 0.17, 0.0))
@@ -1852,7 +2197,7 @@ def markers(frames):
     for n, k in enumerate((1, 10)):
         a = math.tau * k / SECTORS
         w1.mark("crows_%d" % n, (math.cos(a) * (ROAD[1] + 1.8), 0.0, math.sin(a) * (ROAD[1] + 1.8)))
-    w1.mark("den_0", frames[11].p(-1.8, 0.05, 15.5))
+    w1.mark("den_0", frames[11].p(1.6, 0.05, 15.8))
     # Dogs' yards on the ring: inside the garden walls, behind the gates
     for n, k in enumerate((5, 11, 8)):
         w1.mark("dog_%d" % n, frames[k].p(-3.0, 0.05, -1.0))
@@ -1862,6 +2207,11 @@ def markers(frames):
         r = ROAD[1] + 1.9
         w1.mark("cat_%d" % k, (math.cos(a) * r, 0.17, math.sin(a) * r))
     w1.mark("cap_cats", (0.0, HILL_TOP + 0.6, 0.0))
+    # Dumpsters round the ring (the faces' are in build_face), the lid's front to the road, a can or two beside
+    for k, u, v in ((1, -8.5, 6.0), (4, 5.6, 6.0), (7, 7.6, 4.0), (10, 12.2, 3.0)):
+        frame = frames[k]
+        dumpster(frame.p(u, 0.0, v), (-frame.out[0], -frame.out[1]))
+        w1.can(frame.p(u + (1.4 if u > 0 else -1.4), 0.0, v))
     # Crumbs round the inner pavement
     for k in range(20):
         a = math.tau * k / 20

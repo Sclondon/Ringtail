@@ -28,7 +28,7 @@ const CAP_NAMES := {
 ## The rest keep their own colour. (The user, 2026-11-01: "we'll need banjo kazooie style textures".)
 const TEXTURES := {
 	"grass": ["grass", 2.0, Color.WHITE], "dirt": ["dirt", 2.0, Color.WHITE],
-	"asphalt": ["asphalt", 3.0, Color.WHITE], "concrete": ["concrete", 2.0, Color.WHITE],
+	"asphalt": ["asphalt", 5.0, Color.WHITE], "concrete": ["concrete", 2.0, Color.WHITE],
 	"brick": ["brick", 1.4, Color.WHITE], "stone": ["stone", 1.5, Color.WHITE],
 	"siding": ["siding", 1.6, Color.WHITE], "siding2": ["siding", 1.6, Color(1.6, 1.25, 0.62)],
 	"siding3": ["siding", 1.6, Color(1.0, 1.18, 0.74)],
@@ -208,6 +208,12 @@ func _dress(level: Node) -> void:
 				far.albedo_color = (original as BaseMaterial3D).albedo_color if original is BaseMaterial3D else Color.WHITE
 				far.vertex_color_use_as_albedo = true
 				far.disable_fog = true
+				if key == "sky_tree":
+					# (the far hills' painted trees: flat cut-outs, textures/anime_tree.png, tinted by their ridge's haze)
+					far.albedo_texture = load("res://textures/anime_tree.png")
+					far.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
+					far.alpha_scissor_threshold = 0.5
+					far.cull_mode = BaseMaterial3D.CULL_DISABLED
 				made[key] = far
 			if not made.has(key):
 				var material := ShaderMaterial.new()
@@ -221,6 +227,9 @@ func _dress(level: Node) -> void:
 					material.set_shader_parameter(&"tile", paint[1])
 				material.set_shader_parameter(&"albedo", colour)
 				material.set_shader_parameter(&"emission", 0.9 if key == "window" else 0.0)
+				# (the roads' tarmac broken up in world space, no two stretches alike: the user, 2026-11-02, "less
+				# repetitive texture")
+				material.set_shader_parameter(&"variation", 1.0 if key == "asphalt" else 0.0)
 				made[key] = material
 			mesh.set_surface_override_material(k, made[key])
 		# (anything named `hidden_` is solid but not seen: the wall round the brink that keeps him in)
@@ -258,10 +267,14 @@ func _place_things() -> void:
 			# (treep_<n>_<seed>_<size%>_<kind>: a plain tree, no limbs to stand on; the user, 2026-11-02, "not all
 			# trees need a bunch of climbable branches")
 			var parts := name.split("_")
-			var tree := TreeGen.preset("Fir" if parts[4] == "cedar" else "Oak")
+			# (a kind ending lo is the plainer, cheaper version: the wood's outer rows)
+			var cedar := parts[4].begins_with("cedar")
+			var tree := TreeGen.preset("Fir" if cedar else "Oak")
 			tree.seed = int(parts[2])
 			tree.bark_style = TreeGen.Bark.OAK
 			tree.joined = true
+			if parts[4].ends_with("lo"):
+				tree = tree.simple()
 			var body := tree.body()
 			# (a plain tree has no collision of its own: its trunk is given a solid to bump into and scurry up, up
 			# into the crown, where he hops off onto its top; the user, 2026-11-02, "pine trees need collision and
@@ -269,7 +282,7 @@ func _place_things() -> void:
 			var trunk := CollisionShape3D.new()
 			var solid := CylinderShape3D.new()
 			solid.radius = tree.trunk_radius * 0.9
-			solid.height = tree.height * (0.8 if parts[4] == "cedar" else 0.55)
+			solid.height = tree.height * (0.8 if cedar else 0.55)
 			trunk.shape = solid
 			trunk.position.y = solid.height / 2.0
 			body.add_child(trunk)
@@ -296,6 +309,10 @@ func _place_things() -> void:
 			# the user, 2026-11-02, "some much bigger and taller trees as well")
 			var great := float(parts[3]) >= 150.0
 			var tree := TreeGen.preset("Great camphor" if great else "Climbing oak" if int(parts[1]) % 3 != 1 else "Climbing maple")
+			if great:
+				# (the great oak of the grove, the raccoons' base: the great tree's build in oak bark; the user, 2026-11-02,
+				# "a great big oak tree with gnarled roots")
+				tree.bark_style = TreeGen.Bark.OAK
 			tree.seed = int(parts[2])
 			var body := tree.body()
 			body.position = at

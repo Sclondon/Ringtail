@@ -40,7 +40,8 @@ const PAINTS := [Color(0.85, 0.22, 0.18), Color(0.2, 0.45, 0.8), Color(0.95, 0.7
 
 static func place(world: Node3D, markers: Dictionary, player: Player) -> void:
 	# (no grove: nowhere is safe; `safe` measures across the ground only, so far off across it, not below)
-	haven = (markers["grove_heart"] as Transform3D).origin if markers.has("grove_heart") else Vector3(1.0e6, 0.0, 1.0e6)
+	# (the hill's middle where World has a `haven` marker, else the band's base)
+	haven = (markers.get("haven", markers.get("grove_heart", Transform3D.IDENTITY.translated(Vector3(1.0e6, 0.0, 1.0e6)))) as Transform3D).origin
 	var road := 0
 	for loop: PackedVector3Array in _lines(markers, "road"):
 		var lane := _lane(loop)
