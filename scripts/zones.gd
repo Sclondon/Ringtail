@@ -106,7 +106,9 @@ func _recount_kits() -> void:
 func _physics_process(_delta: float) -> void:
 	if world.player == null:
 		return
-	var now := zone_of(world.player.global_position)
+	# (whoever is played: him, or the bird he is playing as)
+	var bird := BirdPlayer.active(world)
+	var now := zone_of(bird.global_position if bird else world.player.global_position)
 	if now != current:
 		current = now
 		changed.emit()
