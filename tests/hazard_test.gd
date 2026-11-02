@@ -98,7 +98,7 @@ func _run() -> void:
 		elif node is HazardFox:
 			fox = node
 			fox.add_to_group(&"fox")
-	_check(cars.size() == 2 and people.size() == 2 and hawk != null and crows.size() == 4 and fox != null,
+	_check(cars.size() == Hazards.CARS_PER_LOOP and people.size() == 2 and hawk != null and crows.size() == 4 and fox != null,
 		"placed: %d cars, %d people, hawk, %d crows, fox" % [cars.size(), people.size(), crows.size()])
 
 	# Cars drive round
@@ -111,7 +111,8 @@ func _run() -> void:
 	# He rides on a car's roof
 	car._stop_left = 0.0
 	car._stop_wait = 99.0
-	await _put(car.global_position + Vector3.UP * 1.6)
+	# (on its roof, whatever kind it is)
+	await _put(car.global_position + Vector3.UP * (car.half_size.y * 2.0 + 0.15))
 	var on := player.global_position
 	await _frames(60)
 	_check(player.global_position.distance_to(on) > 2.0 and player.global_position.y > 1.2,
@@ -119,7 +120,7 @@ func _run() -> void:
 
 	# Run into by a car, he is hurt
 	var hurts := game.hurts
-	var ahead := car.global_transform * Vector3(0.0, 0.05, 2.0)
+	var ahead := car.global_transform * Vector3(0.0, 0.05, car.half_size.z + 0.4)
 	await _put(Vector3(ahead.x, 0.05, ahead.z))
 	await _frames(20)
 	_check(game.hurts > hurts, "a car running into him hurts")

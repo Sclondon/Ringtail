@@ -380,3 +380,19 @@ Read README.md first. Started 2026-11-01.
   third band dives: Claude's pick).
 - Talk: "like hemlocks tower where they say things rather than a popup", then Gloaming's see-through, typed look;
   "spamming" (only the nearest talks, 3 lines a visit); "more things to say" (lines are Claude's placeholders).
+
+## Vehicles (2026-11-02, the user's words)
+
+- "the roads should be wider, the cars bigger and faster" / "and there should be different types, busses etc".
+  `tools/build_vehicles.py` (Blender, `tools/vehicles.blend`) writes `models/vehicle_<kind>.glb`: hatchback, taxi
+  (roof sign), kei_truck (flat bed), kei_van, bus (two-tone, doors on the left, route sign); real sizes (a car about
+  4 m long and 1.5 m high, the bus 10.5 m). Kinds, looks, colours and speeds are Claude's picks.
+- `HazardCar` (scripts/hazard_car.gd): `kind` picks the model and `KINDS` its size, cruise (cars 9.5-11.5 m/s, the
+  bus 7.5) and wheels; one collision box to the roof (stand on it and ride); `half_size` is what Villager and
+  SquadRaccoon read to be run over (below the roof only). It keeps back from the vehicle ahead on its road (`road`),
+  closing to its speed at `GAP`; a bus stops at `bus_stop_<n>` markers near its road (else every so often).
+- `Hazards.place`: three a road (`CARS_PER_LOOP`), kinds in turn from `KIND_MIX` (a bus on every other road),
+  `KIND_PAINTS` for the bus, taxi and kei truck; they drive on the left now, as in Japan (`_lane`, LANE 1.9 m: widen
+  it if the town's roads widen). The road widths are the TOWN fork's.
+- Checks: `tests/vehicle_test.gd` (all up to speed, none runs into another, one pulls up behind a stopped one),
+  `tests/vehicle_shots.gd` (each beside him from four sides). `models/car.glb` (tools/build_hazards.py) is unused now.

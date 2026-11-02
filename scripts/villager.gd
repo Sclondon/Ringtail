@@ -107,9 +107,10 @@ func _physics_process(delta: float) -> void:
 		var moving: float = car.get(&"speed") if car.get(&"speed") is float else 0.0
 		if body == null or moving < 1.5:
 			continue
-		# (within the car's own box: about 2 m wide, 4.6 m long)
+		# (within the vehicle's own box: HazardCar.half_size, a bus far longer than a car)
+		var half: Vector3 = car.get(&"half_size") if car.get(&"half_size") is Vector3 else Vector3(1.0, 0.8, 2.3)
 		var local := body.to_local(global_position)
-		if absf(local.x) < 1.05 and absf(local.z) < 2.3 and local.y < 1.6:
+		if absf(local.x) < half.x + 0.05 and absf(local.z) < half.z + 0.1 and local.y < half.y * 2.0 - 0.3:
 			var away := global_position - body.global_position
 			away.y = 0.0
 			die(away.normalized() * moving + Vector3.UP * 3.0)

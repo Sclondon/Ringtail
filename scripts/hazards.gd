@@ -16,11 +16,19 @@ class_name Hazards
 ##                         "you should spawn in the center of the grove and there shouldnt be enemies there")
 
 ## How many of each, per marker (Claude's picks).
-const CARS_PER_LOOP := 2
+const CARS_PER_LOOP := 3
 const PEOPLE_PER_WALK := 2
 const CROWS_PER_BAND := 4
-## How far right of a road's centre line its cars keep.
-const LANE := 1.6
+## How far left of a road's centre line its vehicles keep (they drive on the left, as in Japan).
+const LANE := 1.9
+## The kinds of vehicle on the roads, in turn (HazardCar.KINDS; the user, 2026-11-02, "there should be different types,
+## busses etc"), and the colours a kind always comes in (body, second colour). Claude's picks.
+const KIND_MIX := [&"hatchback", &"kei_truck", &"bus", &"taxi", &"kei_van", &"hatchback"]
+const KIND_PAINTS := {
+	&"bus": [Color(0.25, 0.55, 0.42), Color(0.93, 0.9, 0.8)],
+	&"taxi": [Color(0.16, 0.3, 0.22), Color(0.95, 0.85, 0.35)],
+	&"kei_truck": [Color(0.93, 0.93, 0.9), Color(0.75, 0.76, 0.78)],
+}
 ## How far round the grove's heart he is safe: nothing chases, stalks or dives at him there (the hill and its slopes).
 const HAVEN_RADIUS := 21.0
 
@@ -33,15 +41,26 @@ const PAINTS := [Color(0.85, 0.22, 0.18), Color(0.2, 0.45, 0.8), Color(0.95, 0.7
 static func place(world: Node3D, markers: Dictionary, player: Player) -> void:
 	# (no grove: nowhere is safe; `safe` measures across the ground only, so far off across it, not below)
 	haven = (markers["grove_heart"] as Transform3D).origin if markers.has("grove_heart") else Vector3(1.0e6, 0.0, 1.0e6)
+	var road := 0
 	for loop: PackedVector3Array in _lines(markers, "road"):
 		var lane := _lane(loop)
 		for k in CARS_PER_LOOP:
 			var car := HazardCar.new()
 			car.route = lane
+			car.road = road
 			car.start = float(k) / CARS_PER_LOOP
+			# (a mix of kinds on each road, a bus on every other one)
+			car.kind = KIND_MIX[(road * 2 + k) % KIND_MIX.size()]
+			if car.kind == &"bus" and road % 2 == 1:
+				car.kind = &"hatchback"
 			car.paint = PAINTS[(world.get_child_count() + k * 3) % PAINTS.size()]
+			if KIND_PAINTS.has(car.kind):
+				car.paint = KIND_PAINTS[car.kind][0]
+				car.paint2 = KIND_PAINTS[car.kind][1]
+			car.stops = _stops(markers, lane)
 			car.player = player
 			world.add_child(car)
+		road += 1
 	var seed := 1
 	for walk: PackedVector3Array in _lines(markers, "walk"):
 		for k in PEOPLE_PER_WALK:
@@ -130,7 +149,28 @@ static func _lines(markers: Dictionary, prefix: String) -> Array[PackedVector3Ar
 	return lines
 
 
-## A closed loop's points moved LANE to the right of the way it runs.
+## Where along `lane` its bus stops are (m): any `bus_stop_<n>` marker within 8 m of it.
+static func _stops(markers: Dictionary, lane: PackedVector3Array) -> Array[float]:
+	var stops: Array[float] = []
+	for name: String in markers:
+		if not name.begins_with("bus_stop_"):
+			continue
+		var at: Vector3 = (markers[name] as Transform3D).origin
+		var run := 0.0
+		var best := INF
+		var best_run := 0.0
+		for i in lane.size():
+			var d := lane[i].distance_to(at)
+			if d < best:
+				best = d
+				best_run = run
+			run += lane[i].distance_to(lane[(i + 1) % lane.size()])
+		if best < 8.0:
+			stops.append(best_run)
+	return stops
+
+
+## A closed loop's points moved LANE to the left of the way it runs.
 static func _lane(loop: PackedVector3Array) -> PackedVector3Array:
 	var lane := PackedVector3Array()
 	var n := loop.size()
@@ -138,7 +178,7 @@ static func _lane(loop: PackedVector3Array) -> PackedVector3Array:
 		var ahead := (loop[(i + 1) % n] - loop[(i - 1 + n) % n])
 		ahead.y = 0.0
 		ahead = ahead.normalized()
-		# (right of the way it runs: +Z ahead has right at -X)
-		var right := Vector3(-ahead.z, 0.0, ahead.x)
-		lane.append(loop[i] + right * LANE)
+		# (left of the way it runs: +Z ahead has left at +X)
+		var left := Vector3(ahead.z, 0.0, -ahead.x)
+		lane.append(loop[i] + left * LANE)
 	return lane
