@@ -26,6 +26,9 @@ var _rest := 0.0
 
 func _init() -> void:
 	super()
+	# (the boy brought low for crowds, tools/build_boy_tp.py: the user, 2026-11-02, "you should also make a lower poly
+	# version of the people like I did for gloaming")
+	model = preload("res://models/boy_tp.glb")
 	size = 1.4
 	walk_speed = 1.2
 	run_speed = 3.6
@@ -40,7 +43,17 @@ func _ready() -> void:
 		_leg = int(at)
 		position = route[_leg].lerp(route[_leg + 1], at - _leg)
 	super()
-	CharacterLook.apply(rig, CharacterLook.random(look_seed))
+	# (faceless, a mask of a head after Inside, as the boy's: the user, 2026-11-02, "the people should use the faceless
+	# mask model")
+	HeadShape.add_to(rig)
+	var chosen := CharacterLook.random(look_seed)
+	chosen["face"] = "mannequin"
+	var look := CharacterLook.dressed(chosen)
+	var masks := ["mask", "mask_long", "mask_soft", "mask_brow", "mask_square", "inside"]
+	look["parts"]["head"] = HeadShape.option(masks[look_seed % masks.size()])
+	rig.look = look
+	if rig.is_node_ready():
+		rig.restyle()
 	_next()
 
 
@@ -75,7 +88,8 @@ func _physics_process(delta: float) -> void:
 		State.STROLL:
 			if not is_going():
 				_next()
-			if near < notice and _rest <= 0.0 and not Hazards.unseen(player) and absf(player.global_position.y - global_position.y) < 1.5:
+			# (by day they notice him from further, at night hardly: DayNight)
+			if near < notice * DayNight.by_day(1.5, 0.6) and _rest <= 0.0 and not Hazards.unseen(player) and absf(player.global_position.y - global_position.y) < 1.5:
 				stop()
 				face(player.global_position)
 				_go(State.START)
