@@ -65,6 +65,8 @@ const ROTOR_STRETCH := 1.2
 const SPIN_STRETCH := 1.15
 ## How long his one turn takes as the twirl begins, seconds.
 const HELI_TURN_TIME := 0.4
+## How far his knees turn out to the side (radians) where a pose solves his legs: a little bow-legged, as an animal's.
+const KNEE_OUT := 0.22
 ## How many frames back the tail's trail reaches.
 const TRAIL_FRAMES := 10
 ## The fur's springs (see _spring_fur), and which region his head is.
@@ -239,7 +241,8 @@ func _pose_extra(delta: float) -> void:
 	if _moves:
 		spin = _moves.spin
 		gliding = _moves.gliding
-	_glide = _approach(_glide, 1.0 if gliding else 0.0, 10.0, delta)
+	# (on the ground it lets go at once: hanging on over the landing, his legs went down through the ground)
+	_glide = 0.0 if grounded and not gliding else _approach(_glide, 1.0 if gliding else 0.0, 10.0, delta)
 	_twirl = fposmod(_twirl + delta * TAU * 3.5 * _glide, TAU)
 	_spin_w = _approach(_spin_w, 1.0 if spin < 1.0 else 0.0, 30.0, delta)
 
@@ -393,7 +396,7 @@ func _pose_hang_swing(delta: float) -> void:
 		var foot := _feet[i].position
 		# (about the hip: sideways with the shimmy, back and forth a little, the trailing leg further)
 		var out := Vector3(clampf(_leg_swing * 0.22 + _shimmy * side * 0.04, -0.3, 0.3), absf(_leg_swing) * 0.08, idle + sin(_time * 3.1 + side) * 0.03 * absf(_shimmy))
-		_solve_leg(i, side, foot + out * w, _feet[i].basis)
+		_set_leg(i, side, foot + out * w, _feet[i].basis, w)
 
 
 ## Climbing (Scurry): his all-fours pose turned up onto the surface ahead of him, belly to it, head up, paws
@@ -648,8 +651,20 @@ func _pose_spin(at: float, w: float) -> void:
 		yaw = -SPIN_BACK + (TAU + SPIN_BACK) * smoothstep(0.0, 1.0, s)
 	_spin_trail = clampf((yaw - _spin_yaw) / maxf(get_process_delta_time(), 0.001) * 0.045, -0.2, 1.3) if at < SPIN_TURNED else _spin_trail * 0.85
 	_spin_yaw = yaw
+	# (where his feet were before the hips go down and round: they stay on the ground, turning under him; carried
+	# with the hips they sank into it, the user, 2026-11-02, "lots of the poses break his legs it looks like")
+	var base_feet: Array[Transform3D] = []
+	for i in 2:
+		base_feet.append(_hips.transform * _feet[i].transform)
 	_hips.position.y -= 0.09 * crouch * w
 	_hips.basis = Basis(Vector3.UP, yaw * w) * _hips.basis
+	var hips_inverse := _hips.transform.affine_inverse()
+	var about := Basis(Vector3.UP, yaw * w)
+	for i in 2:
+		var side := 1.0 if i == 0 else -1.0
+		var planted := Transform3D(about * base_feet[i].basis, about * base_feet[i].origin)
+		planted.origin.y = base_feet[i].origin.y
+		_set_leg(i, side, hips_inverse * planted.origin, _hips.basis.inverse() * planted.basis.orthonormalized(), w)
 	_spine.basis = _slerp(_spine.basis, Basis(Vector3.RIGHT, 0.35) * _spine.basis, crouch * w)
 	_head.basis = _slerp(_head.basis, Basis(Vector3.RIGHT, -0.3) * _head.basis, crouch * w)
 	# Arms in to the chest winding up, flung wide as he goes round
@@ -744,7 +759,7 @@ func _pose_quad(w: float, speed: float, stride: float) -> void:
 		pitch = lerpf(pitch, 0.55 * smoothstep(duty * 0.55, duty, at) * float(at < duty) + 0.85 * _bump(at, duty, 1.0) * (1.0 - smoothstep(0.82, 1.0, at)), galloping)
 		var wanted := Transform3D(Basis(Vector3.RIGHT, pitch), point)
 		var blended := base_feet[i].interpolate_with(wanted, w)
-		_solve_leg(i, side, hips_inverse * blended.origin, _hips.basis.inverse() * blended.basis.orthonormalized())
+		_set_leg(i, side, hips_inverse * blended.origin, _hips.basis.inverse() * blended.basis.orthonormalized(), w)
 	# Fore paws, set down flat under the shoulders
 	for i in 2:
 		var side := 1.0 if i == 0 else -1.0
@@ -804,7 +819,7 @@ func _pose_sneak(w: float, speed: float) -> void:
 		var point := Vector3(base_feet[i].origin.x, ANKLE + step.y + 0.06 * sin(pitch), 0.02 + step.x)
 		var wanted := Transform3D(Basis(Vector3.RIGHT, pitch), point)
 		var blended := base_feet[i].interpolate_with(wanted, w)
-		_solve_leg(i, side, hips_inverse * blended.origin, _hips.basis.inverse() * blended.basis.orthonormalized())
+		_set_leg(i, side, hips_inverse * blended.origin, _hips.basis.inverse() * blended.basis.orthonormalized(), w)
 	# (paws up before his chest, hanging limp from the wrists)
 	var forward := global_basis.z.normalized()
 	for i in 2:
@@ -855,6 +870,29 @@ func _close_paw(i: int, side: float, curl: float, w: float) -> void:
 	_pose_fingers(i, side)
 
 
+## Leg `i` solved to `target` (in the hips' space) with its foot turned `foot_basis`, its knee turned from where it
+## points now towards a little out to the side (KNEE_OUT) by `w`. Solved outright, the knee jumped from the pose
+## underneath into the solver's own plane as a pose blended in, and with his feet set closer than his hips it caved
+## inward (the user, 2026-11-02: "lots of the poses break his legs it looks like").
+func _set_leg(i: int, side: float, target: Vector3, foot_basis: Basis, w: float) -> void:
+	_solve_leg(i, side, target, foot_basis, lerp_angle(_knee_turn(i, side), side * KNEE_OUT, clampf(w, 0.0, 1.0)))
+
+
+## Which way leg `i`'s knee points now, as `_solve_leg`'s `knee`: the turn of its bend about the leg, taken back to
+## the leg hanging straight down.
+func _knee_turn(i: int, side: float) -> float:
+	var hip := Vector3(side * _hip_width, _hip_drop, 0.0)
+	var line := _feet[i].position - hip
+	if line.length_squared() < 0.0001:
+		return side * KNEE_OUT
+	var t := clampf((_shins[i].position - hip).dot(line) / line.length_squared(), 0.0, 1.0)
+	var bend := _shins[i].position - (hip + line * t)
+	if bend.length_squared() < 0.000001:
+		return side * KNEE_OUT
+	var ahead := Quaternion(line.normalized(), Vector3.DOWN) * bend.normalized()
+	return atan2(ahead.x, ahead.z)
+
+
 ## 0 outside a..b, rising to 1 halfway between and back down.
 static func _bump(x: float, a: float, b: float) -> float:
 	return sin(PI * clampf((x - a) / (b - a), 0.0, 1.0))
@@ -893,8 +931,9 @@ func _pose_glide(w: float) -> void:
 		var shoulder := to_local(_shoulders[i].global_position)
 		_solve_arm(i, side, to_global(shoulder + Vector3(side * 0.06, -0.34, 0.05 + sin(_time * 5.0 + side) * 0.05)), _forearm, w)
 		var hip := _hips.transform * Vector3(side * _hip_width, _hip_drop, 0.0)
-		var foot := hip + Vector3(side * 0.03, -0.36, sin(_time * 4.2 + side * 1.3) * 0.06)
-		_solve_leg(i, side, hips_inverse * foot, _hips.basis.inverse() * Basis(Vector3.RIGHT, 0.7))
+		# (dangling, but drawn up enough that his paws do not reach down past where he lands)
+		var foot := hip + Vector3(side * 0.03, -0.28, sin(_time * 4.2 + side * 1.3) * 0.06)
+		_set_leg(i, side, hips_inverse * foot, _hips.basis.inverse() * Basis(Vector3.RIGHT, 0.7), w)
 	_head.basis = _slerp(_head.basis, Basis(Vector3.RIGHT, -0.9), w)
 
 

@@ -335,3 +335,14 @@ Read README.md first. Started 2026-11-01.
   the ones hanging on his belly": Back and Chest (every part) have an Angle of their own (look "parts" [size, width,
   density, angle]); tests/fur_angle.gd works the shader's angle step over the body ruffs' tips (rings: out 0.18 /
   0.14 / 0.06 m at -0.9 / 0 / 0.9); `look_shots.gd ... belly` shoots the belly from the side.
+
+## Legs (2026-11-02)
+
+- The user: "lots of the poses break his legs it looks like". `tests/leg_check.gd` measures every move headless (knee bent
+  back against his front, leg stretched or crushed, foot under the ground, foot turned back, knee flipping across).
+  Found and fixed: the spin lowered and turned his hips with the legs riding along (feet sank 7.5 cm and swung round:
+  now planted and re-solved, pivoting under him); the helicopter hang let go slowly on landing, so his dangling legs
+  went into the ground (now it lets go the frame he lands, and the legs dangle higher); every pose that solves the
+  legs itself (all fours, sneak, spin, hang, helicopter) snapped the knee into the solver's plane as it blended in and
+  could cave it inward (now `RaccoonRig._set_leg` turns the knee from where it points towards KNEE_OUT, a little
+  bow-legged, by the pose's weight). Climbing, ledge hanging and tightropes are not covered by the playground test yet.
