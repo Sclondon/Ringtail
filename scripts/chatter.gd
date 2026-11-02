@@ -82,6 +82,10 @@ func _process(delta: float) -> void:
 			_near[who] = false
 			continue
 		if not who.talks():
+			# (one that has nothing to say any more is not talking to him)
+			if _near.get(who, false):
+				_near[who] = false
+				who.listen(false)
 			continue
 		var near := who == nearest
 		var was: bool = _near.get(who, false)

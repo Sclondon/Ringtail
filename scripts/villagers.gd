@@ -140,6 +140,10 @@ static func place(world: Node3D, markers: Dictionary, hero: Player) -> void:
 	mossback.rotation.y = atan2(heart.x - seat.x, heart.z - seat.z)
 	if oak != Vector3.INF:
 		band._fit = [mossback, oak, heart]
+	# (the leafy platforms up the giant firs, for them to climb up to and sit on: found once the physics has the trees)
+	for name: String in markers:
+		if name.begins_with("npc_perch_"):
+			band._perch_marks.append((markers[name] as Transform3D).origin)
 	# (two play tag; the third sometimes, with whichever)
 	kits[0].playmate = kits[1]
 	kits[1].playmate = kits[0]
@@ -344,6 +348,10 @@ const CHATS := [
 
 ## The giant, the oak and the base, till it is set against the bark (once the trees are in the physics).
 var _fit: Array = []
+## The giant firs' perches: their markers, till the firs are found; then each fir (a node at its trunk's middle on the
+## ground) with meta `perches` (the tops of its platforms).
+var _perch_marks: Array[Vector3] = []
+var firs: Array[Node3D] = []
 var _chats: Array[Dictionary] = []
 var _chat_wait := 5.0
 
@@ -372,6 +380,8 @@ func _free(who: Villager) -> bool:
 func _physics_process(delta: float) -> void:
 	if not _fit.is_empty():
 		_fit_giant()
+	if not _perch_marks.is_empty():
+		_find_firs()
 	_chat_wait -= delta
 	if _chat_wait <= 0.0:
 		_chat_wait = randf_range(6.0, 12.0)
@@ -504,3 +514,59 @@ func _fit_giant() -> void:
 	giant.home = seat
 	giant.velocity = Vector3.ZERO
 	giant.rotation.y = atan2(out.x, out.z)
+
+
+## The giant firs (the user, 2026-11-02: "in between we need a couple big trees for npcs to be in. There should be like
+## leaf platforms to stand on in the big trees"): under each `npc_perch_<n>` a ray out each way finds the nearest
+## trunk, so each platform is put with its fir; a fir is a node at its trunk's middle, on the ground beside it.
+const FIR_RADIUS := 1.1
+
+
+func _find_firs() -> void:
+	var space := get_viewport().get_world_3d().direct_space_state
+	for perch in _perch_marks:
+		var under := perch + Vector3.DOWN * 1.5
+		var best := {}
+		var best_d := 7.0
+		var way := Vector3.ZERO
+		for k in 16:
+			var dir := Vector3.FORWARD.rotated(Vector3.UP, TAU * k / 16.0)
+			var hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(under, under + dir * 7.0, 1))
+			# (bark stands upright: a platform's rim or underside is not the trunk)
+			if not hit.is_empty() and absf((hit.normal as Vector3).y) < 0.2 and (hit.position as Vector3).distance_to(under) < best_d:
+				best = hit
+				best_d = (hit.position as Vector3).distance_to(under)
+				way = dir
+		if best.is_empty():
+			continue
+		# (in from the bark along its normal: a ray's way in is only one of sixteen; a platform whose ray finds its fir
+		# poorly, high up, still goes with the fir nearest: they stand far apart)
+		var normal := Vector3(best.normal.x, 0.0, best.normal.z)
+		var middle: Vector3 = best.position - (normal.normalized() if normal.length() > 0.1 else -way) * FIR_RADIUS
+		var fir: Node3D
+		for other in firs:
+			if Vector2(other.global_position.x - middle.x, other.global_position.z - middle.z).length() < 6.0:
+				fir = other
+		if fir == null:
+			# (its foot: the ground beside the trunk, on the platform's side)
+			var beside: Vector3 = best.position - way * 0.4
+			var down := space.intersect_ray(PhysicsRayQueryParameters3D.create(Vector3(beside.x, perch.y - 2.0, beside.z), Vector3(beside.x, perch.y - 40.0, beside.z), 1))
+			if down.is_empty():
+				continue
+			fir = Node3D.new()
+			fir.name = "Fir%d" % firs.size()
+			add_child(fir)
+			fir.global_position = Vector3(middle.x, (down.position as Vector3).y, middle.z)
+			fir.set_meta(&"perches", [] as Array[Vector3])
+			firs.append(fir)
+		(fir.get_meta(&"perches") as Array[Vector3]).append(perch)
+	_perch_marks.clear()
+
+
+## How many are up `fir` or on their way, and how many on `perch`.
+func up_fir(fir: Node3D, perch := Vector3.INF) -> int:
+	var count := 0
+	for other in members:
+		if other.doing == Villager.Doing.CLIMB and other._tree == fir and (perch == Vector3.INF or other._perch == perch):
+			count += 1
+	return count

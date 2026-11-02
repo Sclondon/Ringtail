@@ -116,15 +116,49 @@ func _run(world: World) -> void:
 	_check(went and highest > 1.5, "a kit climbs a tree (%.1f m up)" % highest)
 	_check(down, "and comes down again to the ground (phase %d, doing %s)" % [climber._climb_phase, Villager.Doing.keys()[climber.doing]])
 
+	# Up a giant fir to a platform, a while sat there, and down again (when the town has firs with platforms)
+	if band.firs.is_empty():
+		print("(no giant firs with platforms in this world: perching not checked)")
+	else:
+		var percher: Villager = adults[1]
+		_only(band, [percher])
+		percher.playmate = null
+		percher._go(Villager.Doing.STAND, 30.0)
+		var perched := percher._begin_perch()
+		var fir := percher._tree
+		if perched:
+			player.global_position = fir.global_position + percher._out * 7.0 + Vector3.UP * 0.5
+		var sat := false
+		var sat_at := 0.0
+		var landed := false
+		var ground_off := 99.0
+		for _i in 6000:
+			if not perched:
+				break
+			await physics_frame
+			if not sat and percher._climb_phase == 5 and percher.is_on_floor():
+				sat = true
+				sat_at = percher.global_position.y - fir.global_position.y
+				# (not the whole while: down after a moment)
+				percher._t = 1.0
+			if sat and percher.doing != Villager.Doing.CLIMB:
+				landed = not percher.dead and percher.collision_mask == 1
+				ground_off = percher.global_position.y - fir.global_position.y
+				break
+		_check(perched and sat and sat_at > 3.0, "a grown-up goes up a giant fir and sits on a platform (%.1f m up, %d firs)" % [sat_at, band.firs.size()])
+		_check(landed and absf(ground_off) < 1.5, "and climbs down again, alive (%.2f m off the fir's foot)" % ground_off)
+
 	# At play
 	_only(band, kits)
 	var played := {}
+	var kit_doings := {}
 	for _i in 1800:
 		await physics_frame
 		for kit: Villager in kits:
+			kit_doings[Villager.Doing.keys()[kit.doing]] = true
 			if kit.doing == Villager.Doing.PLAY:
 				played[kit.play] = true
-	_check(not played.is_empty(), "the kits play (%s)" % ", ".join(played.keys().map(func(k: int) -> String: return Villager.Play.keys()[k])))
+	_check(not played.is_empty(), "the kits play (%s; doing %s)" % [", ".join(played.keys().map(func(k: int) -> String: return Villager.Play.keys()[k])), ", ".join(kit_doings.keys())])
 	# Something brought home: they all celebrate, the giant clapping
 	_only(band, band.members)
 	player.global_position = (adults[0] as Villager).home + Vector3(0.0, 0.5, 3.0)

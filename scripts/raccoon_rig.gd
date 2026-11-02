@@ -285,7 +285,9 @@ func _pose_extra(delta: float) -> void:
 	_gallop = _approach(_gallop, smoothstep(_player.walk_speed, _player.run_speed * 0.8, speed) if fast else 0.0, 6.0, delta)
 	_scurry_gait = _approach(_scurry_gait, 1.0 if scurrying else 0.0, 6.0, delta)
 	var stride := lerpf(0.44, lerpf(BOUND_STRIDE, SCURRY_STRIDE, _scurry_gait), _gallop)
-	_qphase = fposmod(_qphase + speed / stride * delta, 1.0)
+	# (its strides are in its own size: a kit's, or his at 0.9, are that much shorter on the ground, so they come quicker)
+	var own_size := maxf(global_basis.get_scale().y, 0.01)
+	_qphase = fposmod(_qphase + speed / (stride * own_size) * delta, 1.0)
 
 	var spin := 1.0
 	var gliding := false
@@ -301,7 +303,7 @@ func _pose_extra(delta: float) -> void:
 		_pose_quad(smoothstep(0.0, 1.0, _quad), speed, stride)
 	var sneaking: bool = &"is_sneaking" in _player and _player.is_sneaking and free and grounded and wanted < 0.5 and not climbing
 	_sneak = _approach(_sneak, 1.0 if sneaking else 0.0, 6.0, delta)
-	_sphase = fposmod(_sphase + speed / SNEAK_STRIDE * delta, 1.0)
+	_sphase = fposmod(_sphase + speed / (SNEAK_STRIDE * own_size) * delta, 1.0)
 	if _sneak > 0.002:
 		_pose_sneak(smoothstep(0.0, 1.0, _sneak) * (1.0 - _quad), speed)
 	# (upright on his feet, about the place: a little hunched, rubbing his paws when he stands)

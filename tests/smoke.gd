@@ -280,7 +280,9 @@ func _run() -> void:
 	var said: bool = (open.call() as Array).size() == 1
 	await _put(talker.global_position + Vector3(0.0, 0.4, 12.0))
 	await _frames(40)
-	_check(said and (open.call() as Array).is_empty() and not Player.input_blocked, "a raccoon at the grove says its line in a bubble as he comes near, and stops as he goes")
+	# (the one that spoke to him: others may be chatting among themselves meanwhile)
+	var stopped: bool = not villagers.talk._near.get(talker, false) and villagers.talk.bubble_of(talker).openness < 0.1
+	_check(said and stopped and not Player.input_blocked, "a raccoon at the grove says its line in a bubble as he comes near, and stops as he goes")
 	# (killed, one goes limp where it is and stays: it is never put back)
 	var goner: Villager = out_about[0]
 	goner.global_position.y = World.KILL_Y - 5.0

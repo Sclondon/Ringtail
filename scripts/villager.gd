@@ -70,6 +70,12 @@ var _tree: Node3D
 var _climb_to := 0.0
 var _out := Vector3.BACK
 var _climb_phase := 0
+## Up a giant fir to a platform (Villagers.firs): the platform's top (else INF), the spot on it, and the place on the
+## bark it went up by.
+var _perch := Vector3.INF
+var _perch_spot := Vector3.ZERO
+var _grip := Vector3.ZERO
+var _napping := false
 var _play_centre := Vector3.ZERO
 var _hide_spot := Vector3.INF
 
@@ -364,6 +370,7 @@ func _choose() -> void:
 	if giant:
 		_giant_choose()
 		return
+	_perch = Vector3.INF
 	if chat_with:
 		chat_with = null
 		speaking = false
@@ -397,6 +404,9 @@ func _choose() -> void:
 	if stays:
 		var pick := randf()
 		_go(Doing.SIT if pick < 0.4 else (Doing.SNIFF if pick < 0.65 else (Doing.GROOM if pick < 0.8 else Doing.STAND)), randf_range(2.5, 6.0))
+		return
+	# (up a giant fir to sit on a platform a while, now and then)
+	if home != Vector3.INF and randf() < (0.03 if kit else 0.12) and _begin_perch():
 		return
 	# At the grove: the kits at play most of the time, up a tree now and then, pestering the grown-ups; the grown-ups
 	# up a tree or playing tag once in a while (and chatting: Villagers sets that up)
@@ -456,6 +466,14 @@ func _arrived() -> bool:
 func _go(to: Doing, seconds: float) -> void:
 	doing = to
 	_t = seconds
+	# (now and then on all fours about the place, and up again: the user, 2026-11-02, "raccoons should walk around on all
+	# 4s too sometimes"; kits mostly on all fours, now and then up on their hind legs; all stand to talk)
+	if rig and not giant and not stays:
+		var ambling := to in [Doing.STROLL, Doing.GO, Doing.SNIFF, Doing.RUMMAGE, Doing.FOLLOW]
+		if kit:
+			rig.always_on_fours = not ((ambling or to == Doing.STAND) and randf() < 0.3) and to != Doing.TALK
+		else:
+			rig.always_on_fours = ambling and randf() < 0.35
 
 
 ## A level velocity towards `at`, easing off as it gets there; `pace` of its fastest.
@@ -593,18 +611,33 @@ func _start_climb() -> void:
 	collision_mask = 0
 	velocity = Vector3.ZERO
 	rig.climbing_npc = true
+	_grip = global_position
 
 
 ## Up the trunk, holding on a while up there looking about, and down again; moved along it, nothing pushing it.
+## Going to a fir's platform it goes straight up the bark (the platforms round it would catch a ray to the trunk),
+## steps out onto it, walks to a spot, sits there a while (napping, or chatting with one on the same platform), then
+## walks back to the bark and climbs down under it.
 func _climbing(delta: float) -> void:
 	if not is_instance_valid(_tree):
 		_end_climb()
 		return
 	var height := global_position.y - _tree.global_position.y
+	var perching := _perch != Vector3.INF
 	match _climb_phase:
 		1:
-			var on := _trunk_at(height + 0.35)
+			var on := Vector3(_grip.x, 0.0, _grip.z) if perching else _trunk_at(height + 0.35)
 			if on == Vector3.INF or height >= _climb_to:
+				if perching:
+					# (up through the platform's edge, onto it)
+					global_position.y = _perch.y + 0.05
+					rig.climbing_npc = false
+					# (on the platform it walks and sits on it as on the ground)
+					collision_mask = 1
+					var a := randf() * TAU
+					_perch_spot = _perch + Vector3(cos(a), 0.0, sin(a)) * randf_range(0.0, 0.9)
+					_climb_phase = 4
+					return
 				# (as high as it goes: it holds on there)
 				_climb_phase = 2
 				_t = randf_range(4.0, 8.0)
@@ -622,7 +655,7 @@ func _climbing(delta: float) -> void:
 			var query := PhysicsRayQueryParameters3D.create(global_position + Vector3.UP * 0.1, global_position + Vector3.DOWN * 0.4, 1)
 			query.exclude = [get_rid()]
 			var ground := get_world_3d().direct_space_state.intersect_ray(query)
-			var on := _trunk_at(height)
+			var on := Vector3(_grip.x, 0.0, _grip.z) if perching else _trunk_at(height)
 			if on != Vector3.INF:
 				global_position = Vector3(on.x, global_position.y, on.z)
 			if not ground.is_empty() and global_position.y - (ground.position as Vector3).y < down + 0.02:
@@ -631,6 +664,30 @@ func _climbing(delta: float) -> void:
 				return
 			global_position.y -= down
 			velocity = Vector3(0.0, -down / delta, 0.0)
+		4, 6:
+			# (walking along the platform, to its spot or back to the bark)
+			var to := (_perch_spot if _climb_phase == 4 else Vector3(_grip.x, _perch.y, _grip.z)) - global_position
+			to.y = 0.0
+			# (back at the bark, or off the platform's inner edge going to it: down it goes)
+			if to.length() <= (0.12 if _climb_phase == 4 else 0.45) or (_climb_phase == 6 and not is_on_floor()):
+				velocity = Vector3.ZERO
+				if _climb_phase == 4:
+					_climb_phase = 5
+					_t = randf_range(15.0, 35.0)
+					_napping = randf() < 0.4
+				else:
+					_down_from_platform()
+			else:
+				velocity = to.normalized() * walk_speed * 0.8
+				rotation.y = lerp_angle(rotation.y, atan2(to.x, to.z), 1.0 - exp(-9.0 * delta))
+			sit_progress = move_toward(sit_progress, 0.0, delta * 3.0)
+			if _climb_phase != 3:
+				_on_platform(delta)
+			return
+		5:
+			_perched(delta)
+			_on_platform(delta)
+			return
 	# (belly to the trunk)
 	rotation.y = atan2(-_out.x, -_out.z)
 	var hero := villagers.player
@@ -639,13 +696,80 @@ func _climbing(delta: float) -> void:
 		rig._interest_is_threat = false
 
 
+## On a platform: moved as on the ground (stepping off it, it takes hold of the bark and goes down).
+func _on_platform(delta: float) -> void:
+	velocity.y = -0.1 if is_on_floor() else velocity.y - 20.0 * delta
+	move_and_slide()
+	if global_position.y < _perch.y - 1.0:
+		_down_from_platform()
+
+
+## Onto the bark under the platform, and down.
+func _down_from_platform() -> void:
+	_napping = false
+	rig.climbing_npc = true
+	collision_mask = 0
+	velocity = Vector3.ZERO
+	global_position = Vector3(_grip.x, minf(global_position.y, _perch.y - 0.6), _grip.z)
+	_climb_phase = 3
+
+
+## Sat on a platform: napping, or turned to another on the same platform chatting, or looking out; then back down.
+func _perched(delta: float) -> void:
+	velocity = Vector3(0.0, velocity.y, 0.0)
+	sit_progress = move_toward(sit_progress, 1.0, delta * 0.9)
+	var mate: Villager
+	for other in villagers.members:
+		if other != self and other._climb_phase == 5 and other._perch == _perch and not other._napping:
+			mate = other
+	if _napping:
+		rig.express(&"sleepy", 0.5)
+	elif mate:
+		var to_mate := mate.global_position - global_position
+		rotation.y = lerp_angle(rotation.y, atan2(to_mate.x, to_mate.z), 1.0 - exp(-6.0 * delta))
+		# (turn about: whose turn by the clock, the two always opposite)
+		var turn := int(Time.get_ticks_msec() / 2600) % 2 == (0 if get_instance_id() < mate.get_instance_id() else 1)
+		rig.talking = 1.0 if turn else 0.0
+		rig.listening = 0.0 if turn else 1.0
+	else:
+		# (looking out from up there, away from the trunk)
+		rotation.y = lerp_angle(rotation.y, atan2(_out.x, _out.z), 1.0 - exp(-2.0 * delta))
+	if _t <= 0.0:
+		_napping = false
+		_climb_phase = 6
+
+
 func _end_climb() -> void:
 	_climb_phase = 0
 	collision_mask = 1
 	velocity = Vector3.ZERO
 	rig.climbing_npc = false
 	_tree = null
+	_perch = Vector3.INF
+	_napping = false
 	_choose()
+
+
+## Off to sit on a platform up a giant fir near home (not one that has two on it already), if there is one.
+func _begin_perch() -> bool:
+	var near := home if home != Vector3.INF else global_position
+	var choices: Array = []
+	for fir in villagers.firs:
+		if fir.global_position.distance_to(near) > 45.0:
+			continue
+		for perch: Vector3 in fir.get_meta(&"perches"):
+			if villagers.up_fir(fir, perch) < 2:
+				choices.append([fir, perch])
+	if choices.is_empty():
+		return false
+	var pick: Array = choices[randi() % choices.size()]
+	_tree = pick[0]
+	_perch = pick[1]
+	_out = Vector3(_perch.x - _tree.global_position.x, 0.0, _perch.z - _tree.global_position.z).normalized()
+	_climb_to = _perch.y - _tree.global_position.y
+	_climb_phase = 0
+	_go(Doing.CLIMB, 120.0)
+	return true
 
 
 # --- Play (the user, 2026-11-02: "npcoons should also be playing with each other") ---
