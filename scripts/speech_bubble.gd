@@ -15,6 +15,7 @@ const FONT_SIZE := 22
 const MAX_WIDTH := 320.0             # wrap width, in overlay pixels
 const TAIL := 12.0
 const MARGIN := 8.0                  # kept this far inside the screen edges
+const CORNER := 20.0                 # the pill's corner radius
 const PAPER := Color(0.04, 0.04, 0.06, 0.62)
 const EDGE := Color(0.0, 0.0, 0.0, 0.0)
 const INK := Color(1.0, 1.0, 1.0)
@@ -74,7 +75,7 @@ func _build() -> void:
 	style.bg_color = PAPER
 	style.border_color = EDGE
 	style.set_border_width_all(0)
-	style.set_corner_radius_all(20)
+	style.set_corner_radius_all(int(CORNER))
 	style.content_margin_left = 18
 	style.content_margin_right = 18
 	style.content_margin_top = 7
@@ -134,15 +135,18 @@ func _process(delta: float) -> void:
 	panel.reset_size()                # (shrinks back to fit, if it grew while laying out)
 	var size := panel.size
 	var tail: Control = box.get_node("Tail")
-	tail.position = Vector2(size.x * 0.5 - tail.size.x * 0.5, size.y - 3.0)
+	# (the arrow flush under the pill, not overlapping it: both are see-through, and the overlap showed as a dark band;
+	# the user, 2026-11-02, "the little arrow ... overlaps with the text box and leaves a dark line")
+	tail.position = Vector2(size.x * 0.5 - tail.size.x * 0.5, size.y)
 	# Tail tip on the spot above the crow's head, the balloon kept on screen
 	var tip := cam.unproject_position(global_position) * view_scale
 	var screen := overlay.size if overlay else Vector2(1e6, 1e6)
 	var left: float = clamp(tip.x - size.x * 0.5, MARGIN, max(MARGIN, screen.x - size.x - MARGIN))
-	box.position = Vector2(left, tip.y - size.y - TAIL + 3.0)
-	tail.position.x = clamp(tip.x - left - tail.size.x * 0.5, 8.0, size.x - tail.size.x - 8.0)
+	box.position = Vector2(left, tip.y - size.y - TAIL)
+	# (the arrow slides along the bottom to stay over their head, on its straight part, clear of the round corners)
+	tail.position.x = clamp(tip.x - left - tail.size.x * 0.5, CORNER, size.x - tail.size.x - CORNER)
 	# A little overshoot as it pops open, from the tail's tip
 	var s: float = ease(openness, 0.4) * (1.0 + 0.12 * sin(openness * PI))
-	box.pivot_offset = Vector2(tail.position.x + tail.size.x * 0.5, size.y + TAIL - 3.0)
+	box.pivot_offset = Vector2(tail.position.x + tail.size.x * 0.5, size.y + TAIL)
 	box.scale = Vector2.ONE * max(s, 0.01)
 	box.modulate.a = clamp(openness * 2.0, 0.0, 1.0)

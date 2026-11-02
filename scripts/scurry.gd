@@ -41,6 +41,10 @@ func _ready() -> void:
 	var glints := ClimbGlints.new()
 	glints.scurry = self
 	add_child(glints)
+	# (and black bars in from the top and bottom of the screen)
+	var bars := ScurryBars.new()
+	bars.scurry = self
+	add_child(bars)
 	if not InputMap.has_action(&"scurry"):
 		InputMap.add_action(&"scurry", 0.3)
 		var key := InputEventKey.new()
@@ -115,7 +119,13 @@ func _physics_process(delta: float) -> void:
 	# (on it, the stick as on a ladder: up the screen climbs, down comes down, across goes round)
 	var raw: Vector2 = _player._read_move_input()
 	var towards := -raw.y
+	# (across the screen as the camera sees it: right on the stick takes him to the screen's right, whichever side of
+	# the trunk the camera is on; it was fixed to the surface, and came out reversed seen from the other side: the user,
+	# 2026-11-02, "lots of times climbing trees moving left and right is reversed")
 	var along := raw.x
+	var eye := get_viewport().get_camera_3d()
+	if eye and surface_normal.cross(Vector3.UP).dot(eye.global_basis.x) < 0.0:
+		along = -along
 	var up := climb_speed * clampf(towards, -1.0, 1.0)
 	# (a limb over his head: he goes round it, the way he was going round or else to his right, not butting into it)
 	if up > 0.0 and _overhead(middle):

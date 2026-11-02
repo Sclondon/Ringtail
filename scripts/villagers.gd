@@ -26,18 +26,39 @@ const TINTS := [
 ]
 ## Who each at the grove is and what it says (Claude's placeholders: names, and hello-level chatter, no lore).
 const GROVE_LINES := [
-	["Old Grey", "Oh, hello! Back from the town already?", "Mind the cars on the ring road. They never look where they're going."],
-	["Dozy", "Shh. I'm resting my eyes.", "...", "Fine. Hello."],
-	["Gobbler", "Have you seen what the people leave out by the shops? Pizza!", "Whole slices! Some of them barely bitten."],
-	["Pip", "Tag! You're it!", "...Aw, you're too big to play."],
-	["Tumble", "Can you really spin your tail like that?", "Show me again! Again!"],
-	["Nutmeg", "I found an acorn. It's mine.", "You can look at it, though."],
+	["Old Grey", "Oh, hello! Back from the town already?", "Mind the cars on the road. They never look where they're going.",
+			"When I was a kit, all this hill was trees. Well. More trees.", "The dogs down the hill bark worse than they bite. Mostly.",
+			"If something's after you, get down in the tall grass and keep still.", "Wires are for walking. Don't let anyone tell you different.",
+			"See the big mountain? It's always there. I find that restful.", "The shrine folk leave out rice cakes sometimes. Don't tell anyone I told you.",
+			"Off you go, then. Bring something back for the little ones."],
+	["Dozy", "Shh. I'm resting my eyes.", "...", "Fine. Hello.", "Is it night yet? It should be night.", "The owl's awake now, you know. I can tell.",
+			"Wake me if anything good gets thrown out.", "That big tree's lovely and shady. Perfect for a nap.", "Mm. Five more minutes."],
+	["Gobbler", "Have you seen what the people leave out by the shops? Pizza!", "Whole slices! Some of them barely bitten.",
+			"The bins behind the bath house are the best. Warm, too.", "I had a whole doughnut once. I think about it every day.",
+			"Apples from the gardens are fine. Pizza is better.", "Fish bones by the station! Crunchy!",
+			"Don't eat the banana skins. Learn from me.", "If you find cheese, I want to hear about it."],
+	["Pip", "Tag! You're it!", "...Aw, you're too big to play.", "Can you climb the drainpipes? I can't yet.", "I'm going to be the fastest when I'm big.",
+			"Race you to the torii! ...I'll start running now.", "Hide and seek! Close your eyes! Okay, open them. ...Don't look in the grass.",
+			"My tail's getting rings! Look! ...It's getting there."],
+	["Tumble", "Can you really spin your tail like that?", "Show me again! Again!", "I tried to spin and fell over. Twice.",
+			"How do you go so high off the wires? Teach me!", "When I'm big I'm going to fly with my tail. Like a seed.",
+			"Mum says no jumping off the roofs. Did you jump off the roofs?", "Spin! Spin! Spin!"],
+	["Nutmeg", "I found an acorn. It's mine.", "You can look at it, though.", "I'm keeping it for winter. Winter's ages away.",
+			"There are more acorns under the big tree. Those ones are also mine.", "Do you collect things? I collect acorns.",
+			"I counted my acorns. I have one.", "Maybe you can have the next one. Maybe."],
 ]
 ## And out in the town, the grown-ups going about.
 const TOWN_LINES := [
-	["Binsley", "Busy busy. Lots of bins to see to.", "Catch you later!"],
-	["Lookout", "Keep an eye on the sky. The hawk's about."],
-	["Hazel", "This one's with me. Say hello, little one."],
+	["Binsley", "Busy busy. Lots of bins to see to.", "Catch you later!", "Tuesday is the best bin day. Or is it Thursday.",
+			"Knock a can over, have a look inside. That's the job.", "Watch the cats round the back gardens. Grumpy lot.",
+			"The station bins get the commuters' lunches. Prime spot.", "No time to talk, no time at all. ...What's new with you?"],
+	["Lookout", "Keep an eye on the sky. The hawk's about.", "The crows on the wires are mostly all talk. Mostly.",
+			"See a big shadow on the ground? Run first, look up later.", "The owl takes the high poles by the far end. Steer clear.",
+			"Dogs can't climb. Remember that.", "Tall grass, then up a pipe. That's how you lose anything.",
+			"I've been watching that cloud for an hour. It's a good cloud."],
+	["Hazel", "This one's with me. Say hello, little one.", "We're off to the gardens. The plums are nearly ripe.",
+			"Keep to the walls when a car comes. Little ones first.", "She wants to climb everything. I wonder where she gets that.",
+			"Have you seen the view from the top of the stairs? Lovely in the evening.", "We'll see you up at the grove later."],
 ]
 
 var player: Player
