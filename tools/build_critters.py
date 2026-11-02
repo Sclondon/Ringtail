@@ -194,6 +194,8 @@ HEAD_PARTS = {"muzzle", "nose", "whiskers", "brows", "mask", "cheeks", "ears", "
 def weights(part, p):
     if part == "nose" and NOSE_BONE[0]:
         return {"nose": 1.0}
+    if part == "quills" and QUILL_BONE[0]:
+        return {"quills": 1.0}
     if part in HEAD_PARTS:
         return {"head": 1.0}
     if part == "spine_stripe":
@@ -203,26 +205,32 @@ def weights(part, p):
 
 
 NOSE_BONE = [None]
+## A porcupine's quills: a bone of their own on its back, to raise them (CritterRig scales it up when alarmed).
+QUILL_BONE = [None]
 
 
 def bones():
     listed = racc.bones()
     if NOSE_BONE[0] is not None:
         listed.append(("nose", NOSE_BONE[0], "head"))
+    if QUILL_BONE[0] is not None:
+        listed.append(("quills", QUILL_BONE[0], "spine"))
     return listed
 
 
 # --- Proportions: the raccoon's reshape, with each animal's own changes after it ---
 
 WIDE = [1.0]   # (a badger is broader in the body)
+LONG = [1.0]   # (a weasel or an otter is longer in it)
 
 
-def make_reshape(leg, arm, head, wide=1.0):
+def make_reshape(leg, arm, head, wide=1.0, long=1.0):
     racc.LEG_SCALE = leg
     racc.ARM_SCALE = arm
     racc.HEAD_SCALE = head
     racc.DROP = (racc.HIP_Y - racc.ANKLE_Y) * (1.0 - leg)
     WIDE[0] = wide
+    LONG[0] = long
     base_reshape = RACC_RESHAPE
     base_drawn = RACC_DRAWN
 
@@ -235,10 +243,25 @@ def make_reshape(leg, arm, head, wide=1.0):
         p = base_reshape(p)
         if WIDE[0] != 1.0 and not (racc.ARM_BAND[0] < drawn_y < racc.ARM_BAND[1] and abs(p.x) > racc.SHOULDER.x * WIDE[0]):
             p.x *= body_wide(drawn_y)
+        if LONG[0] != 1.0:
+            # (the trunk drawn out between the hips and the neck, all above it carried up by as much)
+            hip, neck = trunk_span()
+            if p.y > hip:
+                p.y += (min(p.y, neck) - hip) * (LONG[0] - 1.0)
         return p
+
+    def trunk_span():
+        return base_reshape(Vector((0.0, racc.HIP_Y, 0.0))).y, base_reshape(Vector((0.0, racc.NECK.y, 0.0))).y
 
     def as_drawn(p):
         p = Vector(p)
+        if LONG[0] != 1.0:
+            hip, neck = trunk_span()
+            top = neck + (neck - hip) * (LONG[0] - 1.0)
+            if p.y > top:
+                p.y -= (neck - hip) * (LONG[0] - 1.0)
+            elif p.y > hip:
+                p.y = hip + (p.y - hip) / LONG[0]
         if WIDE[0] != 1.0:
             guess = base_drawn(p)
             p.x /= body_wide(guess.y)
@@ -533,7 +556,9 @@ if __name__ == "__main__":
     materials, parts = ANIMALS[ANIMAL]()
     racc.reshaping()
     kit.export(ANIMAL, reshaped_bones(), parts, reshaped_weights, materials)
+    racc.paint_grit(ANIMAL)
     if FOLDER:
         racc.look_at(FOLDER, ANIMAL)
     kit.LOW = True
     kit.export(ANIMAL + "_lo", reshaped_bones(), [(part, material, shapes, None) for part, material, shapes, _fuse in parts], reshaped_weights, materials)
+    racc.paint_grit(ANIMAL + "_lo")

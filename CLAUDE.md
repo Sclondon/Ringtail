@@ -431,3 +431,26 @@ Read README.md first. Started 2026-11-01.
 - Unchecked: the HUD's zone/counts still follow the put-away raccoon's place, not the bird's; touch flying on a phone.
 - Tests: `tests/bird_mode_test.gd` (flap up, glide, settle on a wire, land on a roof, take a Crumb, owl, back),
   `tests/bird_mode_shots.gd -- --out=<dir>`.
+
+## The grove's animals (2026-11-02)
+
+- The user: "there should be the other animals in the grove too for me to see - skunk and beavers and rats and mice
+  and rabbits and weasels and martens and otters", "gophers, prairie dogs", then "opossums" and "squirrels",
+  "porcupine", "chipmunk" (with what each does: the opossum hangs by its tail or plays dead startled; the squirrel
+  climbs the trees and sits nibbling; the porcupine waddles, raises its quills when he comes too close and climbs
+  slowly; the chipmunk darts about the food pile and up the trees).
+- Models: `tools/build_grove_animals.py` (Blender, on build_critters.py's pipeline; `-- <dir|-> <animal>`, or
+  `burrow` for models/burrow.glb) writes models/<animal>.glb and _lo for beaver, rat, mouse, weasel, marten, otter,
+  gopher, prairie_dog, opossum, squirrel, porcupine, chipmunk (.blends in tools/). The critter builders now paint the
+  raccoon's grit (racc.paint_grit) after export: without it the kit's Paint colours made every body draw black.
+  Porcupine quills ride a `quills` bone the rig grows (CritterRig.bristle). Sizes: Critter.SIZES.
+- `GroveAnimals.place(world, markers, player)` (scripts/grove_animals.gd, from World._grow_lawn): 28 animals round
+  the clearing (beyond 7 m of grove_heart): otters and the beaver swim in the pond and come out on its bank; prairie
+  dogs and gophers by four burrow mounds, the prairie dogs sitting up as sentries; mice, rats and chipmunks nibbling
+  round the FoodPile; skunks, rabbits, weasel, opossum on the rim; squirrels, chipmunks, the marten and the porcupine
+  go up a nearby trunk, sit, and come down. Near him (3.5 m) they turn to look, within 1.6 m back off; prairie dogs
+  and gophers sit up and stare; the porcupine turns its back, quills up; the opossum may flop (ragdoll) and lie still
+  till he goes. Past 38 m they stand still, their rigs off. Counts, places and every look are Claude's picks.
+  Not done: the opossum hanging by its tail, a chirp sound for the prairie dog.
+- Checks: `tests/grove_animal_shots.gd -- --out=<dir> [lineup] [grove]` (every kind beside him front and side; the
+  grove from above and close by; prints counts, what each is doing, and any that fell through).
