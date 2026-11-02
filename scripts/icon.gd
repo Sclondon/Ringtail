@@ -3,7 +3,7 @@ extends Control
 ## A small symbol drawn in code (no font has them all, and none on the web):
 ## for the HUD's counts and the buttons.
 
-enum Kind { HEART, HEART_EMPTY, CRUMB, CAP, JUMP, DUCK, SPRINT, TAIL, CLOCK, SCURRY }
+enum Kind { HEART, HEART_EMPTY, CRUMB, CAP, JUMP, DUCK, SPRINT, TAIL, CLOCK, SCURRY, PAUSE, PLAY, COMB, CHECK, UNDO, LEFT, RIGHT }
 
 var kind := Kind.HEART
 var colour := Color.WHITE
@@ -81,3 +81,26 @@ func _draw() -> void:
 			draw_circle(c, s * 0.34, ink)
 			draw_line(c, c + Vector2(0, -s * 0.26), colour, w)
 			draw_rect(Rect2(c + Vector2(-s * 0.08, -s * 0.56), Vector2(s * 0.16, s * 0.12)), colour)
+		Kind.PAUSE:
+			for dx in [-0.16, 0.16]:
+				draw_rect(Rect2(c + Vector2(dx * s - s * 0.08, -s * 0.3), Vector2(s * 0.16, s * 0.6)), colour)
+		Kind.PLAY:
+			draw_colored_polygon(PackedVector2Array([c + Vector2(-s * 0.22, -s * 0.32), c + Vector2(s * 0.3, 0.0), c + Vector2(-s * 0.22, s * 0.32)]), colour)
+		Kind.COMB:
+			# A comb: a back and its teeth (the fur editor)
+			draw_rect(Rect2(c + Vector2(-s * 0.38, -s * 0.3), Vector2(s * 0.76, s * 0.16)), colour)
+			for k in 7:
+				var x := lerpf(-0.33, 0.33, k / 6.0) * s
+				draw_line(c + Vector2(x, -s * 0.16), c + Vector2(x, s * 0.32), colour, w * 0.6)
+		Kind.CHECK:
+			draw_polyline(PackedVector2Array([c + Vector2(-s * 0.3, 0.0), c + Vector2(-s * 0.08, s * 0.24), c + Vector2(s * 0.32, -s * 0.26)]), colour, w)
+		Kind.UNDO:
+			var arc := PackedVector2Array()
+			for k in 24:
+				arc.append(c + Vector2.from_angle(lerpf(-2.6, 2.0, k / 23.0)) * s * 0.28)
+			draw_polyline(arc, colour, w, true)
+			var tip := arc[0]
+			draw_colored_polygon(PackedVector2Array([tip + Vector2(-s * 0.16, -s * 0.02), tip + Vector2(s * 0.1, -s * 0.12), tip + Vector2(s * 0.04, s * 0.14)]), colour)
+		Kind.LEFT, Kind.RIGHT:
+			var way := -1.0 if kind == Kind.LEFT else 1.0
+			draw_polyline(PackedVector2Array([c + Vector2(-way * s * 0.12, -s * 0.28), c + Vector2(way * s * 0.16, 0.0), c + Vector2(-way * s * 0.12, s * 0.28)]), colour, w)

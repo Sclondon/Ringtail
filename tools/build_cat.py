@@ -15,6 +15,8 @@ import math
 import os
 import sys
 
+import bpy
+
 from mathutils import Matrix, Vector
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -139,6 +141,145 @@ def reshaped_weights(part, p):
     return weights(part, racc.as_drawn(p))
 
 
+# --- A cat's build: longer and skinnier than him (the user, 2026-11-02: "the cats need ... longer skinnier bodies")
+# Laid over the raccoon's own `reshape`: the body from the hips to the neck drawn out LONG times (all above it carried
+# up), and the body and legs made SLIM times as wide and deep; the arms brought in to the narrower shoulders, and as
+# thin; the tail carried up with the hips, not stretched; the head as it was.
+
+LONG = 1.38
+SLIM = 0.76
+_RACCOON_RESHAPE = racc.reshape
+_RACCOON_AS_DRAWN = racc.as_drawn
+_HIPS = racc.HIP_Y - racc.DROP
+_NECK = racc.NECK.y - racc.DROP
+_SHIFT = (_NECK - _HIPS) * (LONG - 1.0)
+_ARM_Y = racc.SHOULDER.y - racc.DROP
+_SHOULDER = racc.SHOULDER.x
+_BEHIND = 0.17
+_TAIL_Y = racc.TAIL_ROOT.y - racc.DROP
+
+
+def _stretch(y):
+    if y <= _HIPS:
+        return y
+    if y <= _NECK:
+        return _HIPS + (y - _HIPS) * LONG
+    return y + _SHIFT
+
+
+def _unstretch(y):
+    if y <= _HIPS:
+        return y
+    if y <= _HIPS + (_NECK - _HIPS) * LONG:
+        return _HIPS + (y - _HIPS) / LONG
+    return y - _SHIFT
+
+
+def _slim_at(y):
+    """How much narrower at this height (after stretching): SLIM up to the neck, none in the head."""
+    return SLIM + (1.0 - SLIM) * kit.blend(_NECK + _SHIFT - 0.05, _NECK + _SHIFT + 0.04, y)
+
+
+def _squeeze(v, edge, slim):
+    """Narrower about the middle: within `edge`, scaled; beyond it (the arms, the tail), moved in by as much."""
+    if abs(v) <= edge:
+        return v * slim
+    return math.copysign(abs(v) - edge * (1.0 - slim), v)
+
+
+def cat_reshape(p):
+    p = _RACCOON_RESHAPE(p)
+    y = _stretch(p.y)
+    slim = _slim_at(y)
+    body = Vector((_squeeze(p.x, _SHOULDER, slim), y, _squeeze(p.z, _BEHIND, slim)))
+    # (the arms: brought in with the shoulders, as thin, not drawn out)
+    arm = Vector((_squeeze(p.x, _SHOULDER, SLIM), _stretch(_ARM_Y) + (p.y - _ARM_Y) * SLIM, p.z * SLIM))
+    # (the tail: carried up with its root, not drawn out)
+    tail = Vector((p.x * SLIM, p.y + _stretch(_TAIL_Y) - _TAIL_Y, _squeeze(p.z, _BEHIND, SLIM)))
+    in_arm = kit.blend(_SHOULDER - 0.03, _SHOULDER + 0.02, abs(p.x)) * kit.blend(_ARM_Y + 0.13, _ARM_Y + 0.09, p.y) \
+        * kit.blend(_ARM_Y - 0.13, _ARM_Y - 0.09, p.y)
+    in_tail = kit.blend(-_BEHIND + 0.03, -_BEHIND - 0.03, p.z) * kit.blend(_HIPS - 0.05, _HIPS + 0.02, p.y)
+    return body.lerp(arm, in_arm).lerp(tail, in_tail * (1.0 - in_arm))
+
+
+def cat_as_drawn(p):
+    """Near enough the inverse of `cat_reshape`, for weighing points."""
+    p = Vector(p)
+    if abs(p.x) > _SHOULDER * SLIM + 0.01 and abs(p.y - _stretch(_ARM_Y)) < 0.1:
+        q = Vector((math.copysign(abs(p.x) + _SHOULDER * (1.0 - SLIM), p.x), _ARM_Y + (p.y - _stretch(_ARM_Y)) / SLIM, p.z / SLIM))
+    elif p.z < -_BEHIND * SLIM and p.y > _HIPS - 0.05:
+        q = Vector((p.x / SLIM, p.y - (_stretch(_TAIL_Y) - _TAIL_Y), math.copysign(abs(p.z) + _BEHIND * (1.0 - SLIM), p.z)))
+    else:
+        slim = _slim_at(p.y)
+        q = Vector((p.x / slim if abs(p.x) <= _SHOULDER * slim else math.copysign(abs(p.x) + _SHOULDER * (1.0 - slim), p.x),
+                    _unstretch(p.y), p.z / slim if abs(p.z) <= _BEHIND * slim else math.copysign(abs(p.z) + _BEHIND * (1.0 - slim), p.z)))
+    return _RACCOON_AS_DRAWN(q)
+
+
+# --- Its markings, baked into the vertex colours for the shader (scripts/fur_look.gd) to draw patterns with ---
+# (the user: "the cats need color variations"; "different fur types"). Red: grit, as his (over GRIT_SCALE). Green:
+# where a cat's white goes (bib and belly, muzzle and chin, paws and socks). Blue: patches (a slow mottle, 0..1, for
+# calico and white patches). Alpha: the tabby's stripe (across the body, round the legs and tail). Drawn as the
+# points lie as built (in the rest pose), so they stay put on it as it moves.
+
+def _markings(p, flex):
+    from mathutils import noise
+    grit = racc.grit_at(p, flex) / racc.GRIT_SCALE
+    # (white: the front of the chest and belly, the muzzle and chin, the paws and lower legs)
+    chest = kit.blend(0.02, 0.09, p.z) * kit.blend(_HIPS + 0.05, _HIPS + 0.12, p.y) * kit.blend(_NECK + _SHIFT + 0.12, _NECK + _SHIFT + 0.02, p.y)
+    face = kit.blend(0.05, 0.11, p.z) * kit.blend(racc.HEAD_CENTRE.y + _SHIFT - 0.02, racc.HEAD_CENTRE.y + _SHIFT - 0.1, p.y)
+    feet = kit.blend(0.13, 0.08, p.y)
+    hands = kit.blend(racc.WRIST_X - 0.1, racc.WRIST_X - 0.04, abs(p.x)) * kit.blend(0.14, 0.2, p.y)
+    wobble = 0.08 * noise.noise(p * 14.0)
+    white = min(1.0, max(0.0, max(chest, face, feet, hands) + wobble))
+    patches = min(1.0, max(0.0, 0.5 + 0.9 * noise.noise(p * 5.5 + Vector((2.3, 0.7, 5.1)))))
+    # (stripes run round each part: across the body and legs by height, round the arms by reach, round the tail
+    # along it)
+    if p.z < -_BEHIND:
+        along = -p.z * 1.2 + p.y * 0.4
+    elif abs(p.x) > _SHOULDER * SLIM + 0.02 and abs(p.y - _stretch(_ARM_Y)) < 0.1:
+        along = abs(p.x)
+    else:
+        along = p.y
+    stripe = 0.5 + 0.5 * math.sin(along * 52.0 + 2.2 * noise.noise(p * 7.0))
+    return (grit, white, patches, stripe)
+
+
+def paint_markings(name):
+    """Paints the markings onto the figure just exported, and writes it out again (as paint_grit does his grit)."""
+    for obj in bpy.data.objects:
+        if obj.type != "MESH":
+            continue
+        mesh = obj.data
+        layer = mesh.color_attributes.new("Markings", "FLOAT_COLOR", "CORNER")
+        tags = mesh.uv_layers.get(kit.METRES)
+        clean = {k for k, m in enumerate(mesh.materials) if m and m.name.split(".")[0] in ("eye", "pupil", "pink")}
+        for poly in mesh.polygons:
+            for index in poly.loop_indices:
+                if poly.material_index in clean:
+                    layer.data[index].color = (1.0 / racc.GRIT_SCALE, 0.0, 0.0, 0.0)
+                    continue
+                p = kit.from_blender(mesh.vertices[mesh.loops[index].vertex_index].co)
+                v = tags.data[index].uv.y if tags else 0.0
+                flex = -v - 0.001 if v < -0.0005 else -1.0
+                layer.data[index].color = _markings(p, flex)
+        mesh.color_attributes.active_color = layer
+        mesh.color_attributes.render_color_index = mesh.color_attributes.find("Markings")
+    bpy.ops.wm.save_as_mainfile(filepath=os.path.join(kit.ROOT, "tools", name + ".blend"))
+    bpy.ops.export_scene.gltf(
+        filepath=os.path.join(kit.ROOT, "models", name + ".glb"),
+        export_format="GLB",
+        export_yup=True,
+        export_animations=False,
+        export_skins=True,
+        export_vertex_color="ACTIVE",
+        export_all_vertex_colors=False,
+        export_try_sparse_sk=True,
+        export_morph_tangent=False,
+    )
+    print("MARKINGS %s" % name)
+
+
 PARTS = [
     ("body", FUR, racc.body, (0.006, 4, 6000)),
     ("feet", PAW, racc.feet, (0.004, 3, 2400)),
@@ -160,12 +301,26 @@ PARTS = [
     ("ruffs", FUR, racc.ruffs, None),
 ]
 
+# Its fur types (racc.FUR_TYPES; the user: "They should also have different fur types"): models/cat.glb is "spiky",
+# and `-- fur=<type>` builds models/cat_<type>.glb. `-- fur=all` builds every one of CAT_FURS.
+CAT_FURS = ["spiky", "sleek", "shaggy", "soft"]
+
 if __name__ == "__main__":
     racc.reshaping()
+    racc.reshape = cat_reshape
+    racc.as_drawn = cat_as_drawn
+    kind = racc.fur_arg()
     folder = kit.PREVIEW_DIR
     kit.PREVIEW_DIR = None
-    kit.export(NAME, racc.reshaped_bones(), PARTS, reshaped_weights, MATERIALS)
-    if folder:
-        racc.look_at(folder, NAME)
-    kit.LOW = True
-    kit.export(NAME + "_lo", racc.reshaped_bones(), [(part, material, shapes, None) for part, material, shapes, _fuse in PARTS], reshaped_weights, MATERIALS)
+    for fur in (CAT_FURS if kind == "all" else [kind or "spiky"]):
+        racc.use_fur(fur)
+        name = NAME if fur == "spiky" else NAME + "_" + fur
+        kit.export(name, racc.reshaped_bones(), PARTS, reshaped_weights, MATERIALS)
+        paint_markings(name)
+        if folder:
+            racc.look_at(folder, name)
+    if not kind or kind in ("spiky", "all"):
+        kit.LOW = True
+        racc.use_fur("spiky")
+        kit.export(NAME + "_lo", racc.reshaped_bones(), [(part, material, shapes, None) for part, material, shapes, _fuse in PARTS], reshaped_weights, MATERIALS)
+        paint_markings(NAME + "_lo")

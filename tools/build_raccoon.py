@@ -426,6 +426,118 @@ def tail_dark(_b):
     return cones(True)
 
 
+# --- Fur types (the user, 2026-11-02: "a model editor where I can switch out the fur with different texture types
+# like the hair editor in gloaming"): each a build of its own, models/raccoon_fur_<type>.glb (`-- fur=<type>`), whose
+# mesh scripts/fur_look.gd swaps in. "spiky" is the plain build, raccoon.glb, and these multipliers are all 1 for it.
+# "cones" gives his body, upper arms and thighs the tail's treatment: rings of spiky cones, banded (the user: "I like
+# his tail fur, can we make his body and arms work like that too? — or an option for that in the editor").
+
+FUR_TYPES = {
+    "spiky": {},
+    "soft": {"length": 0.75, "width": 1.9, "count": 1.3, "flare": 0.75},
+    "shaggy": {"length": 1.7, "width": 1.25, "count": 1.25, "flare": 1.35, "droop": 0.6},
+    "sleek": {"length": 0.45, "width": 1.2, "count": 0.5, "flare": 0.35},
+    "wiry": {"length": 1.35, "width": 0.45, "count": 1.7, "flare": 1.1},
+    "cones": {"cones": True},
+}
+FUR_NOW = {"length": 1.0, "width": 1.0, "count": 1.0, "flare": 1.0, "droop": 0.0, "cones": False}
+
+
+def use_fur(kind):
+    """Sets FUR_NOW for a fur type (FUR_TYPES), before building."""
+    FUR_NOW.update({"length": 1.0, "width": 1.0, "count": 1.0, "flare": 1.0, "droop": 0.0, "cones": False})
+    FUR_NOW.update(FUR_TYPES[kind])
+
+
+def _n(count):
+    """How many tufts of a kind, for the fur type."""
+    return count if FUR_NOW["count"] == 1.0 else max(1, int(round(count * FUR_NOW["count"])))
+
+
+def _flare(flare):
+    return flare if FUR_NOW["flare"] == 1.0 else 1.0 + (flare - 1.0) * FUR_NOW["flare"]
+
+
+def body_cones(dark):
+    """His body, upper arms and thighs in the tail's spiky cones, one after another down each, banded by turns (the
+    dark ones, or the others): the "cones" fur type. A finished mesh in Blender's axes."""
+    made = bmesh.new()
+    tags = {}
+
+    def ring(centre, u, v, radius, spiky=False, region=0, lean=Vector()):
+        loop = []
+        count = SPIKES * 2 if spiky else SPIKES
+        for j in range(count):
+            a = math.tau * j / count
+            tip = spiky and j % 2 == 0
+            r = radius * (1.0 if not spiky or tip else 0.68)
+            p = centre + (lean if tip else Vector()) + (u * math.cos(a) + v * math.sin(a)) * r
+            vert = made.verts.new(kit.to_blender(reshape(p)))
+            tags[vert] = (region, (1.0 if tip else 0.45) if spiky else 0.0)
+            loop.append(vert)
+        return loop
+
+    def join(a, b):
+        for j in range(len(b)):
+            k0 = j * len(a) // len(b)
+            k1 = ((j + 1) * len(a) // len(b)) % len(a)
+            j1 = (j + 1) % len(b)
+            if k0 == k1:
+                made.faces.new((a[k0], b[j], b[j1]))
+            else:
+                made.faces.new((a[k0], a[k1], b[j1], b[j]))
+
+    def band(start, end, count, at, size, region_of, first=0):
+        """`count` cones from `start` to `end` along a line: at(s) its centre, size(s) its (u, v) there; each cone's
+        base at its start, its spiky rim flared at its end, overlapping the next as the tail's do."""
+        step = (end - start) / count
+        for k in range(count):
+            if ((k + first) % 2 == 1) != dark:
+                continue
+            s0 = start + k * step - step * 0.35
+            s1 = start + (k + 1) * step
+            u0, v0 = size(s0)
+            u1, v1 = size(s1)
+            region = region_of((s0 + s1) * 0.5)
+            lean = (at(s1) - at(s0)).normalized() * abs(step) * 0.45
+            base = ring(at(s0), u0, v0, 0.7, region=region)
+            rim = ring(at(s1), u1, v1, 1.6, True, region, lean)
+            back = ring(at(s1) + (at(s1) - at(s0)).normalized() * 0.006, u1, v1, 0.62, region=region)
+            join(base, rim)
+            join(back, rim)
+            made.faces.new(base[::-1])
+            made.faces.new(back)
+
+    # The body, neck to seat, the cones pointing down (its profile as drawn: height, half width, half depth, offset)
+    profile = [(0.44, 0.145, 0.125, -0.01), (0.50, 0.178, 0.152, 0.0), (0.58, 0.188, 0.162, 0.012),
+               (0.66, 0.178, 0.152, 0.012), (0.73, 0.158, 0.132, 0.004), (0.79, 0.142, 0.112, 0.0), (0.83, 0.10, 0.09, 0.0)]
+
+    def body_at(y):
+        for (y0, rx0, rz0, z0), (y1, rx1, rz1, z1) in zip(profile, profile[1:]):
+            if y0 <= y <= y1:
+                f = (y - y0) / (y1 - y0)
+                return rx0 + (rx1 - rx0) * f, rz0 + (rz1 - rz0) * f, z0 + (z1 - z0) * f
+        return profile[0][1:] if y < profile[0][0] else profile[-1][1:]
+
+    band(0.82, 0.45, 5, lambda y: Vector((0.0, y, body_at(y)[2])),
+         lambda y: (X * body_at(y)[0], Z * body_at(y)[1]), lambda y: REGION["chest" if y > 0.7 else "hips"])
+    for side in (1.0, -1.0):
+        suffix = "_l" if side > 0 else "_r"
+        # Upper arms, out from the shoulder (as drawn: along X), the cones pointing out
+        band(0.0, UPPER_ARM + 0.01, 3, lambda d: Vector((side * (SHOULDER.x + d), SHOULDER.y, 0.0)),
+             lambda d: (Y * (0.058 - d * 0.08), Z * (0.058 - d * 0.08)), lambda d: REGION["upper_arm" + suffix], 1)
+        # Thighs, down from the hip
+        band(HIP_Y + 0.02, KNEE_Y - 0.01, 3, lambda y: Vector((side * HIP_X, y, 0.0)),
+             lambda y: (X * (0.06 + (y - KNEE_Y) * 0.15), Z * (0.065 + (y - KNEE_Y) * 0.15)),
+             lambda y: REGION["thigh" + suffix], 1)
+    bmesh.ops.recalc_face_normals(made, faces=made.faces[:])
+    tag_spikes(made, tags)
+    mesh = bpy.data.meshes.new("body_cones_dark" if dark else "body_cones")
+    made.to_mesh(mesh)
+    made.free()
+    return mesh
+
+
 def ruffs(_b):
     """Bushy fur: zigzag ruffs of spikes like the tail's, flaring out and pointing down, on his upper arms and thighs,
     as cuffs at the elbows and knees, and as shaggy layers round his body (the user: "bushy", not thin; and their
@@ -468,7 +580,7 @@ def ruffs(_b):
         u = axis.cross(Z if abs(axis.z) < 0.9 else X).normalized()
         v = axis.cross(u).normalized()
         base = ring(centre - axis * 0.035, axis, u, v, radius * 0.7, wide=wide, region=region)
-        rim = ring(centre, axis, u, v, radius * flare, lean, True, wide, region)
+        rim = ring(centre, axis, u, v, radius * _flare(flare), lean, True, wide, region)
         back = ring(centre + axis * 0.01, axis, u, v, radius * 0.7, wide=wide, region=region)
         join(base, rim)
         join(back, rim)
@@ -488,14 +600,14 @@ def ruffs(_b):
         for y, r, flare in ((HIP_Y - 0.03, 0.086, 1.27), (0.33, 0.072, 1.25), (KNEE_Y, 0.056, 1.2)):
             ruff(Vector((side * HIP_X, y, 0.0)), -Y, r, flare, REGION[("thigh" if y > KNEE_Y else "shin") + suffix])
         # Loose tufts between the ruffs of his upper arms and thighs
-        for k in range(10):
+        for k in range(_n(10)):
             d = rng.uniform(0.02, UPPER_ARM - 0.02)
             a = rng.uniform(0.0, math.tau)
             normal = Vector((0.0, math.cos(a), math.sin(a)))
             root = Vector((side * (SHOULDER.x + d), SHOULDER.y, 0.0)) + normal * 0.045
             tuft(made, tags, root, (normal * 0.45 + out).normalized(), rng.uniform(0.02, 0.045), 0.024,
                  REGION["upper_arm" + suffix], rng)
-        for k in range(11):
+        for k in range(_n(11)):
             y = rng.uniform(KNEE_Y + 0.02, HIP_Y - 0.02)
             a = rng.uniform(0.0, math.tau)
             normal = Vector((math.cos(a), 0.0, math.sin(a)))
@@ -509,7 +621,7 @@ def ruffs(_b):
     # ...and loose tufts all over it between them, of every length
     profile = [(0.44, 0.145, 0.125, -0.01), (0.50, 0.178, 0.152, 0.0), (0.58, 0.188, 0.162, 0.012),
                (0.66, 0.178, 0.152, 0.012), (0.73, 0.158, 0.132, 0.004), (0.79, 0.142, 0.112, 0.0)]
-    for k in range(80):
+    for k in range(_n(80)):
         y = rng.uniform(0.45, 0.79)
         rx, rz, zo = profile[0][1], profile[0][2], profile[0][3]
         for (y0, rx0, rz0, z0), (y1, rx1, rz1, z1) in zip(profile, profile[1:]):
@@ -532,6 +644,11 @@ def ruffs(_b):
 
 def tuft(made, tags, root, direction, length, width, region, rng):
     """One loose spike of fur: a flat-ish four-sided point from `root` along `direction`, its tip springing."""
+    # (the fur type: FUR_TYPES)
+    length *= FUR_NOW["length"]
+    width *= FUR_NOW["width"]
+    if FUR_NOW["droop"] > 0.0:
+        direction = (direction - Y * FUR_NOW["droop"]).normalized()
     u = direction.cross(Y if abs(direction.y) < 0.9 else X).normalized()
     v = direction.cross(u).normalized()
     base = []
@@ -559,7 +676,7 @@ def head_fur(_b):
     tags = {}
     rng = random.Random(5)
     for row, (depth, reach) in enumerate([(0.0, 1.0), (-0.16, 0.85)]):
-        count = 16 - row * 4
+        count = _n(16 - row * 4)
         for k in range(count):
             t = math.tau * (k + rng.uniform(-0.3, 0.3) + row * 0.5) / count
             z = depth + rng.uniform(-0.04, 0.04)
@@ -574,7 +691,7 @@ def head_fur(_b):
     # And short fur over the rest of his head besides: the crown, the back and the sides, laid back (none on the
     # face) (the user, 2026-11-02: "he should have head fur besides the mane ring")
     placed = 0
-    while placed < 60:
+    while placed < _n(60):
         a = rng.uniform(0.0, math.tau)
         b = rng.uniform(-0.35, 1.25)
         n = Vector((math.cos(b) * math.cos(a), math.sin(b), math.cos(b) * math.sin(a)))
@@ -875,10 +992,44 @@ def paint_grit(name):
 
 
 # (run as a script it builds the raccoon; imported, as tools/build_cat.py does, it only lends its shapes)
+def fur_arg():
+    """The fur type asked for after `--` (`fur=<type>`), taken out of what the kit reads there; None for the plain build."""
+    asked = [arg for arg in sys.argv[sys.argv.index("--") + 1:] if arg.startswith("fur=")] if "--" in sys.argv else []
+    if kit.PREVIEW_DIR and kit.PREVIEW_DIR.startswith("fur="):
+        kit.PREVIEW_DIR = None
+    kit.ONLY = [arg for arg in kit.ONLY if not arg.startswith("fur=")]
+    return asked[0][4:] if asked else None
+
+
+def fur_parts(parts):
+    """The parts for the fur type in FUR_NOW: with "cones", the body's ruffs are banded cones, the dark ones a part of
+    their own (in the tail's dark ring colour)."""
+    if not FUR_NOW["cones"]:
+        return parts
+    swapped = []
+    for part in parts:
+        if part[0] == "ruffs":
+            swapped.append(("ruffs", part[1], lambda _b: body_cones(False), None))
+            swapped.append(("ruffs_band", RING, lambda _b: body_cones(True), None))
+        else:
+            swapped.append(part)
+    return swapped
+
+
 if __name__ == "__main__":
     reshaping()
+    kind = fur_arg()
     folder = kit.PREVIEW_DIR
     kit.PREVIEW_DIR = None
+    if kind and kind != "spiky":
+        # A fur type of its own: models/raccoon_fur_<type>.glb, the full model only (the editor swaps its mesh in)
+        use_fur(kind)
+        name = NAME + "_fur_" + kind
+        kit.export(name, reshaped_bones(), fur_parts(PARTS), reshaped_weights, MATERIALS)
+        paint_grit(name)
+        if folder:
+            look_at(folder, name)
+        sys.exit(0)
     kit.export(NAME, reshaped_bones(), PARTS, reshaped_weights, MATERIALS)
     paint_grit(NAME)
     if folder:

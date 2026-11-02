@@ -17,6 +17,7 @@ var _message_t := 0.0
 var _buttons: HBoxContainer
 var _tail_touch: Button
 var _dev: VBoxContainer
+var pause: PauseMenu
 
 
 func _ready() -> void:
@@ -42,6 +43,22 @@ func _ready() -> void:
 	top_right.offset_top = 16
 	root.add_child(top_right)
 	_caps = _counter(top_right, Icon.Kind.CAP, Color(0.98, 0.78, 0.25))
+	# The pause button, always on screen (Esc, P or Start too): the pause screen and the model editor (the user,
+	# 2026-11-02: "Give me a pause screen and model editor")
+	pause = PauseMenu.new()
+	pause.world = world
+	add_child(pause)
+	var stop := Button.new()
+	stop.custom_minimum_size = Vector2(64, 64)
+	stop.focus_mode = Control.FOCUS_NONE
+	stop.tooltip_text = "Pause (Esc)"
+	var bars := Icon.make(Icon.Kind.PAUSE, 40.0)
+	bars.set_anchors_preset(Control.PRESET_FULL_RECT)
+	stop.add_child(bars)
+	stop.pressed.connect(pause.open)
+	top_right.add_child(stop)
+	# (the look last made in the editor, on him from the start)
+	FurEditor.wear_all.call_deferred(world)
 
 	_clock_row = HBoxContainer.new()
 	_clock_row.set_anchors_preset(Control.PRESET_CENTER_TOP)

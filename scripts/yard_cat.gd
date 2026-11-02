@@ -1,6 +1,6 @@
 class_name YardCat
 extends CharacterBody3D
-## A ginger yard cat (the enemy; its look is a placeholder), built and animated as the raccoon is: his model
+## A yard cat (the enemy; each its own look, FurLook.CAT_LOOKS: placeholders), built and animated as the raccoon is: his model
 ## kit and his rig (CatRig, a RaccoonRig, on all fours whenever it is on the ground). It wanders its patch;
 ## when the raccoon comes near it stalks him low, stops, wiggles its rump, and pounces in a leap. A pounce
 ## that reaches him hurts him. His tail spin (`tail_hit`) knocks it tumbling, and it runs off for good, with
@@ -35,6 +35,9 @@ var mode := Mode.WANDER
 var target: Player
 var home := Vector3.ZERO
 var rig: CatRig
+## Which cat of the town it is (in the order made): its look is FurLook.cat(index).
+var index := 0
+static var _made := 0
 
 var _t := 0.0
 var _mode_t := 0.0
@@ -65,6 +68,13 @@ func _ready() -> void:
 	add_child(collider)
 	rig = CatRig.new()
 	rig.name = "Rig"
+	# (each cat its own look: colours, fur type, markings; the user, 2026-11-02, "the cats need color variations ...
+	# different fur types")
+	index = _made
+	_made += 1
+	var look := FurLook.cat(index)
+	rig.model = load(FurLook.model_path("cat", look.get("fur", "spiky")))
+	rig.look = look
 	rig.scale = Vector3.ONE * size
 	rig.dusty = false
 	add_child(rig)

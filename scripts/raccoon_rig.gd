@@ -131,6 +131,8 @@ var _gallop := 0.0
 var _qphase := 0.0
 var _sneak := 0.0
 var _sphase := 0.0
+var _hunch := 0.0
+var _still := 0.0
 ## 1 going on all fours in the scurry's gallop, 0 in the sprint's bound.
 var _scurry_gait := 0.0
 var _glide := 0.0
@@ -230,6 +232,13 @@ func _pose_extra(delta: float) -> void:
 	_sphase = fposmod(_sphase + speed / SNEAK_STRIDE * delta, 1.0)
 	if _sneak > 0.002:
 		_pose_sneak(smoothstep(0.0, 1.0, _sneak) * (1.0 - _quad), speed)
+	# (upright on his feet, about the place: a little hunched, rubbing his paws when he stands)
+	var upright := free and grounded and wanted < 0.5 and not sneaking and not climbing and busy < 0.2 and spin >= 1.0 \
+			and not gliding and _hang < 0.1 and _swim < 0.1 and _tight < 0.1 and _carry < 0.1
+	_hunch = _approach(_hunch, 1.0 if upright else 0.0, 6.0, delta)
+	_still = _approach(_still, 1.0 if speed < 0.2 else 0.0, 4.0, delta)
+	if _hunch > 0.002:
+		_pose_hunch(smoothstep(0.0, 1.0, _hunch) * (1.0 - _quad) * (1.0 - _sneak), _still)
 	if _climb_w > 0.002:
 		_pose_climb(_climb_w)
 	if _hang > 0.3:
@@ -436,6 +445,8 @@ func _make_fur() -> void:
 	shader.code = Toon.SHADER.replace("void fragment() {", FUR_VERTEX + "\nvoid fragment() {").replace(
 			"ALBEDO = albedo * (1.0 - stripe * line);",
 			"ALBEDO = albedo * (1.0 - stripe * line) * mix(vec3(1.0), COLOR.rgb * GRIT_SCALE, COLOR.a);")
+	# (and the marks and markings the model editor sets: FurLook)
+	shader.code = FurLook.patterned(shader.code)
 	for part: MeshInstance3D in meshes:
 		for surface in part.mesh.get_surface_count():
 			var toon := part.get_surface_override_material(surface) as ShaderMaterial
@@ -454,9 +465,12 @@ func _make_fur() -> void:
 	_fur_speed_was.resize(regions)
 	_fur_uniform.resize(regions)
 	_fur_seen.fill(Vector3.INF)
+	FurLook.paint(self)
 
 
 func restyle() -> void:
+	# (the fur type the look asks for, its mesh put on before it is shaded: FurLook)
+	FurLook.swap(self)
 	super()
 	if is_node_ready() or not _tail.is_empty():
 		_fur_materials.clear()
@@ -757,6 +771,32 @@ func _pose_sneak(w: float, speed: float) -> void:
 		var paw := Vector3(side * 0.07, shoulder.y - 0.05 + 0.012 * rise, shoulder.z + 0.19)
 		_solve_arm(i, side, to_global(paw), _forearm, w)
 		_lay_hand(i, side, forward, (Vector3.DOWN + forward * 0.35).normalized(), w * 0.85)
+
+
+## Upright on his feet, walking or standing, he is a little hunched (the user, 2026-11-02: "his walk should be
+## slightly hunched as well"); standing still he rubs his paws together before his chest ("his idle should be
+## slightly hunched and rubbing his hands together"). `still` is how still he is (1 standing).
+func _pose_hunch(w: float, still: float) -> void:
+	_hips.basis = _slerp(_hips.basis, Basis(Vector3.RIGHT, 0.1) * _hips.basis, w)
+	_spine.basis = _slerp(_spine.basis, Basis(Vector3.RIGHT, 0.2 + 0.08 * still) * _spine.basis, w)
+	if _chest:
+		_chest.basis = _slerp(_chest.basis, Basis(Vector3.RIGHT, 0.1 + 0.06 * still) * _chest.basis, w)
+	# (his head kept looking ahead, not at the ground)
+	if _neck:
+		_neck.basis = _slerp(_neck.basis, Basis(Vector3.RIGHT, -0.25 - 0.1 * still) * _neck.basis, w)
+	var rub := w * still
+	if rub < 0.002:
+		return
+	# (paws together before his chest, rubbing: each going round against the other, out of step)
+	var forward := global_basis.z.normalized()
+	var turn := _time * 7.5
+	for i in 2:
+		var side := 1.0 if i == 0 else -1.0
+		var shoulder := to_local(_shoulders[i].global_position)
+		var round := Vector3(cos(turn + PI * i) * 0.018, sin(turn + PI * i) * 0.014, 0.0)
+		var paw := Vector3(side * 0.028, shoulder.y - 0.11, shoulder.z + 0.15) + round
+		_solve_arm(i, side, to_global(paw), _forearm, rub)
+		_lay_hand(i, side, forward, (forward * 0.6 + Vector3.UP * 0.5 - global_basis.x.normalized() * side * 0.6).normalized(), rub * 0.8)
 
 
 ## 0 outside a..b, rising to 1 halfway between and back down.

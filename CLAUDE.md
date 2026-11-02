@@ -183,3 +183,22 @@ Read README.md first. Started 2026-11-01.
   drawn along their twigs); "Climbing oak"/"Climbing maple" trunks about 1.5x thicker; a new "Great camphor" (my pick
   of species, after the shrine trees in the Ghibli stills). A tree marker of 150% or more grows a Great camphor at its
   own size (world.gd), so its limbs stay a jump apart. tests/tree_climb.gd climbs all three; tree_shots.gd shoots them.
+- Cats, pause and the model editor (the user, 2026-11-02: "the cats need color variations, and longer skinnier
+  bodies. They should also have different fur types. Give me a pause screen and model editor where I can switch out
+  the fur with different texture types like the hair editor in gloaming"; then, on his fur, "I like his tail fur, can
+  we make his body and arms work like that too? — or an option for that in the editor"):
+  - Cats: tools/build_cat.py lays `cat_reshape` over his (body 1.38x longer from hips to neck, 0.76x as wide and
+    deep, thinner arms and legs) and bakes markings into the vertex colours (R grit, G where white goes, B patches, A
+    tabby stripe). Fur types `-- fur=all` build cat.glb (spiky), cat_sleek, cat_shaggy, cat_soft. Each town cat
+    takes FurLook.CAT_LOOKS[its index] (Claude's picks: ginger tabby, black, grey long-hair tabby, tuxedo, calico,
+    cream tabby & white, white with patches) unless the editor changed it.
+  - His fur types (`tools/build_raccoon.py -- fur=<type>`, models/raccoon_fur_<type>.glb; FUR_TYPES multiply tuft
+    length, width, count, ruff flare and droop, all 1 for the plain build): spiky (raccoon.glb, still the default),
+    soft, shaggy, sleek, wiry, and cones (body, upper arms and thighs in banded tail cones). FurLook.swap puts the
+    type's mesh on (RaccoonRig.restyle), FurLook.patterned/paint draw the marks (plain, frosted tips, dark tips,
+    streaked, stippled) and a cat's markings (solid, tabby, tuxedo, calico, patches, tabby & white) in the fur shader.
+  - Pause: the HUD's pause button (top right, always shown), Esc, P or Start: Go on, or Fur & looks (FurEditor, over
+    the paused game, after Gloaming's CharacterEditor: turntable, drag/arrows to turn, Face/Whole, a panel of fur
+    type, marks, markings and colour sliders; Own look; Done). Looks are kept in user://looks.json (FurLook.FILE) and
+    worn from the start. Alone: `godot --path . res://scenes/fur_editor.tscn`.
+  - Checks: `tests/look_shots.gd -- --out=<dir> [cats] [furs] [menus]` (window; menus at 1280x720 and 390x844).
