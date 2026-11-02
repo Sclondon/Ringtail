@@ -267,16 +267,12 @@ func _run() -> void:
 	_check(at_grove.size() >= 6 and kits.size() >= 3 and out_about.size() >= 3, "raccoons at the grove (%d, %d kits) and about the town (%d)" % [at_grove.size(), kits.size(), out_about.size()])
 	var talker: Villager = at_grove[0]
 	await _put(talker.global_position + Vector3(0.0, 0.4, 1.0))
-	var prompted: bool = villagers.talk._prompt.visible
-	villagers.talk.press()
-	# (whoever is nearest: a kit may have run up closer)
-	var opened := villagers.talk.talking != null and Player.input_blocked
-	for _i in 12:
-		if villagers.talk.talking == null:
-			break
-		villagers.talk.press()
-		await physics_frame
-	_check(prompted and opened and villagers.talk.talking == null and not Player.input_blocked, "talks to a raccoon at the grove, and the talk ends")
+	await _frames(30)
+	var bubble := villagers.talk.bubble_of(talker)
+	var said := bubble.openness > 0.5 and bubble.label.text in talker.lines
+	await _put(talker.global_position + Vector3(0.0, 0.4, 9.0))
+	await _frames(40)
+	_check(said and bubble.openness < 0.1 and not Player.input_blocked, "a raccoon at the grove says its line in a bubble as he comes near, and stops as he goes")
 	# (killed, one goes limp where it is and stays: it is never put back)
 	var goner: Villager = out_about[0]
 	goner.global_position.y = -25.0

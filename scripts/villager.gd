@@ -9,7 +9,7 @@ extends CharacterBody3D
 ## strolling a step or two; kits chase one another round the grown-ups. Out in the town (`route` set): it goes from
 ## haunt to haunt along the route, at a lope, and at each does a little something (rummages, sniffs, sits, washes).
 ## A kit with a `parent` keeps at its heels, darting off and back. All of them run from danger (Villagers.threat_near)
-## and turn to look at the hero as he comes near; those with `lines` can be talked to (TalkBox). On collision layer
+## and turn to look at the hero as he comes near; those with `lines` say them in speech bubbles (Chatter). On collision layer
 ## 4, seeing only the world, as his band are: it never blocks him.
 
 signal jumped
@@ -247,7 +247,7 @@ func talks() -> bool:
 	return not lines.is_empty()
 
 
-## Whether the hero is near enough to talk to it (TalkBox).
+## Whether the hero is near enough to talk to it.
 func in_reach(hero: Node3D) -> bool:
 	return not dead and doing != Doing.FLEE and hero.global_position.distance_to(global_position) < (1.5 if kit else 1.9)
 

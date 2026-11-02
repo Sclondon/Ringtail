@@ -26,7 +26,7 @@ const WALK_FEET := [0.0, 0.5, 0.25, 0.75]
 ## fore paws, and gathers his hind feet up under him (the user: "more of a bounding leap"; and again, 2026-11-02,
 ## "I liked when the all 4s run was more of basically a jump").
 const BOUND_FEET := [0.0, 0.04, 0.5, 0.54]
-const BOUND_STRIDE := 1.9
+const BOUND_STRIDE := 2.6
 ## Scurrying fast he gallops as a raccoon does (Muybridge, Animal Locomotion plate 744, "Raccoon walking, changing
 ## to a gallop"; the user, 2026-11-02, "the scurry can use this new animation"): a hind foot, then the other a beat
 ## later (not a mirrored pair: "his back legs seem so mirrored and stiff"), a short flight stretched out, a fore
@@ -244,6 +244,12 @@ func _pose_extra(delta: float) -> void:
 	_still = _approach(_still, 1.0 if speed < 0.2 else 0.0, 4.0, delta)
 	if _hunch > 0.002:
 		_pose_hunch(smoothstep(0.0, 1.0, _hunch) * (1.0 - _quad) * (1.0 - _sneak), _still)
+	# (his fingers together, not splayed, in most of what he does: the user, 2026-11-02, "the fingers shouldnt be
+	# splayed in the idle or most poses"; spread only where a paw is set on something: on all fours, climbing, hanging)
+	var spread := maxf(_quad, maxf(_climb_w, minf(_hang, 1.0)))
+	if spread < 0.998:
+		for i in 2:
+			_close_paw(i, 1.0 if i == 0 else -1.0, -1.0, 0.9 * (1.0 - spread))
 	if _climb_w > 0.002:
 		_pose_climb(_climb_w)
 	if _hang > 0.3:
@@ -816,12 +822,15 @@ func _pose_hunch(w: float, still: float) -> void:
 		var paw := Vector3(side * 0.028, shoulder.y - 0.11, shoulder.z + 0.15) + circling
 		_solve_arm(i, side, to_global(paw), _forearm, rub)
 		_close_paw(i, side, 0.5, rub)
-		_lay_hand(i, side, forward, (forward * 0.6 + Vector3.UP * 0.5 - global_basis.x.normalized() * side * 0.6).normalized(), rub * 0.8)
+		# (the paws hanging, fingers pointing down, not up: the user, "his hands should be pointed down not up in his idle")
+		_lay_hand(i, side, forward, (forward * 0.35 + Vector3.DOWN - global_basis.x.normalized() * side * 0.3).normalized(), rub * 0.8)
 
 
-## Paw `i` with its fingers drawn together and curled `curl` (0 flat .. 1.4 a fist), by `w`, over what the rig set.
+## Paw `i` with its fingers drawn together and curled `curl` (0 flat .. 1.4 a fist; below 0: as curled as it is), by
+## `w`, over what the rig set.
 func _close_paw(i: int, side: float, curl: float, w: float) -> void:
-	_curl[i] = lerpf(_curl[i], curl, w)
+	if curl >= 0.0:
+		_curl[i] = lerpf(_curl[i], curl, w)
 	_splay[i] = lerpf(_splay[i], 0.05, w)
 	_pose_fingers(i, side)
 

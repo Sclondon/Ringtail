@@ -4,7 +4,7 @@ extends Node3D
 ## to talk to", "kits and adults", "And there should be other raccons just running around the map doing stuff"):
 ## a gathering at the grove's heart, grown-ups standing and sitting about while their kits play tag round them,
 ## each with a word for the hero; and a few out in the town going round their haunts, one with a kit at its heels.
-## Walk up to one with something to say and "Talk to <name>" shows (TalkBox, as in Gloaming).
+## Walk up to one with something to say and it says it in a speech bubble over its head (Chatter, as in Hemlock's Tower).
 ##
 ##   Villagers.place(world, markers, player)    # in World._ready, once the player is in
 ##
@@ -42,7 +42,7 @@ const TOWN_LINES := [
 
 var player: Player
 var members: Array[Villager] = []
-var talk: TalkBox
+var talk: Chatter
 
 
 static func place(world: Node3D, markers: Dictionary, hero: Player) -> void:
@@ -50,7 +50,7 @@ static func place(world: Node3D, markers: Dictionary, hero: Player) -> void:
 	band.name = "Villagers"
 	band.player = hero
 	world.add_child(band)
-	band.talk = TalkBox.new()
+	band.talk = Chatter.new()
 	band.talk.villagers = band
 	band.add_child(band.talk)
 
