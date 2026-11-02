@@ -318,3 +318,11 @@ Read README.md first. Started 2026-11-01.
   twentieths (group in tenths; a cat's side still in UV x), and above the density the whole spike folds into its root
   (inside him) and takes no spring. tests/fur_bare.gd checks every one of his models: every body-fur point out from
   its root has its offset (0 that cannot fold). `look_shots.gd ... bare` shoots density 0, short, laid flat, stood out.
+- "the grove hill is way too steep": the mound is HILL_TOP 2 m over 13 m of clearing to HILL_FOOT 23.5 m (smaller
+  lumps); build_town.py prints its steepest slope (17.5 degrees, the pond's banks aside); slope trees standing on
+  the winding path are moved along their radius till clear. "there's a random red disk that bounces you": the
+  trampoline marker and bed are gone (no route used it; World skips a missing marker).
+- "pine trees need collision and should be climbable": every plain tree (treep_) gets a trunk cylinder (80% of a
+  cedar's height, 55% of an oak's) and a hidden flare out into the crown at its top, and is in `climbable`: he
+  scurries up, is eased out round the trunk and hops on top (holding the stick at the tree, as with the
+  drainpipes). tests/plain_tree.gd: walking into a cedar and an oak stops him; he climbs both and stands on top.

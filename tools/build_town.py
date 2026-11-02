@@ -90,9 +90,9 @@ w1.COLOURS.update({
     "far_tree2": (0.28, 0.46, 0.26),
 })
 
-HILL_TOP = 7.0          # the plateau's height
+HILL_TOP = 2.0          # the plateau's height: a gentle mound (the user, 2026-11-02: "the grove hill is way too steep")
 PLATEAU = 13.0          # its radius: the open clearing on top (the user, 2026-11-02: "the spawning area is too small and cramped")
-HILL_FOOT = 24.0        # where the hill meets the flat
+HILL_FOOT = 23.5        # where the mound meets the flat (the inner pavement starts at 23.6)
 ROAD = (26.0, 33.0)     # the ring road, inner and outer edge
 ROAD_MIDDLE = 29.5
 PAVE = 2.4              # the pavements either side of it
@@ -125,7 +125,7 @@ def hill_height(x, z):
         return 0.0
     t = (r - PLATEAU) / (HILL_FOOT - PLATEAU)
     s = 1.0 - (t * t * (3.0 - 2.0 * t) if t > 0.0 else 0.0)
-    lumps = 0.35 * noise.noise(Vector((x * 0.13, z * 0.13, 0.5))) * min(1.0, r / PLATEAU) ** 2
+    lumps = 0.2 * noise.noise(Vector((x * 0.13, z * 0.13, 0.5))) * min(1.0, r / PLATEAU) ** 2
     h = HILL_TOP * s + lumps * s
     # the pond, sunk in the top
     d = math.hypot((x - POOL[0]) / POOL_RADII[0], (z - POOL[1]) / POOL_RADII[1])
@@ -802,9 +802,17 @@ def grove():
     # hut and the shrine; then a few on the slopes below)
     ring = [(0, 105), (165, 110), (195, 100), (227, 160), (255, 105), (290, 100), (320, 110), (345, 95)]
     trees = [(math.cos(math.radians(deg)) * 12.3, math.sin(math.radians(deg)) * 12.3, size) for deg, size in ring]
-    trees += [(17.5, 6.5, 95), (-17.0, -3.0, 100), (-3.0, 18.5, 95), (-12.0, 16.0, 90), (18.0, -9.5, 100)]
-    for x, z, _size in trees:
-        if path_distance(x, z) < 2.5:
+    trees += [(17.5, 6.5, 95), (-17.0, -3.0, 100), (-3.0, 18.5, 95), (-19.0, 6.0, 90), (18.0, -9.5, 100)]
+    # (a tree on the slope that stands on the winding path is moved in or out along its radius till it is clear)
+    for k, (x, z, size) in enumerate(trees):
+        if path_distance(x, z) >= 2.5:
+            continue
+        r, a = math.hypot(x, z), math.atan2(z, x)
+        for step in (1.0, -1.0, 2.0, -2.0, 3.0, -3.0, 4.0, -4.0):
+            if path_distance(math.cos(a) * (r + step), math.sin(a) * (r + step)) >= 2.5 and PLATEAU < r + step < HILL_FOOT - 1.0:
+                trees[k] = (math.cos(a) * (r + step), math.sin(a) * (r + step), size)
+                break
+        else:
             print("TREE ON THE PATH at", x, z)
     # (climbing trees, tree_<n>_<seed>_<size%>: the great camphor and two more round the ring, for the glide and
     # the routes; the rest plain, treep_<n>_<seed>_<size%>_<kind>: World)
@@ -815,6 +823,9 @@ def grove():
             w1.mark("tree_%d_%d_%d" % (k, 101 + k * 7, size), at)
         else:
             w1.mark("treep_%d_%d_%d_%s" % (k, 101 + k * 7, size, "cedar" if k % 3 == 2 else "oak"), at)
+    steepest = max(math.degrees(math.atan(math.hypot(hill_height(x + 0.25, z) - hill_height(x - 0.25, z), hill_height(x, z + 0.25) - hill_height(x, z - 0.25)) / 0.5))
+                   for x in range(-23, 24) for z in range(-23, 24) if math.hypot(x, z) < 23.3 and math.hypot(x - POOL[0], z - POOL[1]) > 3.0)
+    print("MOUND STEEPEST %.1f deg" % steepest)
     # garden trees behind the houses
     for n, (k, u, v, size) in enumerate(((0, -2.0, 13.0, 80), (5, 0.0, 12.5, 85), (8, 0.0, 12.0, 75), (7, 8.0, 12.0, 70))):
         frame = Frame(math.tau * (k + 0.5) / SECTORS, FRONT, LOTS[k][1])
@@ -1603,7 +1614,6 @@ def markers(frames):
         a = math.pi * 0.5 + math.tau * (k + 1) / 9
         w1.mark("race_%d" % k, (math.cos(a) * ROAD_MIDDLE, 0.4, math.sin(a) * ROAD_MIDDLE))
     w1.mark("cap_race", (0.0, 0.6, ROAD[0] - 1.0))
-    w1.mark("trampoline", (8.0, hill_height(8.0, 12.0) + 0.6, 12.0))
     # Crumbs round the inner pavement
     for k in range(20):
         a = math.tau * k / 20
@@ -1628,11 +1638,6 @@ def build():
     hill()
     markers(frames)
     beyond()
-    tramp = w1.Piece("nocol_trampoline")
-    tx, tz = 8.0, 12.0
-    ty = hill_height(tx, tz)
-    tramp.cylinder((tx, ty + 0.56, tz), 1.35, 0.08, "metal", 16, top="red")
-    tramp.done()
     print("CRUMBS %d WIRES %d CANS %d" % (w1._count["crumb"], w1._count["wire"], w1._count["can"]))
     bpy.ops.wm.save_as_mainfile(filepath=os.path.join(ROOT, "tools", "town.blend"))
     bpy.ops.export_scene.gltf(

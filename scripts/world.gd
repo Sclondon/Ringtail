@@ -245,9 +245,31 @@ func _place_things() -> void:
 			tree.bark_style = TreeGen.Bark.OAK
 			tree.joined = true
 			var body := tree.body()
+			# (a plain tree has no collision of its own: its trunk is given a solid to bump into and scurry up, up
+			# into the crown, where he hops off onto its top; the user, 2026-11-02, "pine trees need collision and
+			# should be climbable")
+			var trunk := CollisionShape3D.new()
+			var solid := CylinderShape3D.new()
+			solid.radius = tree.trunk_radius * 0.9
+			solid.height = tree.height * (0.8 if parts[4] == "cedar" else 0.55)
+			trunk.shape = solid
+			trunk.position.y = solid.height / 2.0
+			body.add_child(trunk)
+			# (and at its top a flare out into the crown, as on the drainpipes: climbing, it eases him out round
+			# the trunk, and over the top he lands on its broad top)
+			var flare := PackedVector3Array()
+			for k in 10:
+				var turn := TAU * k / 10.0
+				flare.append(Vector3(cos(turn), 0.0, sin(turn)) * solid.radius + Vector3.UP * (solid.height - 1.2))
+				flare.append(Vector3(cos(turn), 0.0, sin(turn)) * (solid.radius + 0.7) + Vector3.UP * solid.height)
+			var crown := CollisionShape3D.new()
+			crown.shape = ConvexPolygonShape3D.new()
+			(crown.shape as ConvexPolygonShape3D).points = flare
+			body.add_child(crown)
 			body.position = at
 			body.rotation.y = float(parts[2]) * 0.7
 			body.scale = Vector3.ONE * float(parts[3]) / 100.0
+			body.add_to_group(&"climbable")
 			add_child(body)
 		elif name.begins_with("tree_"):
 			# (tree_<n>_<seed>_<size%>: a climbable tree of the grove, GameCommon's TreeGen, its limbs to stand on)
