@@ -799,3 +799,24 @@ Read README.md first. Started 2026-11-01.
   `godot --path . --audio-driver Dummy -s res://tools/make_animal_faces.gd`), seven across, four on a tall screen.
 - Checks: `tests/play_as_test.gd` (headless: each walks, runs, jumps, its tail button, back to the raccoon),
   `tests/play_as_shots.gd -- --out=<dir> [animals]` (the page, and some in the grove standing, running, tail button).
+
+## Ferns, brambles and flowers (2026-11-02)
+
+- The user: "we should bring in the ferns from warren" and "and make blackberry bushes and flower generator".
+- GameCommon's new `godot/undergrowth` (installed here under `scripts/`): Warren's `Undergrowth` (ferns, bushes, moss;
+  lifted unchanged with `plant_push.gdshaderinc`), `FlowerGen` (eleven PNW presets: lupine, foxglove, fireweed,
+  trillium, oxeye daisy, Oregon iris, columbine, salal blossom, camas, garden rose, hydrangea) and `BrambleGen`
+  (Himalayan blackberry mounds: arching thorny canes, leaf-spray cards, flowers, berries by ripeness), drawn with
+  `PlantLook`. See its README.
+- `GrovePlants` (scripts/grove_plants.gd, from World._grow_lawn; Claude's picks of where): ferns, moss and bushes thick
+  under the grove's trees and through its woods, a few under trees elsewhere; brambles outside the grove's outermost
+  trees, on the banks beside every road (more in the industrial zone) and over the building site's lots; drifts of
+  wildflowers on the grove's lawns, trilliums and salal in its shade, flowers on the road verges, roses, hydrangeas and
+  foxgloves in the suburb's (Rural) front gardens. Read from tree_/treep_/great_oak and road_<loop>_<i> markers and the
+  zones by name, only on grass (TownGrass.mask), brambles only where the ground round them is all grass at about their
+  height. Flowers 1.4x real. Patches of 24 m, shown by zone as GroveMushrooms are; ferns drawn to 38 m, flowers 38,
+  brambles 60. In a bramble thicket he is hidden as in tall grass (`GrovePlants.in_thicket`, from Hazards.hidden:
+  Claude's pick). `RINGTAIL_NO_PLANTS=1` leaves them out, to measure against.
+- Checks: `tests/plant_shots.gd -- --out=<dir>` (every preset, three seeds, close from four sides, triangle counts),
+  `tests/plants_world.gd` (headless: counts, every zone, none off the grass, hidden in a thicket; `-- --out=<dir>` in a
+  window shoots the grove's woods, a lawn, a bramble, a road).

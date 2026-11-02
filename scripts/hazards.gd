@@ -114,7 +114,8 @@ static func unseen(target: Node3D) -> bool:
 ## spots as well"): on the ground in a patch, and not bounding through it flat out (then the grass thrashes and he
 ## is seen). Claude's pick of when.
 static func hidden(target: Node3D) -> bool:
-	if not TownGrass.hidden(target.global_position):
+	# (or down in a bramble thicket: GrovePlants)
+	if not (TownGrass.hidden(target.global_position) or GrovePlants.in_thicket(target.global_position)):
 		return false
 	var body := target as CharacterBody3D
 	if body and not body.is_on_floor():
