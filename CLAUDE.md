@@ -396,6 +396,21 @@ Read README.md first. Started 2026-11-01.
   it if the town's roads widen). The road widths are the TOWN fork's.
 - Checks: `tests/vehicle_test.gd` (all up to speed, none runs into another, one pulls up behind a stopped one),
   `tests/vehicle_shots.gd` (each beside him from four sides). `models/car.glb` (tools/build_hazards.py) is unused now.
+- Then "the cars need a lot of work — need to be scaled to the human models and actually work on the slopes, with more
+  realistic wheels and such", and "need bright headlights at night". Scale: the town's people are the boy at size
+  1.4 (about 1.75 m); a hatchback's roof comes to a person's head, the bus is near twice their height
+  (vehicle_shots.gd stands one of them and him by each). Slopes (HazardCar._place): each wheel rays down for its road
+  (past the cars and him); the body goes to its wheels' height, pitched and rolled to the plane under them (smoothed,
+  22/s); each wheel follows its own road at once within TRAVEL 0.12 m (the springs); front wheels steer by the turn
+  (atan of wheelbase x yaw rate / speed); the body mesh leans out in turns and dips braking (the box does not); it
+  climbs up to 35% slower and takes a steep downhill bend up to 30% slower. `contact_error` is the worst wheel's gap to
+  its road. Wheels (build_vehicles.py wheels()): a round-shouldered tyre with tread grooves, a dished rim, a centre cap,
+  five lug nuts, a dark inner face. Lights: lamp, tail and sign faces unshaded (always lit); at night (DayNight
+  .current.night > 0.5, or `HazardCar.lights` 0/1 forcing it) every vehicle shows a soft cone of light ahead and the
+  LIT 3 nearest him real SpotLight3D beams and a red tail light. The vehicles' glass is "carglass": DayNight lights
+  anything named "glass" at night as house windows. Checks: vehicle_test.gd (every wheel within 5 cm of its road:
+  about 1 mm), vehicle_hill_shots.gd -- --out=<dir> [night] (the sharpest sloped hairpin from the side; ZoneStreaming
+  is freed and the hour held there).
 
 ## The one-hand handstand on points (2026-11-02)
 

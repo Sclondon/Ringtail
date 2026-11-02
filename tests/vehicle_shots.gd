@@ -1,5 +1,6 @@
 extends SceneTree
-## Each vehicle (HazardCar's kinds) standing beside the raccoon, from four sides, in the game's shading:
+## Each vehicle (HazardCar's kinds) standing beside one of the town's people (HazardPerson, 1.75 m) and the raccoon,
+## from four sides, in the game's shading; and its wheels and lights close up:
 ##   godot --path . --audio-driver Dummy --fixed-fps 60 --resolution 1280x720 -s res://tests/vehicle_shots.gd -- --out=<dir>
 ## Needs a window (kept off the screen).
 
@@ -25,6 +26,12 @@ func _run(level: Node3D) -> void:
 	eye.fov = 40.0
 	level.add_child(eye)
 	eye.make_current()
+	# (a grown-up of the town, as Hazards puts them out, stood still)
+	var person := HazardPerson.new()
+	person.route = PackedVector3Array([Vector3(-30.0, 0.05, -20.0), Vector3(-31.0, 0.05, -20.0)])
+	level.add_child(person)
+	for _i in 5:
+		await physics_frame
 	var x := 0.0
 	var placed: Array[HazardCar] = []
 	for kind: StringName in HazardCar.KINDS:
@@ -43,13 +50,22 @@ func _run(level: Node3D) -> void:
 		for other in placed:
 			other.visible = other == car
 		player.global_position = car.global_position + Vector3(car.half_size.x + 0.7, 0.3, car.half_size.z - 0.5)
+		# (standing by its side: a walk of a centimetre)
+		var stand := car.global_position + Vector3(car.half_size.x + 0.6, 0.05, 0.3)
+		person.route = PackedVector3Array([stand, stand + Vector3(0.0, 0.0, 0.01)])
+		person.global_position = stand
 		player.velocity = Vector3.ZERO
 		for _i in 40:
 			await physics_frame
 		var middle := car.global_position + Vector3(0.0, car.half_size.y, 0.0)
 		var reach := car.half_size.z * 2.0 + 4.0
-		for view: Array in [["side", Vector3(1.0, 0.25, 0.0)], ["front", Vector3(0.0, 0.25, -1.0)], ["back", Vector3(0.0, 0.25, 1.0)], ["quarter", Vector3(0.8, 0.45, -0.8)]]:
-			eye.look_at_from_position(middle + (view[1] as Vector3).normalized() * reach, middle)
+		for view: Array in [["side", Vector3(1.0, 0.25, 0.0)], ["front", Vector3(0.0, 0.25, 1.0)], ["back", Vector3(0.0, 0.25, -1.0)], ["quarter", Vector3(0.8, 0.45, 0.8)], ["wheel", Vector3(1.0, 0.1, 0.35)]]:
+			if view[0] == "wheel":
+				# (close on its front wheel)
+				var hub := car.global_transform * (car._wheel_rest[0] if not car._wheel_rest.is_empty() else Vector3.ZERO)
+				eye.look_at_from_position(hub + (view[1] as Vector3).normalized() * 2.2, hub)
+			else:
+				eye.look_at_from_position(middle + (view[1] as Vector3).normalized() * reach, middle)
 			for _i in 3:
 				await process_frame
 			await RenderingServer.frame_post_draw

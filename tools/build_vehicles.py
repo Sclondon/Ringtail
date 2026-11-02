@@ -32,7 +32,8 @@ PREVIEW_DIR = sys.argv[sys.argv.index("--") + 1] if "--" in sys.argv and len(sys
 COLOURS = {
     "paint": (0.85, 0.22, 0.18),
     "paint2": (0.93, 0.9, 0.8),
-    "glass": (0.3, 0.42, 0.52),
+    # (not "glass": DayNight lights the town's "glass" at night, as house windows)
+    "carglass": (0.3, 0.42, 0.52),
     "chrome": (0.78, 0.8, 0.84),
     "trim": (0.16, 0.16, 0.18),
     "tyre": (0.1, 0.1, 0.11),
@@ -148,17 +149,38 @@ class Part:
 
 
 def wheels(kind, made, places, radius, width):
-    """A wheel at each (x, z): a tyre and a hub, its own object turning about its axle."""
+    """A wheel at each (x, z), its own object turning about its axle (the user, 2026-11-02: "more realistic wheels"):
+    a tyre with rounded shoulders and a tread (its outer band darker grooves), a dished rim with five lug nuts and a
+    centre cap on the outer face, and the dark inside of the wheel arch on the inner face."""
     for name, x, z in places:
         wheel = Part("%s_wheel_%s" % (kind, name), (x, radius, z))
         side = 1 if x > 0 else -1
-        wheel.tube([(x - side * width / 2, radius, z), (x + side * width / 2, radius, z)], [radius, radius], "tyre", 14)
-        wheel.tube([(x + side * (width / 2 - 0.02), radius, z), (x + side * (width / 2 + 0.01), radius, z)],
-                   [radius * 0.55, radius * 0.55], "hub", 10)
+        # The tyre: across its width, round at its shoulders
+        across = [-0.5, -0.44, -0.3, 0.3, 0.44, 0.5]
+        heights = [0.84, 0.96, 1.0, 1.0, 0.96, 0.84]
+        wheel.tube([(x + side * width * a, radius, z) for a in across], [radius * h for h in heights], "tyre", 18)
+        # Its tread: grooves round it, a little proud of the tyre
+        for k in range(3):
+            a = -0.22 + 0.22 * k
+            wheel.tube([(x + side * width * (a - 0.035), radius, z), (x + side * width * (a + 0.035), radius, z)],
+                       [radius * 1.008, radius * 1.008], "trim", 18)
+        # The rim, dished in from the tyre's outer wall, and its centre cap
+        face = x + side * (width * 0.5 + 0.004)
+        wheel.tube([(face - side * 0.03, radius, z), (face, radius, z)], [radius * 0.66, radius * 0.66], "hub", 16)
+        wheel.tube([(face, radius, z), (face + side * 0.012, radius, z)], [radius * 0.5, radius * 0.42], "chrome", 16)
+        wheel.tube([(face + side * 0.012, radius, z), (face + side * 0.03, radius, z)], [radius * 0.17, radius * 0.12], "chrome", 10)
+        # Five lug nuts round the cap
+        for n in range(5):
+            a = math.tau * n / 5
+            ny, nz = math.cos(a) * radius * 0.28, math.sin(a) * radius * 0.28
+            wheel.box((face + side * 0.016, radius + ny, z + nz), (0.016, radius * 0.07, radius * 0.07), "trim")
+        # The inside: dark
+        inner = x - side * (width * 0.5 + 0.002)
+        wheel.tube([(inner, radius, z), (inner - side * 0.004, radius, z)], [radius * 0.8, radius * 0.8], "trim", 14)
         made.append(wheel.done())
 
 
-def side_windows(body, half_width, spans, y0, y1, mat="glass"):
+def side_windows(body, half_width, spans, y0, y1, mat="carglass"):
     """Windows along both sides: each span (z_front, z_back) from y0 up to y1."""
     for side in (1, -1):
         x = side * (half_width + 0.004)
@@ -186,8 +208,8 @@ def hatchback():
                (-1.98, 0.9), (-1.98, 0.3)]
     body.prism(profile, w, "paint")
     # Glass: windscreen, hatch, the side windows
-    body.pane([(-w + 0.06, 0.98, 1.0), (w - 0.06, 0.98, 1.0), (w - 0.1, 1.38, 0.5), (-w + 0.1, 1.38, 0.5)], "glass")
-    body.pane([(w - 0.1, 1.27, -1.72), (-w + 0.1, 1.27, -1.72), (-w + 0.08, 0.98, -1.92), (w - 0.08, 0.98, -1.92)], "glass")
+    body.pane([(-w + 0.06, 0.98, 1.0), (w - 0.06, 0.98, 1.0), (w - 0.1, 1.38, 0.5), (-w + 0.1, 1.38, 0.5)], "carglass")
+    body.pane([(w - 0.1, 1.27, -1.72), (-w + 0.1, 1.27, -1.72), (-w + 0.08, 0.98, -1.92), (w - 0.08, 0.98, -1.92)], "carglass")
     side_windows(body, w, [(0.85, -0.05), (-0.15, -1.5)], 1.0, 1.36)
     lamps(body, w, 2.05, -1.98, 0.72)
     made.append(body.done())
@@ -202,8 +224,8 @@ def taxi():
     profile = [(2.3, 0.3), (2.35, 0.75), (1.25, 0.88), (0.65, 1.42), (-0.85, 1.45), (-1.45, 0.95), (-2.3, 0.88),
                (-2.32, 0.3)]
     body.prism(profile, w, "paint")
-    body.pane([(-w + 0.06, 0.92, 1.2), (w - 0.06, 0.92, 1.2), (w - 0.1, 1.38, 0.7), (-w + 0.1, 1.38, 0.7)], "glass")
-    body.pane([(w - 0.08, 1.4, -0.9), (-w + 0.08, 1.4, -0.9), (-w + 0.06, 0.96, -1.4), (w - 0.06, 0.96, -1.4)], "glass")
+    body.pane([(-w + 0.06, 0.92, 1.2), (w - 0.06, 0.92, 1.2), (w - 0.1, 1.38, 0.7), (-w + 0.1, 1.38, 0.7)], "carglass")
+    body.pane([(w - 0.08, 1.4, -0.9), (-w + 0.08, 1.4, -0.9), (-w + 0.06, 0.96, -1.4), (w - 0.06, 0.96, -1.4)], "carglass")
     side_windows(body, w, [(1.05, 0.0), (-0.1, -1.1)], 0.95, 1.36)
     # The white band along each side, and the lit sign on the roof
     for side in (1, -1):
@@ -222,9 +244,9 @@ def kei_truck():
     # The cab over the front wheels, flat-fronted
     cab = [(1.7, 0.4), (1.72, 1.15), (1.55, 1.8), (0.6, 1.8), (0.6, 0.4)]
     body.prism(cab, w, "paint")
-    body.pane([(-w + 0.06, 1.2, 1.72), (w - 0.06, 1.2, 1.72), (w - 0.08, 1.72, 1.57), (-w + 0.08, 1.72, 1.57)], "glass")
+    body.pane([(-w + 0.06, 1.2, 1.72), (w - 0.06, 1.2, 1.72), (w - 0.08, 1.72, 1.57), (-w + 0.08, 1.72, 1.57)], "carglass")
     side_windows(body, w, [(1.5, 0.7)], 1.15, 1.7)
-    body.pane([(w - 0.08, 1.2, 0.59), (-w + 0.08, 1.2, 0.59), (-w + 0.08, 1.7, 0.59), (w - 0.08, 1.7, 0.59)], "glass", -0.012)
+    body.pane([(w - 0.08, 1.2, 0.59), (-w + 0.08, 1.2, 0.59), (-w + 0.08, 1.7, 0.59), (w - 0.08, 1.7, 0.59)], "carglass", -0.012)
     # The flat bed and its low drop sides, a frame under it
     body.box((0, 0.68, -0.55), (w * 2, 0.08, 2.3), "bed")
     for side in (1, -1):
@@ -244,9 +266,9 @@ def kei_van():
     w = 0.74
     profile = [(1.7, 0.35), (1.72, 1.0), (1.45, 1.85), (-1.68, 1.88), (-1.7, 0.35)]
     body.prism(profile, w, "paint")
-    body.pane([(-w + 0.06, 1.05, 1.68), (w - 0.06, 1.05, 1.68), (w - 0.08, 1.78, 1.48), (-w + 0.08, 1.78, 1.48)], "glass")
+    body.pane([(-w + 0.06, 1.05, 1.68), (w - 0.06, 1.05, 1.68), (w - 0.08, 1.78, 1.48), (-w + 0.08, 1.78, 1.48)], "carglass")
     side_windows(body, w, [(1.35, 0.55), (0.4, -0.6), (-0.75, -1.5)], 1.12, 1.7)
-    body.pane([(w - 0.12, 1.15, -1.7), (-w + 0.12, 1.15, -1.7), (-w + 0.12, 1.72, -1.7), (w - 0.12, 1.72, -1.7)], "glass", -0.012)
+    body.pane([(w - 0.12, 1.15, -1.7), (-w + 0.12, 1.15, -1.7), (-w + 0.12, 1.72, -1.7), (w - 0.12, 1.72, -1.7)], "carglass", -0.012)
     # A sliding door's runner, a stripe
     for side in (1, -1):
         body.box((side * (w + 0.006), 0.8, -0.1), (0.012, 0.08, 3.3), "paint2")
@@ -268,17 +290,17 @@ def bus():
         quad = [(x, 0.36, 5.2), (x, 1.15, 5.2), (x, 1.15, -5.2), (x, 0.36, -5.2)]
         body.face(quad if side < 0 else quad[::-1], "paint")
     side_windows(body, w, [(4.3 - k * 1.25, 3.25 - k * 1.25) for k in range(7)], 1.5, 2.55)
-    body.pane([(-w + 0.1, 1.2, 5.27), (w - 0.1, 1.2, 5.27), (w - 0.12, 2.38, 5.31), (-w + 0.12, 2.38, 5.31)], "glass", 0.008)
-    body.pane([(w - 0.15, 1.6, -5.25), (-w + 0.15, 1.6, -5.25), (-w + 0.15, 2.45, -5.25), (w - 0.15, 2.45, -5.25)], "glass", -0.012)
+    body.pane([(-w + 0.1, 1.2, 5.27), (w - 0.1, 1.2, 5.27), (w - 0.12, 2.38, 5.31), (-w + 0.12, 2.38, 5.31)], "carglass", 0.008)
+    body.pane([(w - 0.15, 1.6, -5.25), (-w + 0.15, 1.6, -5.25), (-w + 0.15, 2.45, -5.25), (w - 0.15, 2.45, -5.25)], "carglass", -0.012)
     # The doors on the kerb side (left, +X, as Japan drives on the left), and the lit route sign over the screen
     for zf, zb in ((4.95, 4.05), (0.6, -0.3)):
         quad = [(w + 0.012, 0.36, zf), (w + 0.012, 2.5, zf), (w + 0.012, 2.5, zb), (w + 0.012, 0.36, zb)]
-        body.face(quad[::-1], "glass")
+        body.face(quad[::-1], "carglass")
     body.box((0, 2.72, 5.22), (1.9, 0.32, 0.12), "sign")
     body.box((w + 0.01, 2.75, 3.0), (0.03, 0.26, 1.6), "sign")
     lamps(body, w, 5.3, -5.25, 0.75, 0.15)
     made.append(body.done())
-    wheels("bus", made, (("fl", 1.1, 3.4), ("fr", -1.1, 3.4), ("rl", 1.1, -2.9), ("rr", -1.1, -2.9)), 0.48, 0.3)
+    wheels("bus", made, (("fl", 1.14, 3.4), ("fr", -1.14, 3.4), ("rl", 1.14, -2.9), ("rr", -1.14, -2.9)), 0.48, 0.3)
     return made
 
 
