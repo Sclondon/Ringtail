@@ -66,6 +66,8 @@ const ROTOR_STRETCH := 1.2
 const SPIN_STRETCH := 1.15
 ## How long his one turn takes as the twirl begins, seconds.
 const HELI_TURN_TIME := 0.4
+## How fast he turns round in the spin jump's twirl (rad/s), on top of the turn the jump keeps (SpinJump).
+const TJ_SPEED := 12.0
 ## How far his knees turn out to the side (radians) where a pose solves his legs: a little bow-legged, as an animal's.
 const KNEE_OUT := 0.22
 ## How many frames back the tail's trail reaches.
@@ -142,6 +144,7 @@ var _leg_swing_speed := 0.0
 var _spin_jump: Node
 var _tj_w := 0.0
 var _tj_turn := 0.0
+var _tj_speed := 0.0
 var _paw_was: Array[float] = [0.0, 0.0, 0.0, 0.0]
 
 var _quad := 0.0
@@ -286,10 +289,21 @@ func _pose_extra(delta: float) -> void:
 		_pose_spin(spin, _spin_w)
 	# The spin jump: round and round in the air, arms out, the tail stiff (SpinJump)
 	var twirling: bool = _spin_jump != null and _spin_jump.twirling
-	_tj_w = _approach(_tj_w, 1.0 if twirling else 0.0, 14.0, delta)
+	# (up to speed at once, and once down it winds down, slowing to stop on a whole turn, not snapping back: the user,
+	# 2026-11-02, "the spin jump spin starts too slow and finishes way too fast")
+	if twirling:
+		_tj_speed = move_toward(_tj_speed, TJ_SPEED, TJ_SPEED * 10.0 * delta)
+	elif _tj_turn > 0.0:
+		var left := TAU - _tj_turn
+		_tj_speed = clampf(move_toward(_tj_speed, 0.0, 14.0 * delta), 2.2, maxf(left * 3.0, 2.2))
+	_tj_turn += _tj_speed * delta
+	if _tj_turn >= TAU:
+		_tj_turn = fposmod(_tj_turn, TAU) if twirling else 0.0
+		if not twirling:
+			_tj_speed = 0.0
+	_tj_w = _approach(_tj_w, 1.0 if twirling or _tj_speed > 0.0 else 0.0, 30.0, delta)
 	if _tj_w > 0.002:
-		_tj_turn = fposmod(_tj_turn + delta * 12.0 * _tj_w, TAU)
-		_hips.basis = Basis(Vector3.UP, _tj_turn * _tj_w) * _hips.basis
+		_hips.basis = Basis(Vector3.UP, _tj_turn) * _hips.basis
 		for i in 2:
 			var side := 1.0 if i == 0 else -1.0
 			_solve_arm(i, side, to_global(Basis(Vector3.UP, _tj_turn) * Vector3(side * 0.48, 0.62, 0.0)), _forearm, _tj_w)
