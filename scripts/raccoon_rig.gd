@@ -168,6 +168,11 @@ var _sleep_w := 0.0
 ## Crying (a lost kit, the user, 2026-11-02: "the kits need a crying animation") and clinging to his back (a found one:
 ## "the kits should be able to cling to your back"): 0..1, set from outside; and how far into each it is.
 var crying := 0.0
+## Peeing (0..1, set by Pee: the user, 2026-11-02, "holding down on the dpad should be a piss button").
+var peeing := 0.0
+## Where he aims it (x left/right, y near/far, each -1..1), set by Pee.
+var pee_aim := Vector2.ZERO
+var _pee_w := 0.0
 var clinging := 0.0
 var _cry_w := 0.0
 var _cling_w := 0.0
@@ -317,6 +322,10 @@ func _pose_extra(delta: float) -> void:
 	_cling_w = _approach(_cling_w, clinging, 8.0, delta)
 	if _cling_w > 0.002:
 		_pose_cling(smoothstep(0.0, 1.0, _cling_w))
+	# Peeing (Pee sets `peeing`): a hind leg cocked up and out, dog-fashion
+	_pee_w = _approach(_pee_w, peeing, 6.0, delta)
+	if _pee_w > 0.002:
+		_pose_pee(smoothstep(0.0, 1.0, _pee_w))
 	# (his fingers together, not splayed, in most of what he does: the user, 2026-11-02, "the fingers shouldnt be
 	# splayed in the idle or most poses"; spread only where a paw is set on something: on all fours, climbing, hanging)
 	var spread := maxf(_quad, maxf(_climb_w, minf(_hang, 1.0)))
@@ -1094,6 +1103,23 @@ func _pose_cry(w: float, delta: float) -> void:
 		add_child(_tears)
 	_tears.emitting = w > 0.5
 	_tears.global_position = _head.global_position + global_basis.z.normalized() * 0.05 * global_basis.get_scale().y
+
+
+## Peeing as a man at a urinal does (the user, 2026-11-02: "he should pee like a dude at a urinal and you should be
+## able to aim it"): stood up straight, hips forward, leaning back a touch, both paws held at the front of his hips,
+## head bowed watching where it goes, his body turned a little after `pee_aim` (x: left/right, y: near/far).
+func _pose_pee(w: float) -> void:
+	_hips.position.z += 0.03 * w
+	_spine.basis = _slerp(_spine.basis, Basis(Vector3.UP, -pee_aim.x * 0.3) * _spine.basis, w)
+	_spine.basis = _slerp(_spine.basis, Basis(Vector3.RIGHT, -0.18) * _spine.basis, w)
+	if _neck:
+		_neck.basis = _slerp(_neck.basis, Basis(Vector3.RIGHT, 0.45 - pee_aim.y * 0.25) * Basis(Vector3.UP, -pee_aim.x * 0.3) * _neck.basis, w)
+	var size := global_basis.get_scale().y
+	var front := _hips.global_position + global_basis.z.normalized() * 0.07 * size + Vector3.DOWN * 0.03 * size
+	for i in 2:
+		var side := 1.0 if i == 0 else -1.0
+		_solve_arm(i, side, front + global_basis.x.normalized() * side * 0.02 * size, _forearm, w)
+		_close_paw(i, side, 0.8, w)
 
 
 ## Clinging to his back: set against it facing the way he faces (LostKits carries it there, turned as his body is),
