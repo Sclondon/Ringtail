@@ -490,12 +490,15 @@ func _spring_fur(delta: float) -> void:
 		return
 	var parts := _fur_parts()
 	var mesh_basis := _fur_mesh.global_basis.orthonormalized().inverse()
+	# (measured in his own size: a raccoon drawn six times as big, the grove's giant, moves six times as many metres
+	# for the same stride, which threw his fur about wildly: the user, 2026-11-02, "the totoro raccoon fur freaks out")
+	var size := maxf(_fur_mesh.global_basis.get_scale().x, 0.01)
 	for r in parts.size():
 		var here: Vector3 = parts[r].global_position if parts[r] else global_position
-		if _fur_seen[r] == Vector3.INF:
+		if _fur_seen[r] == Vector3.INF or here.distance_to(_fur_seen[r]) > 0.5 * size:
 			_fur_seen[r] = here
 			_fur_speed_was[r] = Vector3.ZERO
-		var speed := (here - _fur_seen[r]) / delta
+		var speed := (here - _fur_seen[r]) / delta / size
 		var accel := (speed - _fur_speed_was[r]) / delta
 		_fur_seen[r] = here
 		_fur_speed_was[r] = speed
