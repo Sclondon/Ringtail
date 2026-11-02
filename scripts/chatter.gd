@@ -41,12 +41,21 @@ func _ready() -> void:
 func bubble_of(who: Villager) -> SpeechBubble:
 	if not _bubbles.has(who):
 		var bubble := SpeechBubble.new()
-		bubble.position.y = 0.6 if who.kit else 0.95
+		# (over its head, however big it is)
+		bubble.position.y = (0.6 / 0.5 if who.kit else 0.95) * float(who.build.get("size", 1.0))
 		who.add_child(bubble)
 		_bubbles[who] = bubble
 		_line[who] = 0
 		_wait[who] = 0.0
 	return _bubbles[who]
+
+
+## Whether one of them is talking to him now (then chats between the others do not show).
+func busy() -> bool:
+	for who in _near:
+		if _near[who]:
+			return true
+	return false
 
 
 func _process(delta: float) -> void:
@@ -57,13 +66,22 @@ func _process(delta: float) -> void:
 	var nearest: Villager
 	var best := REACH
 	for who: Villager in villagers.members:
-		if is_instance_valid(who) and who.talks() and not who.dead and who.doing != Villager.Doing.FLEE:
+		if is_instance_valid(who) and who.talks() and not who.dead and who.doing != Villager.Doing.FLEE \
+				and who.doing != Villager.Doing.CHAT and who.doing != Villager.Doing.CLIMB:
 			var d := hero.global_position.distance_to(who.global_position)
 			if d < best:
 				best = d
 				nearest = who
 	for who: Villager in villagers.members:
-		if not is_instance_valid(who) or not who.talks():
+		if not is_instance_valid(who):
+			continue
+		# (chatting with another: its bubble is the chat's, Villagers._turns; kept up here, not cut short)
+		if who.doing == Villager.Doing.CHAT:
+			if _bubbles.has(who):
+				_bubbles[who].tick(delta, false)
+			_near[who] = false
+			continue
+		if not who.talks():
 			continue
 		var near := who == nearest
 		var was: bool = _near.get(who, false)

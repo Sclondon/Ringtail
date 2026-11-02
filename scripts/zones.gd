@@ -29,6 +29,8 @@ var current := -1
 ## Which zone is the grove (-1 with no zones), and its heart.
 var grove := -1
 var heart := Vector3.ZERO
+## How many Crumbs he had when he last left the grove (for the celebration when he comes back with more).
+var _crumbs_left_with := 0
 
 
 static func place(world: World) -> Zones:
@@ -126,5 +128,12 @@ func _physics_process(_delta: float) -> void:
 	var bird := BirdPlayer.active(world)
 	var now := zone_of(bird.global_position if bird else world.player.global_position)
 	if now != current:
+		# (back in the grove having found food since he was last there: they all celebrate, at the pile; the user,
+		# 2026-11-02, "they should all celebrate when you bring stuff back")
+		if grove >= 0 and now == grove and world.crumbs > _crumbs_left_with:
+			var pile := world.get_node_or_null(^"FoodPile") as Node3D
+			Villagers.celebrate(pile.global_position if pile else heart)
+		if current == grove:
+			_crumbs_left_with = world.crumbs
 		current = now
 		changed.emit()

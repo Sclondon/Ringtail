@@ -16,7 +16,10 @@ signal jumped
 signal landed(impact_speed: float)
 signal respawned
 
-enum Doing { STAND, STROLL, SIT, GROOM, SNIFF, RUMMAGE, PLAY, GO, FOLLOW, FLEE, TALK }
+enum Doing { STAND, STROLL, SIT, GROOM, SNIFF, RUMMAGE, PLAY, GO, FOLLOW, FLEE, TALK, CHAT, CLIMB, CELEBRATE }
+## What kits (and now and then grown-ups) play: tag round the grove, chasing round a tree, pouncing at each other,
+## hide and seek in the tall grass, pestering a grown-up.
+enum Play { TAG, TREE, POUNCE, HIDE, PESTER }
 
 ## (what the rig reads of a body)
 var walk_speed := 1.0
@@ -33,6 +36,10 @@ var rub_progress := 1.0
 var villagers: Villagers
 var rig: RaccoonRig
 var kit := false
+## The giant of the grove (Villagers.GIANT): a gentle huge one that mostly dozes, solid to stand on and climb.
+var giant := false
+var _solid: AnimatableBody3D
+var _solid_shape: CylinderShape3D
 ## Lost (LostKits): it stays on its spot until found.
 var stays := false
 var dead := false
@@ -48,8 +55,23 @@ var parent: Villager
 ## A lost kit he has found: him, whom it follows home to the grove (LostKits).
 var leader: Node3D
 ## Kits at play: whom it is chasing (or running from), and which way round.
+## Its own build (Villagers._random_build): size, girth, head, ears, tail, fur.
+var build := {}
 var playmate: Villager
 var chasing := false
+var play := Play.TAG
+## Chatting (Villagers sets it up): whom with, where to stand, and whether it is its turn to talk.
+var chat_with: Villager
+var chat_spot := Vector3.ZERO
+var speaking := false
+## Climbing a tree (CLIMB): which, how far up it is going, which way is out from the trunk, and what part of it
+## it is at (0 going to it, 1 up, 2 holding on up there, 3 down).
+var _tree: Node3D
+var _climb_to := 0.0
+var _out := Vector3.BACK
+var _climb_phase := 0
+var _play_centre := Vector3.ZERO
+var _hide_spot := Vector3.INF
 
 var doing := Doing.STAND
 var _t := 0.0
@@ -81,6 +103,11 @@ func _ready() -> void:
 		walk_speed = 0.7
 		run_speed = 3.2
 		sprint_speed = 4.6
+	if giant:
+		walk_speed = 1.0
+		run_speed = 1.8
+		sprint_speed = 2.2
+		_make_solid()
 	# (what it does first is chosen once it knows where it belongs)
 	_go(Doing.STAND, randf_range(0.2, 1.2))
 
@@ -121,13 +148,32 @@ func _physics_process(delta: float) -> void:
 		leg = parent.leg
 		parent = null
 		_choose()
+	# (talking or listening, in the rig's own pose for it: chatting, or saying its lines to him)
+	var at_chat := doing == Doing.CHAT and _at(chat_spot, 0.3)
+	rig.talking = 1.0 if (at_chat and speaking) or _bubble_open() else 0.0
+	rig.listening = 1.0 if at_chat and not speaking else 0.0
+	# (celebrating: arms up and jumping, the giant clapping; the giant lounges back as it dozes)
+	var party := doing == Doing.CELEBRATE
+	rig.cheer = 1.0 if party and not giant else 0.0
+	rig.clap = 1.0 if party and giant else 0.0
+	rig.lounge = 1.0 if giant and doing == Doing.SIT else 0.0
+	# (up a tree it holds on and goes up and down it by itself, nothing pushing it about)
+	if doing == Doing.CLIMB and _climb_phase > 0:
+		_t -= delta
+		_climbing(delta)
+		return
 	_t -= delta
 
+	if giant:
+		_keep_solid()
 	# What its mind is on
-	if doing != Doing.TALK:
+	# (the giant fears nothing)
+	if doing != Doing.TALK and not giant:
 		var threat := villagers.threat_near(global_position, 3.2 if route.is_empty() else 3.8)
 		if threat != Vector3.INF:
 			_flee_from = threat
+			if doing == Doing.CHAT:
+				villagers.end_chat(self)
 			if doing != Doing.FLEE:
 				_go(Doing.FLEE, randf_range(1.2, 2.0))
 	match doing:
@@ -161,6 +207,31 @@ func _physics_process(delta: float) -> void:
 				_go(Doing.SNIFF if randf() < 0.5 else Doing.FOLLOW, randf_range(1.0, 2.5))
 		Doing.PLAY:
 			want = _play(delta)
+		Doing.CELEBRATE:
+			# (the kits racing round in a ring; the grown-ups jumping where they are, now and then spinning)
+			if kit and home != Vector3.INF:
+				_play_angle += delta * 3.2
+				want = _toward(home + Vector3(cos(_play_angle), 0.0, sin(_play_angle)) * 2.0, 1.0)
+			if not giant and is_on_floor() and randf() < delta * 2.2:
+				_pounce_now = true
+				if randf() < 0.3:
+					_spin_left = TAU
+		Doing.CHAT:
+			# (to its place a step from the other, and there it stays, turned to it)
+			want = _toward(chat_spot, 0.4)
+			settle = at_chat
+		Doing.CLIMB:
+			# (to the foot of the tree, and then up it: _climbing)
+			var foot := _tree_foot()
+			# (no way to its foot, among roots or round a wall: it gives the tree up)
+			if _stuck > 2.5:
+				_stuck = 0.0
+				_tree = null
+				_choose()
+				foot = global_position
+			want = _toward(foot, 0.8)
+			if _at(foot, 0.35):
+				_start_climb()
 		Doing.FLEE:
 			var away := global_position - _flee_from
 			away.y = 0.0
@@ -170,7 +241,7 @@ func _physics_process(delta: float) -> void:
 			want = Vector3(sin(Time.get_ticks_msec() * 0.006 + _seed), 0.0, cos(Time.get_ticks_msec() * 0.005 + _seed)) * 0.18
 		_:
 			settle = true
-	if home != Vector3.INF and doing != Doing.FLEE and doing != Doing.PLAY:
+	if home != Vector3.INF and doing != Doing.FLEE and doing != Doing.PLAY and doing != Doing.CHAT and doing != Doing.CLIMB:
 		# (at the grove it never wanders far from its place)
 		var off := Vector3(home.x - global_position.x, 0.0, home.z - global_position.z)
 		if off.length() > 3.5:
@@ -201,6 +272,11 @@ func _physics_process(delta: float) -> void:
 		if want.length() > 1.0 and _blocked(want):
 			vy = 4.6 if kit else 5.4
 			jumped.emit()
+		elif _pounce_now:
+			# (a pounce at its playmate, or a hop round the grown-up it is pestering)
+			_pounce_now = false
+			vy = 3.4
+			jumped.emit()
 		_stuck = _stuck + delta if want.length() > 1.0 and flat.length() < 0.3 else 0.0
 		if _stuck > 2.5 and not route.is_empty():
 			_stuck = 0.0
@@ -212,7 +288,16 @@ func _physics_process(delta: float) -> void:
 		_fall_speed = -vy
 	velocity = Vector3(flat.x, vy, flat.z)
 	is_sprinting = flat.length() > run_speed * 0.7 or (kit and flat.length() > walk_speed * 1.4)
-	if flat.length() > 0.15 and doing != Doing.RUMMAGE:
+	if _spin_left > 0.0:
+		var turn := minf(_spin_left, delta * 14.0)
+		rotation.y += turn
+		_spin_left -= turn
+	elif party and not kit:
+		rotation.y = lerp_angle(rotation.y, atan2(hero_flat.x, hero_flat.z), 1.0 - exp(-6.0 * delta))
+	elif at_chat and chat_with:
+		var to_other := chat_with.global_position - global_position
+		rotation.y = lerp_angle(rotation.y, atan2(to_other.x, to_other.z), 1.0 - exp(-6.0 * delta))
+	elif flat.length() > 0.15 and doing != Doing.RUMMAGE:
 		rotation.y = lerp_angle(rotation.y, atan2(flat.x, flat.z), 1.0 - exp(-9.0 * delta))
 	elif hero_flat.length() < 4.0 or doing == Doing.TALK:
 		# (still, it turns to the hero as he comes near)
@@ -274,6 +359,13 @@ func listen(on: bool) -> void:
 
 ## Picks what to do next.
 func _choose() -> void:
+	if giant:
+		_giant_choose()
+		return
+	if chat_with:
+		chat_with = null
+		speaking = false
+	_pestering = null
 	if leader:
 		_go(Doing.FOLLOW, 1.0)
 		return
@@ -304,14 +396,32 @@ func _choose() -> void:
 		var pick := randf()
 		_go(Doing.SIT if pick < 0.4 else (Doing.SNIFF if pick < 0.65 else (Doing.GROOM if pick < 0.8 else Doing.STAND)), randf_range(2.5, 6.0))
 		return
-	# At the grove
-	if kit and playmate and not playmate.dead and randf() < 0.7:
-		_go(Doing.PLAY, randf_range(5.0, 9.0))
-		_play_angle = randf() * TAU
-		playmate.doing = Doing.PLAY
-		playmate._t = _t
-		playmate.chasing = not chasing
-		return
+	# At the grove: the kits at play most of the time, up a tree now and then, pestering the grown-ups; the grown-ups
+	# up a tree or playing tag once in a while (and chatting: Villagers sets that up)
+	var roll_play := randf()
+	if kit:
+		if roll_play < 0.12 and _begin_climb():
+			return
+		if roll_play < 0.24 and _start_pester():
+			return
+		if playmate and not playmate.dead and not playmate.stays and playmate.leader == null and playmate.doing != Doing.CLIMB \
+				and playmate.doing != Doing.FLEE and roll_play < 0.85:
+			_start_play()
+			return
+	elif home != Vector3.INF:
+		if roll_play < 0.07 and _begin_climb():
+			return
+		if roll_play < 0.12:
+			var other := villagers.idle_adult(self)
+			if other:
+				playmate = other
+				other.playmate = self
+				chasing = true
+				play = Play.TAG
+				_start_play()
+				play = Play.TAG
+				other.play = Play.TAG
+				return
 	var roll := randf()
 	if roll < 0.28:
 		_go(Doing.STAND, randf_range(2.0, 5.0))
@@ -355,10 +465,44 @@ func _toward(at: Vector3, pace: float) -> Vector3:
 	return seek.normalized() * clampf(far * 2.0, 0.0, sprint_speed) * pace
 
 
-## Kits at play: one runs round the grown-ups and the other chases it, swapping now and then (it is tag).
+## At play: tag (one runs round the grown-ups, or round a tree, the other chases it, swapping when caught),
+## pouncing at each other, hide and seek in the tall grass, or pestering a grown-up.
 func _play(delta: float) -> Vector3:
+	if play == Play.PESTER:
+		if _pestering == null or _pestering.dead:
+			return Vector3.ZERO
+		# (round and round it, close, with little hops)
+		_play_angle += delta * 2.6
+		if is_on_floor() and randf() < delta * 1.5:
+			_pounce_now = true
+		return _toward(_pestering.global_position + Vector3(cos(_play_angle), 0.0, sin(_play_angle)) * 0.55, 1.0)
 	if playmate == null or playmate.dead:
 		return Vector3.ZERO
+	if play == Play.POUNCE:
+		# (squaring up to each other, then a pounce, and again)
+		var gap := playmate.global_position - global_position
+		gap.y = 0.0
+		if gap.length() < 0.9 and is_on_floor() and randf() < delta * 1.4:
+			_pounce_now = true
+			if rig:
+				rig.express(&"surprised", 0.6)
+		if gap.length() < 0.55:
+			return -gap.normalized() * 1.2
+		return _toward(playmate.global_position, 0.5)
+	if play == Play.HIDE and _hide_spot != Vector3.INF:
+		if not chasing:
+			# (off into the tall grass, and down in it, still)
+			return _toward(_hide_spot, 1.0)
+		# (counting first, then looking, nose down; found: the game is over)
+		if _t > 6.0:
+			return Vector3.ZERO
+		if _at(playmate.global_position, 0.6):
+			if rig:
+				rig.express(&"happy", 1.5)
+			_t = 0.0
+			playmate._t = 0.0
+		return _toward(playmate.global_position + Vector3(sin(_t * 2.0), 0.0, cos(_t * 1.7)) * 0.8, 0.45)
+	var centre := _play_centre if play == Play.TREE else home
 	if chasing:
 		var gap := playmate.global_position - global_position
 		gap.y = 0.0
@@ -366,11 +510,11 @@ func _play(delta: float) -> Vector3:
 			# (caught: now the other one is it)
 			chasing = false
 			playmate.chasing = true
-			_play_angle = atan2(global_position.z - home.z, global_position.x - home.x)
+			_play_angle = atan2(global_position.z - centre.z, global_position.x - centre.x)
 		return _toward(playmate.global_position, 0.95)
-	_play_angle += delta * (1.3 + 0.4 * sin(Time.get_ticks_msec() * 0.0017 + _seed))
-	var radius := 2.2 + 0.6 * sin(Time.get_ticks_msec() * 0.0009 + _seed)
-	return _toward(home + Vector3(cos(_play_angle), 0.0, sin(_play_angle)) * radius, 1.0)
+	_play_angle += delta * (1.3 + 0.4 * sin(Time.get_ticks_msec() * 0.0017 + _seed)) * (1.6 if play == Play.TREE else 1.0)
+	var radius := (1.3 if play == Play.TREE else 2.2) + 0.6 * sin(Time.get_ticks_msec() * 0.0009 + _seed) * (0.3 if play == Play.TREE else 1.0)
+	return _toward(centre + Vector3(cos(_play_angle), 0.0, sin(_play_angle)) * radius, 1.0)
 
 
 ## Whether something solid is close in front of it, low enough to hop over.
@@ -385,3 +529,250 @@ func _blocked(way: Vector3) -> bool:
 		if not hit.is_empty() and (hit.normal as Vector3).y < 0.6:
 			return true
 	return false
+
+
+## Whether it is there (across the ground), near enough.
+func _at(spot: Vector3, near: float) -> bool:
+	return Vector2(spot.x - global_position.x, spot.z - global_position.z).length() < near
+
+
+## Whether its speech bubble is up (saying its lines to him, or chatting).
+func _bubble_open() -> bool:
+	var bubble: SpeechBubble = villagers.talk._bubbles.get(self) if villagers.talk else null
+	return bubble != null and bubble.openness > 0.3
+
+
+# --- Climbing a tree (the user, 2026-11-02: "npcoons should also be playing with each other and climbing trees") ---
+
+## Off to climb a tree near its place, if there is one nobody else is up: true if so.
+func _begin_climb() -> bool:
+	var near := home if home != Vector3.INF else global_position
+	var choices: Array[Node3D] = []
+	for node in get_tree().get_nodes_in_group(&"climbable"):
+		var tree := node as Node3D
+		# (a tree stands where it grows; a mesh of many poles sits at the middle of the world)
+		if tree == null or tree.global_position.length() < 2.0 or tree.global_position.distance_to(near) > 32.0:
+			continue
+		if villagers.tree_taken(tree, self):
+			continue
+		choices.append(tree)
+	if choices.is_empty():
+		return false
+	_tree = choices[randi() % choices.size()]
+	_out = Vector3(global_position.x - _tree.global_position.x, 0.0, global_position.z - _tree.global_position.z)
+	_out = _out.normalized() if _out.length() > 0.05 else Vector3.BACK
+	_climb_to = randf_range(2.0, 4.5 if kit else 3.5)
+	_climb_phase = 0
+	_go(Doing.CLIMB, 25.0)
+	return true
+
+
+## Where its trunk is, on the side it came from, at `height` over the foot of the tree: the point a hand from its bark
+## (Vector3.INF where there is no trunk there: above it).
+func _trunk_at(height: float) -> Vector3:
+	var y := _tree.global_position.y + height
+	var centre := Vector3(_tree.global_position.x, y, _tree.global_position.z)
+	var query := PhysicsRayQueryParameters3D.create(centre + _out * 3.0, centre, 1)
+	query.exclude = [get_rid()]
+	var hit := get_world_3d().direct_space_state.intersect_ray(query)
+	if hit.is_empty():
+		return Vector3.INF
+	return (hit.position as Vector3) + _out * (0.16 if kit else 0.22)
+
+
+## The foot of the tree, where it starts up.
+func _tree_foot() -> Vector3:
+	var at := _trunk_at(0.5)
+	return at if at != Vector3.INF else _tree.global_position + _out * 0.8
+
+
+func _start_climb() -> void:
+	_climb_phase = 1
+	collision_mask = 0
+	velocity = Vector3.ZERO
+	rig.climbing_npc = true
+
+
+## Up the trunk, holding on a while up there looking about, and down again; moved along it, nothing pushing it.
+func _climbing(delta: float) -> void:
+	if not is_instance_valid(_tree):
+		_end_climb()
+		return
+	var height := global_position.y - _tree.global_position.y
+	match _climb_phase:
+		1:
+			var on := _trunk_at(height + 0.35)
+			if on == Vector3.INF or height >= _climb_to:
+				# (as high as it goes: it holds on there)
+				_climb_phase = 2
+				_t = randf_range(4.0, 8.0)
+				velocity = Vector3.ZERO
+			else:
+				var up := (1.6 if kit else 1.3) * delta
+				global_position = Vector3(on.x, global_position.y + up, on.z)
+				velocity = Vector3(0.0, up / delta, 0.0)
+		2:
+			velocity = Vector3.ZERO
+			if _t <= 0.0:
+				_climb_phase = 3
+		3:
+			var down := (1.8 if kit else 1.5) * delta
+			var query := PhysicsRayQueryParameters3D.create(global_position + Vector3.UP * 0.1, global_position + Vector3.DOWN * 0.4, 1)
+			query.exclude = [get_rid()]
+			var ground := get_world_3d().direct_space_state.intersect_ray(query)
+			var on := _trunk_at(height)
+			if on != Vector3.INF:
+				global_position = Vector3(on.x, global_position.y, on.z)
+			if not ground.is_empty() and global_position.y - (ground.position as Vector3).y < down + 0.02:
+				global_position.y = (ground.position as Vector3).y
+				_end_climb()
+				return
+			global_position.y -= down
+			velocity = Vector3(0.0, -down / delta, 0.0)
+	# (belly to the trunk)
+	rotation.y = atan2(-_out.x, -_out.z)
+	var hero := villagers.player
+	if hero and hero.global_position.distance_to(global_position) < 6.0:
+		rig._interest = hero
+		rig._interest_is_threat = false
+
+
+func _end_climb() -> void:
+	_climb_phase = 0
+	collision_mask = 1
+	velocity = Vector3.ZERO
+	rig.climbing_npc = false
+	_tree = null
+	_choose()
+
+
+# --- Play (the user, 2026-11-02: "npcoons should also be playing with each other") ---
+
+## Sets it and its playmate playing one game or another: tag, round a tree, pouncing, hide and seek in tall grass.
+func _start_play() -> void:
+	var kinds: Array[Play] = [Play.TAG, Play.TAG, Play.POUNCE]
+	var tree := _near_tree()
+	if tree:
+		kinds.append(Play.TREE)
+	var grass := _near_tall_grass()
+	if grass != Vector3.INF:
+		kinds.append(Play.HIDE)
+	play = kinds[randi() % kinds.size()]
+	_play_centre = tree.global_position if play == Play.TREE else home
+	_hide_spot = grass
+	_go(Doing.PLAY, randf_range(6.0, 11.0))
+	_play_angle = randf() * TAU
+	playmate.play = play
+	playmate._play_centre = _play_centre
+	playmate._hide_spot = _hide_spot
+	playmate.doing = Doing.PLAY
+	playmate._t = _t
+	playmate.chasing = not chasing
+	if play == Play.HIDE:
+		# (the one that is "it" counts first, then goes looking)
+		chasing = randf() < 0.5
+		playmate.chasing = not chasing
+
+
+## A kit pestering a grown-up: hopping round it close, the grown-up putting up with it.
+func _start_pester() -> bool:
+	for other in villagers.members:
+		if other != self and not other.kit and not other.dead and other.home != Vector3.INF and _at(other.global_position, 6.0):
+			playmate = other if playmate == null else playmate
+			_pestering = other
+			play = Play.PESTER
+			_go(Doing.PLAY, randf_range(4.0, 7.0))
+			if other.rig:
+				other.rig.express(&"sleepy", 3.0)
+			return true
+	return false
+
+
+var _pestering: Villager
+var _pounce_now := false
+var _spin_left := 0.0
+
+
+## Glad: it turns to him and celebrates a few seconds (Villagers.celebrate), then goes back to what it was doing.
+func celebrate() -> void:
+	if dead or stays or leader or (doing == Doing.CLIMB and _climb_phase > 0) or doing == Doing.FLEE:
+		return
+	_tree = null
+	if chat_with:
+		villagers.end_chat(self)
+	_go(Doing.CELEBRATE, randf_range(3.0, 4.5))
+	_play_angle = randf() * TAU
+	if rig:
+		rig.express(&"happy", _t)
+
+
+func _near_tree() -> Node3D:
+	var near := home if home != Vector3.INF else global_position
+	for node in get_tree().get_nodes_in_group(&"climbable"):
+		var tree := node as Node3D
+		if tree and tree.global_position.length() > 2.0 and tree.global_position.distance_to(near) < 32.0:
+			return tree
+	return null
+
+
+func _near_tall_grass() -> Vector3:
+	var lawn := TownGrass.current
+	if lawn == null:
+		return Vector3.INF
+	var near := home if home != Vector3.INF else global_position
+	for patch in lawn._tall:
+		var at := Vector3(patch.x, near.y, patch.y)
+		if Vector2(patch.x - near.x, patch.y - near.z).length() < 18.0:
+			return at
+	return Vector3.INF
+
+
+# --- The giant of the grove (the user, 2026-11-02: "1 giant Totoro-sized raccoon") ---
+
+## Its body to stand on and climb: a broad drum, as tall as it is sitting or standing, following it about (on the
+## world's layer, so he lands on it and scurries up it; in the group `climbable`, so the kits climb it too).
+func _make_solid() -> void:
+	_solid = AnimatableBody3D.new()
+	_solid.name = "GiantBody"
+	# (not synced to the physics step: synced, it kept the place it was made at, not where the giant settled)
+	_solid.sync_to_physics = false
+	_solid_shape = CylinderShape3D.new()
+	_solid_shape.radius = 1.15
+	_solid_shape.height = 3.0
+	var shape := CollisionShape3D.new()
+	shape.shape = _solid_shape
+	shape.position.y = 1.5
+	_solid.add_child(shape)
+	_solid.add_to_group(&"climbable")
+	# (a child of it, so it goes where it goes; setting a top-level one's place each step did not take)
+	add_child(_solid)
+	# (it stands where it is: its own small capsule does not block the others; the drum does)
+	add_collision_exception_with(_solid)
+
+
+func _keep_solid() -> void:
+	if _solid == null:
+		return
+	# (its lap and belly, not its whole height: up there he stands on its belly, below its head)
+	var tall := lerpf(2.2, 1.5, sit_progress)
+	_solid_shape.height = tall
+	(_solid.get_child(0) as CollisionShape3D).position.y = tall * 0.5
+
+
+## What the giant does: dozes sitting, mostly (a long while, sleepy-eyed), scratches itself, stands a while looking
+## about (the rig's idles: a big stretch, a yawn of a neck crack), and now and then plods a few slow steps.
+func _giant_choose() -> void:
+	var roll := randf()
+	if roll < 0.6:
+		_go(Doing.SIT, randf_range(14.0, 28.0))
+		rig.express(&"sleepy", _t)
+	elif roll < 0.75:
+		_go(Doing.GROOM, randf_range(5.0, 8.0))
+		rub_progress = 1.0
+	elif roll < 0.92:
+		_go(Doing.STAND, randf_range(6.0, 12.0))
+	else:
+		var a := randf() * TAU
+		_goal = home + Vector3(cos(a), 0.0, sin(a)) * randf_range(0.8, 2.0)
+		_pace = 0.3
+		_go(Doing.STROLL, randf_range(5.0, 9.0))

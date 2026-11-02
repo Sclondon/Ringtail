@@ -178,6 +178,23 @@ var _idle_t := 0.0
 var _idle_for := 5.0
 var _idle_w := {}
 var _still := 0.0
+## Set from outside (Villager): how much it is talking (gesturing, its head bobbing) or listening (head tilted, nodding),
+## and whether it is climbing a tree of its own accord (no Scurry: a raccoon of the town).
+var talking := 0.0
+var listening := 0.0
+var climbing_npc := false
+## Also set from outside: cheering (arms up, waving), clapping (paws together before the chest, over and over), and
+## lounging (sitting leant well back, as against a tree).
+var cheer := 0.0
+var clap := 0.0
+var lounge := 0.0
+var _cheer_w := 0.0
+var _clap_w := 0.0
+var _lounge_w := 0.0
+var _talk_w := 0.0
+var _listen_w := 0.0
+var _talk_hand := 0
+var _talk_flip := 0.0
 ## 1 going on all fours in the scurry's gallop, 0 in the sprint's bound.
 var _scurry_gait := 0.0
 var _glide := 0.0
@@ -241,7 +258,7 @@ func _pose_extra(delta: float) -> void:
 	# (ducking, crawling and scurrying he is on all fours: the user, 2026-11-01, "why is duck not on all 4s?")
 	var low: bool = (&"is_ducking" in _player and _player.is_ducking) or (&"is_crawling" in _player and _player.is_crawling)
 	var scurrying: bool = _scurry != null and _scurry.held
-	var climbing: bool = _scurry != null and _scurry.climbing
+	var climbing: bool = (_scurry != null and _scurry.climbing) or climbing_npc
 	_climb_w = _approach(_climb_w, 1.0 if climbing else 0.0, 10.0, delta)
 	if climbing:
 		speed = absf(velocity.y)
@@ -306,6 +323,16 @@ func _pose_extra(delta: float) -> void:
 	if spread < 0.998:
 		for i in 2:
 			_close_paw(i, 1.0 if i == 0 else -1.0, -1.0, 0.9 * (1.0 - spread))
+	# Talking or listening (the raccoons of the town to one another, or to him): over whatever they stand or sit doing
+	_talk_w = _approach(_talk_w, talking, 5.0, delta)
+	_listen_w = _approach(_listen_w, listening, 4.0, delta)
+	if (_talk_w > 0.002 or _listen_w > 0.002) and _quad < 0.5 and not climbing:
+		_pose_talk(delta, _talk_w * (1.0 - _quad), _listen_w * (1.0 - _quad))
+	_cheer_w = _approach(_cheer_w, cheer, 6.0, delta)
+	_clap_w = _approach(_clap_w, clap, 6.0, delta)
+	_lounge_w = _approach(_lounge_w, lounge, 1.5, delta)
+	if (_cheer_w > 0.002 or _clap_w > 0.002 or _lounge_w > 0.002) and not climbing:
+		_pose_cheer(_cheer_w * (1.0 - _quad), _clap_w * (1.0 - _quad), _lounge_w)
 	if _climb_w > 0.002:
 		_pose_climb(_climb_w)
 	if _hang > 0.3:
@@ -453,6 +480,58 @@ func _pose_hang_swing(delta: float) -> void:
 		# (about the hip: sideways with the shimmy, back and forth a little, the trailing leg further)
 		var out := Vector3(clampf(_leg_swing * 0.22 + _shimmy * side * 0.04, -0.3, 0.3), absf(_leg_swing) * 0.08, idle + sin(_time * 3.1 + side) * 0.03 * absf(_shimmy))
 		_set_leg(i, side, foot + out * w, _feet[i].basis, w)
+
+
+## Celebrating (Villagers.celebrate): arms flung up, waving; or clapping, paws meeting before the chest. Lounging:
+## leant well back from the hips, as against a trunk, head lolling.
+func _pose_cheer(cheer_w: float, clap_w: float, lounge_w: float) -> void:
+	if lounge_w > 0.002:
+		_spine.basis = Basis(Vector3.RIGHT, -0.45 * lounge_w) * _spine.basis
+		_head.basis = Basis(Vector3.RIGHT, 0.25 * lounge_w) * Basis(Vector3.BACK, 0.15 * lounge_w) * _head.basis
+	for i in 2:
+		var side := 1.0 if i == 0 else -1.0
+		var shoulder := to_local(_shoulders[i].global_position)
+		if cheer_w > 0.002:
+			var wave := sin(_time * 9.0 + i * 1.6)
+			_solve_arm(i, side, to_global(shoulder + Vector3(side * (0.12 + 0.05 * wave), 0.26, 0.05)), _forearm, cheer_w)
+			_close_paw(i, side, 0.2, cheer_w)
+		if clap_w > 0.002:
+			var apart := 0.02 + 0.07 * absf(sin(_time * 6.0))
+			_solve_arm(i, side, to_global(shoulder + Vector3(side * apart, -0.08, 0.17)), _forearm, clap_w)
+			_close_paw(i, side, 0.15, clap_w)
+
+
+## Talking (the user, 2026-11-02: "there needs to be a talking animation too so raccoon NPCs can talk to each other"):
+## a paw up before the chest gesturing, open, with flicks of the wrist, now one paw and now the other, now and then
+## both; the head bobbing with the words, the body swaying a little, the brows up. Listening: the head tilted,
+## nodding now and then. Over the idle's arms while it is on.
+func _pose_talk(delta: float, talk: float, listen: float) -> void:
+	if talk > 0.002:
+		_talk_flip -= delta
+		if _talk_flip <= 0.0:
+			_talk_flip = randf_range(0.9, 2.0)
+			_talk_hand = randi() % 3
+			express(&"happy" if randf() < 0.6 else &"surprised", 0.9)
+		var beat := _time * 6.5
+		_spine.basis = Basis(Vector3.BACK, sin(_time * 1.6) * 0.05 * talk) * _spine.basis
+		_head.basis = Basis(Vector3.RIGHT, (sin(beat) * 0.07 - 0.05) * talk) * Basis(Vector3.UP, sin(_time * 1.1) * 0.12 * talk) * _head.basis
+		var forward := global_basis.z.normalized()
+		for i in 2:
+			var side := 1.0 if i == 0 else -1.0
+			var up := 1.0 if _talk_hand == 2 or _talk_hand == i else 0.0
+			var shoulder := to_local(_shoulders[i].global_position)
+			# (a gesture: out and up before the chest, rising and falling with the words, swinging out to the side)
+			var out := Vector3(side * (0.1 + 0.05 * sin(beat * 0.5 + side)), -0.08 + 0.06 * sin(beat + i * 1.7), 0.17 + 0.03 * sin(beat * 0.7))
+			var low := Vector3(side * 0.06, -0.24, 0.05)
+			var weight := talk * lerpf(0.55, 1.0, up)
+			_solve_arm(i, side, to_global(shoulder + low.lerp(out, up)), _forearm, weight)
+			_close_paw(i, side, lerpf(0.45, 0.15, up), weight)
+			if up > 0.5:
+				# (the paw open and turned up, flicking with the wrist)
+				_lay_hand(i, side, (Vector3.UP + forward * 0.4).normalized(), (forward + global_basis.x.normalized() * side * 0.5 + Vector3.UP * 0.3 * sin(beat * 1.3)).normalized(), weight * 0.7)
+	if listen > 0.002:
+		var nod := maxf(sin(_time * 2.2), 0.0) ** 6.0
+		_head.basis = Basis(Vector3.BACK, 0.2 * listen) * Basis(Vector3.RIGHT, 0.16 * nod * listen) * _head.basis
 
 
 ## Climbing (Scurry): his all-fours pose turned up onto the surface ahead of him, belly to it, head up, paws

@@ -171,6 +171,8 @@ func _home(kit: Villager) -> void:
 			break
 	kit._choose()
 	changed.emit(found, total)
+	# (and they all celebrate: the user, 2026-11-02, "they should all celebrate when you bring stuff back")
+	Villagers.celebrate(kit.global_position)
 
 
 func _puff_at(at: Vector3) -> void:

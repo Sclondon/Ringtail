@@ -17,6 +17,17 @@ const KIT := 0.5
 ## A kit's head and middle against a grown-up's: bigger and rounder.
 const KIT_HEAD := 1.4
 const KIT_MIDDLE := Vector3(1.15, 1.0, 1.15)
+## A few characters: a very fat old one, a tall skinny one, a tiny runt of a kit (Claude's picks).
+const OLD_GREY := {"size": 1.12, "girth": 1.55, "head": 1.05, "ears": 0.85, "marks": "frosted", "fur": "shaggy", "tail": [0.95, 1.35],
+		"colours": {"fur": Color(0.55, 0.54, 0.53), "light": Color(0.88, 0.87, 0.85), "limb": Color(0.33, 0.32, 0.32), "tan": Color(0.66, 0.65, 0.63), "ring": Color(0.2, 0.2, 0.2)}}
+const LANKY := {"size": 1.22, "girth": 0.8, "head": 0.95, "ears": 1.35, "fur": "sleek", "tail": [1.3, 0.85]}
+const RUNT := {"size": 0.38, "girth": 1.0, "head": 1.12, "ears": 1.45, "fur": "soft"}
+## The giant of the grove (the user, 2026-11-02: "1 giant Totoro-sized raccoon"): a raccoon, about six times the
+## size of the rest, round and fat, gentle and sleepy (Claude's picks for its look and its name).
+const GIANT := {"giant": true, "size": 6.0, "girth": 1.6, "head": 1.05, "ears": 0.9, "marks": "frosted", "fur": "shaggy", "tail": [1.1, 1.45],
+		"colours": {"fur": Color(0.47, 0.42, 0.38), "light": Color(0.86, 0.82, 0.76), "limb": Color(0.27, 0.24, 0.22), "tan": Color(0.6, 0.55, 0.49), "ring": Color(0.19, 0.17, 0.16)}}
+const GIANT_LINES := ["Old Mossback", "Mmmmm... hello... little one.", "...", "The grove is... warm... today.",
+		"Mmm. Stay a while.", "Zzz... mm? Oh. Still here?", "The little ones... climb on me. I don't mind."]
 const TINTS := [
 	{"fur": Color(0.5, 0.47, 0.45), "tan": Color(0.57, 0.53, 0.5)},
 	{"fur": Color(0.58, 0.5, 0.42), "tan": Color(0.66, 0.56, 0.45)},
@@ -61,6 +72,9 @@ const TOWN_LINES := [
 			"Have you seen the view from the top of the stairs? Lovely in the evening.", "We'll see you up at the grove later."],
 ]
 
+## The raccoons of the world now (for `celebrate`).
+static var current: Villagers
+
 var player: Player
 var members: Array[Villager] = []
 var talk: Chatter
@@ -69,6 +83,7 @@ var talk: Chatter
 static func place(world: Node3D, markers: Dictionary, hero: Player) -> void:
 	var band := Villagers.new()
 	band.name = "Villagers"
+	current = band
 	band.player = hero
 	world.add_child(band)
 	band.talk = Chatter.new()
@@ -78,21 +93,48 @@ static func place(world: Node3D, markers: Dictionary, hero: Player) -> void:
 	# At the grove's heart: three grown-ups about it, three kits playing round them
 	var heart: Vector3 = (markers["grove_heart"] as Transform3D).origin if markers.has("grove_heart") \
 			else Vector3(0.5, (markers["check_top"] as Transform3D).origin.y if markers.has("check_top") else 7.1, 3.5)
+	# (the base is at the foot of the great oak, where the giant sits among its roots: the user, 2026-11-02, "the main base
+	# should be at the base of a great big oak tree with gnarled roots, where the giant raccoon sits and snoozes")
+	var oak := Vector3.INF
+	if markers.has("great_oak"):
+		oak = (markers["great_oak"] as Transform3D).origin
+		var out := Vector3(heart.x - oak.x, 0.0, heart.z - oak.z)
+		out = out.normalized() if out.length() > 0.5 else Vector3.BACK
+		heart = oak + out * 7.5
 	var spot := 0
 	for k in 3:
 		var a := TAU * k / 3 + 0.4
-		var adult := band._add(false, k, heart + Vector3(cos(a), 0.4, sin(a)) * 1.3)
+		# (Old Grey a very fat old one)
+		var adult := band._add(false, k, heart + Vector3(cos(a), 0.4, sin(a)) * 1.3, OLD_GREY if k == 0 else {})
 		adult.home = heart + Vector3(cos(a), 0.0, sin(a)) * 1.3
 		adult.say(GROVE_LINES[spot])
 		spot += 1
 	var kits: Array[Villager] = []
 	for k in 3:
 		var a := TAU * k / 3 + 1.4
-		var young := band._add(true, k + 2, heart + Vector3(cos(a), 0.4, sin(a)) * 2.3)
+		# (the third a tiny runt)
+		var young := band._add(true, k + 2, heart + Vector3(cos(a), 0.4, sin(a)) * 2.3, RUNT if k == 2 else {})
 		young.home = heart
 		young.say(GROVE_LINES[spot])
 		spot += 1
 		kits.append(young)
+	# The giant: sitting at the foot of the great tree (the biggest tree_ marker), facing the clearing
+	var seat := heart + Vector3(6.0, 0.0, 0.0)
+	var biggest := 149.0
+	for name: String in markers:
+		if name.begins_with("tree_") and name.get_slice_count("_") >= 4 and float(name.get_slice("_", 3)) > biggest:
+			biggest = float(name.get_slice("_", 3))
+			var trunk: Vector3 = (markers[name] as Transform3D).origin
+			var toward := Vector3(heart.x - trunk.x, 0.0, heart.z - trunk.z).normalized()
+			seat = trunk + toward * 4.5
+	if oak != Vector3.INF:
+		# (against the oak's trunk, among the roots, facing out over the base)
+		var out := Vector3(heart.x - oak.x, 0.0, heart.z - oak.z).normalized()
+		seat = oak + out * 4.0
+	var mossback := band._add(false, 8, seat + Vector3.UP * 0.5, GIANT)
+	mossback.home = seat
+	mossback.say(GIANT_LINES)
+	mossback.rotation.y = atan2(heart.x - seat.x, heart.z - seat.z)
 	# (two play tag; the third sometimes, with whichever)
 	kits[0].playmate = kits[1]
 	kits[1].playmate = kits[0]
@@ -104,7 +146,8 @@ static func place(world: Node3D, markers: Dictionary, hero: Player) -> void:
 	var spread := [0, route.size() / 3, route.size() * 2 / 3]
 	for k in 3:
 		var at: int = spread[k]
-		var goer := band._add(false, k + 1, route[at] + Vector3.UP * 0.4)
+		# (Lookout a tall skinny one)
+		var goer := band._add(false, k + 1, route[at] + Vector3.UP * 0.4, LANKY if k == 1 else {})
 		goer.route = route
 		goer.leg = at
 		goer.say(TOWN_LINES[k])
@@ -113,11 +156,17 @@ static func place(world: Node3D, markers: Dictionary, hero: Player) -> void:
 			young.parent = goer
 
 
-func _add(kit: bool, look: int, at: Vector3) -> Villager:
+func _add(kit: bool, look: int, at: Vector3, special := {}) -> Villager:
 	var member := Villager.new()
+	# (its own build: seeded by who it is, so it is the same raccoon every time; `special` for the few characters)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(members.size() * 7919 + look * 131 + (1 if kit else 0))
+	var build := _random_build(kit, rng)
+	build.merge(special, true)
 	member.name = ("Kit%d" if kit else "Raccoon%d") % members.size()
 	member.villagers = self
 	member.kit = kit
+	member.giant = bool(build.get("giant", false))
 	var rig := RaccoonRig.new()
 	rig.name = "Rig"
 	rig.dusty = false
@@ -125,16 +174,56 @@ func _add(kit: bool, look: int, at: Vector3) -> Villager:
 	rig.cap_hand = false
 	# (kits go about on all fours; grown-ups stand, and drop to all fours to run)
 	rig.always_on_fours = kit
-	rig.scale = Vector3.ONE * (KIT if kit else ADULT[look % ADULT.size()])
-	rig.look = {"colours": TINTS[look % TINTS.size()]}
+	rig.scale = Vector3.ONE * float(build.size)
+	rig.look = {"colours": build.colours, "fur": build.fur, "marks": build.marks, "tail": build.tail}
 	member.rig = rig
 	member.position = at
 	member.rotation.y = randf() * TAU
 	add_child(member)
-	if kit:
-		_kit_shape(rig)
+	_shape_bones(rig, kit, build)
+	member.build = build
 	members.append(member)
 	return member
+
+
+## A build of its own (the user, 2026-11-02: "different sized raccoons (big fat ones and little ones) and different ear
+## sizes etc, more character variation"): size, girth, head, ears, tail, fur colour, marks and type, a wide but
+## believable spread, a kit always plainly a kit. Claude's picks.
+static func _random_build(kit: bool, rng: RandomNumberGenerator) -> Dictionary:
+	var size := rng.randf_range(0.43, 0.58) if kit else 1.0 + rng.randfn(0.0, 0.1)
+	var fur := Color.from_hsv(rng.randf_range(0.05, 0.11), rng.randf_range(0.06, 0.32), rng.randf_range(0.38, 0.68))
+	return {
+		"size": clampf(size, 0.38, 1.25),
+		"girth": rng.randf_range(1.0, 1.3) if kit else clampf(1.05 + rng.randfn(0.0, 0.17), 0.8, 1.5),
+		"head": rng.randf_range(0.92, 1.15),
+		"ears": rng.randf_range(0.75, 1.5),
+		"tail": [rng.randf_range(0.8, 1.3), rng.randf_range(0.8, 1.4)],
+		"colours": {"fur": fur, "light": fur.lightened(0.45), "limb": fur.darkened(0.35), "tan": fur.lightened(0.15),
+				"ring": fur.darkened(0.6)},
+		"marks": ["plain", "plain", "plain", "frosted", "dark_tips", "streaked", "stippled"][rng.randi() % 7],
+		"fur": ["rings", "rings", "rings", "soft", "shaggy", "sleek", "spiky", "wiry"][rng.randi() % 8],
+	}
+
+
+## Its build in its bones: head and ears, and the middle widened (a fat one round, a thin one narrow), a kit's head and
+## middle bigger again. The bones' rest made so (the rig keeps a bone's rest size in every pose).
+static func _shape_bones(rig: RaccoonRig, kit: bool, build: Dictionary) -> void:
+	var skeleton := rig._skeleton
+	if skeleton == null:
+		return
+	var girth := float(build.girth)
+	var sizes := {
+		# (the head sits on the widened middle: its own size kept, not the middle's width too)
+		"head": Vector3(1.0 / girth, 1.0, 1.0 / girth) * float(build.head) * (KIT_HEAD if kit else 1.0),
+		"spine": Vector3(girth, 1.0, girth) * (KIT_MIDDLE if kit else Vector3.ONE),
+		"ear_l": Vector3.ONE * float(build.ears), "ear_r": Vector3.ONE * float(build.ears),
+	}
+	for bone: String in sizes:
+		var index := skeleton.find_bone(bone)
+		if index < 0:
+			continue
+		var rest := skeleton.get_bone_rest(index)
+		skeleton.set_bone_rest(index, Transform3D(rest.basis.scaled_local(sizes[bone]), rest.origin))
 
 
 ## A kit's big head and round middle: the bones' rest made bigger (the rig keeps a bone's rest size in every pose).
@@ -177,6 +266,9 @@ func apart(member: Villager) -> Vector3:
 	for other in members:
 		if other == member or other.dead:
 			continue
+		# (two chatting stand close on purpose)
+		if other == member.chat_with:
+			continue
 		var gap := member.global_position - other.global_position
 		gap.y = 0.0
 		var d := gap.length()
@@ -200,3 +292,144 @@ func threat_near(at: Vector3, reach: float) -> Vector3:
 				best = thing.global_position
 	return best
 
+
+
+# --- The grown-ups chatting with one another (the user, 2026-11-02: "there needs to be a talking animation too so
+# raccoon NPCs can talk to each other") ---
+
+## What they say to one another, turn about (Claude's placeholders). Shown only when he is near, one bubble at a time.
+const CHATS := [
+	["Did you hear the dogs last night?", "All night! Not a wink of sleep.", "The beagle's the loudest.", "The bloodhound's the worst."],
+	["They put the bins out early this week.", "Did they? Nobody tells me anything.", "I'm telling you now.", "...Thank you."],
+	["The kits are getting so big.", "Eating us out of house and grove.", "Have you seen the pile, though?", "Growing nicely."],
+	["Mind the new bus on the hill road.", "Big as a house!", "Bigger than a house.", "Bigger than two houses."],
+	["Lovely evening.", "Lovely.", "Bit of wind.", "Bit of wind, yes."],
+	["Have you tried the station bins?", "Too many people.", "Too many sandwiches, you mean.", "...Tomorrow, then."],
+]
+
+var _chats: Array[Dictionary] = []
+var _chat_wait := 5.0
+
+
+## Whether another of them has gone up `tree` (or is on the way).
+func tree_taken(tree: Node3D, asking: Villager) -> bool:
+	for other in members:
+		if other != asking and other.doing == Villager.Doing.CLIMB and other._tree == tree:
+			return true
+	return false
+
+
+## A grown-up at the grove with nothing much on (for a game of tag, or a chat), or null.
+func idle_adult(asking: Villager) -> Villager:
+	for other in members:
+		if other != asking and _free(other) and asking.global_position.distance_to(other.global_position) < 8.0:
+			return other
+	return null
+
+
+func _free(who: Villager) -> bool:
+	return not who.kit and not who.giant and not who.dead and not who.stays and who.leader == null and who.parent == null \
+			and who.doing in [Villager.Doing.STAND, Villager.Doing.SIT, Villager.Doing.SNIFF, Villager.Doing.GROOM, Villager.Doing.STROLL]
+
+
+func _physics_process(delta: float) -> void:
+	_chat_wait -= delta
+	if _chat_wait <= 0.0:
+		_chat_wait = randf_range(6.0, 12.0)
+		_try_chat()
+	_turns(delta)
+
+
+## Two grown-ups near each other with nothing much on: they meet and chat.
+func _try_chat() -> void:
+	for a in members:
+		if not _free(a):
+			continue
+		for b in members:
+			if b == a or not _free(b):
+				continue
+			if a.global_position.distance_to(b.global_position) < (6.0 if a.home != Vector3.INF else 4.0):
+				start_chat(a, b)
+				return
+
+
+func start_chat(a: Villager, b: Villager) -> void:
+	var middle := (a.global_position + b.global_position) * 0.5
+	var across := Vector3(b.global_position.x - a.global_position.x, 0.0, b.global_position.z - a.global_position.z)
+	across = across.normalized() if across.length() > 0.05 else Vector3.RIGHT
+	# (time to walk up to each other; the chat's own while starts when they meet: _turns)
+	var seconds := 15.0
+	for pair: Array in [[a, b, -1.0], [b, a, 1.0]]:
+		var who: Villager = pair[0]
+		who.chat_with = pair[1]
+		who.chat_spot = middle + across * 0.45 * float(pair[2])
+		who._go(Villager.Doing.CHAT, seconds)
+	a.speaking = true
+	b.speaking = false
+	_chats.append({"a": a, "b": b, "turn": randf_range(1.8, 2.8), "line": 0, "words": CHATS[randi() % CHATS.size()]})
+
+
+## A chat broken off (one of them took fright): both go back to what they were doing.
+func end_chat(who: Villager) -> void:
+	var other := who.chat_with
+	for each: Villager in [who, other]:
+		if each and is_instance_valid(each):
+			each.chat_with = null
+			each.speaking = false
+			if each.doing == Villager.Doing.CHAT and each != who:
+				each._choose()
+
+
+## Turns in the chats: each says a bit, then the other. If he is near the nearest chat and no one is talking to him,
+## what they say shows over them.
+func _turns(delta: float) -> void:
+	var nearest: Dictionary = {}
+	var best := 7.0
+	for chat in _chats.duplicate():
+		var a: Villager = chat.a
+		var b: Villager = chat.b
+		if not is_instance_valid(a) or not is_instance_valid(b) or a.chat_with != b or a.doing != Villager.Doing.CHAT:
+			_chats.erase(chat)
+			continue
+		var d := player.global_position.distance_to((a.global_position + b.global_position) * 0.5) if player else INF
+		if d < best:
+			best = d
+			nearest = chat
+	for chat in _chats:
+		var a: Villager = chat.a
+		var b: Villager = chat.b
+		# (they only start once both are there)
+		if not (a._at(a.chat_spot, 0.3) and b._at(b.chat_spot, 0.3)):
+			continue
+		# (and from then it runs its while: walking up to each other is not the chat)
+		if not chat.has("met"):
+			chat.met = true
+			var seconds := randf_range(6.0, 12.0)
+			a._t = seconds
+			b._t = seconds
+		chat.turn = float(chat.turn) - delta
+		var show := chat == nearest and talk and not talk.busy()
+		if chat.turn <= 0.0 or (show and int(chat.line) == 0 and not chat.has("shown")):
+			if chat.turn <= 0.0:
+				chat.turn = randf_range(2.2, 3.2)
+				a.speaking = not a.speaking
+				b.speaking = not a.speaking
+			var speaker: Villager = a if a.speaking else b
+			var listener: Villager = b if a.speaking else a
+			if show:
+				chat.shown = true
+				var words: Array = chat.words
+				talk.bubble_of(speaker).say(words[int(chat.line) % words.size()], 2.6, speaker.display_name)
+				talk.bubble_of(listener).hold = 0.0
+				chat.line = int(chat.line) + 1
+
+
+## Something brought home (a lost kit led back, the food pile grown): everyone at the grove celebrates a few seconds,
+## turned to him, jumping with their arms up, the kits racing round, the giant awake and clapping (the user,
+## 2026-11-02: "they should all celebrate when you bring stuff back").
+static func celebrate(at: Vector3) -> void:
+	if current == null or not is_instance_valid(current):
+		return
+	for member in current.members:
+		if is_instance_valid(member) and member.home != Vector3.INF and member.global_position.distance_to(at) < 35.0:
+			member.celebrate()
