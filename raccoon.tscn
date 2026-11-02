@@ -1,24 +1,35 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=9 format=3]
 
 [ext_resource type="PackedScene" path="res://player.tscn" id="1"]
 [ext_resource type="Script" path="res://scripts/raccoon_rig.gd" id="2"]
 [ext_resource type="Script" path="res://scripts/tail_moves.gd" id="3"]
 [ext_resource type="PackedScene" path="res://models/raccoon.glb" id="4"]
 [ext_resource type="Script" path="res://scripts/water_leap.gd" id="5"]
+[ext_resource type="Script" path="res://scripts/long_jump.gd" id="6"]
+[ext_resource type="Script" path="res://scripts/cloud_dust.gd" id="7"]
 
 [node name="Raccoon" instance=ExtResource("1")]
-run_speed = 5.8
-sprint_speed = 5.8
-auto_sprint = false
+run_speed = 4.4
+sprint_speed = 6.2
+sprint_delay = 0.05
+slide_min_speed = 5.0
+sleep_after = 75.0
 
 [node name="Rig" parent="." index="1"]
 script = ExtResource("2")
 model = ExtResource("4")
 key_poses = false
 cap_hand = false
+dusty = false
 
 [node name="TailMoves" type="Node" parent="." index="2"]
 script = ExtResource("3")
 
 [node name="WaterLeap" type="Node" parent="." index="3"]
 script = ExtResource("5")
+
+[node name="LongJump" type="Node" parent="." index="4"]
+script = ExtResource("6")
+
+[node name="CloudDust" type="Node3D" parent="." index="5"]
+script = ExtResource("7")

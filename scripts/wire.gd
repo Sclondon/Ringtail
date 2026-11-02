@@ -95,7 +95,7 @@ func _physics_process(delta: float) -> void:
 	var falling := rider.velocity.y
 	if not riding:
 		# Coming down onto it: from above it last frame to at or below it now, close enough sideways
-		if falling <= 0.0 and _was_y >= on_line.y - 0.05 and here.y <= on_line.y + 0.05 and aside.length() < CATCH and at > 0.02 and at < 0.98 \
+		if falling <= 0.0 and _was_y >= on_line.y - 0.05 and here.y <= on_line.y + 0.05 and _was_y - here.y < 1.0 and aside.length() < CATCH and at > 0.02 and at < 0.98 \
 				and rider.state == Player.State.FREE:
 			riding = true
 			t = at

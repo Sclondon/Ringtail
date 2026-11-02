@@ -42,16 +42,18 @@ func _run() -> void:
 	var rig := player.get_node(^"Rig") as RaccoonRig
 	var moves := player.get_node(^"TailMoves") as TailMoves
 	_check(world.crumbs_total >= 90, "world has its Crumbs (%d)" % world.crumbs_total)
-	_check(get_nodes_in_group(&"cats").size() == 3, "three cats in the yard")
+	_check(get_nodes_in_group(&"cats").size() >= 3, "cats in the alley")
 
 	# Running goes onto all fours, bounding
 	await _put(Vector3(0.0, 0.05, 8.0))
 	Input.action_press(&"move_up")
 	var most := 0.0
+	var bound := 0.0
 	for _i in 70:
 		await physics_frame
 		most = maxf(most, rig._quad)
-	_check(most > 0.9 and rig._gallop > 0.5, "running on all fours (quad %.2f)" % most)
+		bound = maxf(bound, rig._gallop)
+	_check(most > 0.9 and bound > 0.5, "running on all fours (quad %.2f)" % most)
 
 	# Duck-walking too
 	await _put(Vector3(0.0, 0.05, 8.0))
@@ -87,6 +89,35 @@ func _run() -> void:
 	await _frames(20)
 	_check(cat.mode == YardCat.Mode.DAZED, "tail spin on the ground beats a cat")
 	cat.set_physics_process(true)
+
+	# The long jump: flat out, duck into a slide and jump, and he goes long
+	await _put(Vector3(0.0, 0.05, -36.0))
+	Input.action_press(&"move_up")
+	await _frames(45)
+	Input.action_press(&"duck")
+	await _frames(3)
+	var took_off := player.global_position
+	player._queue_jump()
+	Input.action_press(&"jump")
+	var long_speed := 0.0
+	for _i in 12:
+		await physics_frame
+		long_speed = maxf(long_speed, Vector2(player.velocity.x, player.velocity.z).length())
+	_release()
+	await _frames(50)
+	_check(long_speed > 8.0, "a long jump out of a slide (%.1f m/s along)" % long_speed)
+
+	# The spin in the air is a second jump
+	await _put(Vector3(0.0, 0.05, 8.0))
+	Input.action_press(&"jump")
+	player._queue_jump()
+	await _frames(16)
+	var before_spin := player.velocity.y
+	moves.press()
+	await _frames(2)
+	_check(player.velocity.y > 5.0 and before_spin < 3.0, "the air spin is a second jump (%.1f m/s up)" % player.velocity.y)
+	Input.action_release(&"jump")
+	await _frames(60)
 
 	# A spin in the air
 	await _put(Vector3(0.0, 0.05, 8.0))

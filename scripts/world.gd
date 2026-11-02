@@ -1,8 +1,9 @@
 class_name World
 extends Node3D
 ## A world: its model (built in Blender, models/<name>.glb), and what the game puts
-## in it at the model's markers (see tools/build_world1.py): the raccoon, the camera,
-## Crumbs, Bottlecaps, cats, the race, the trampoline, the trellis and the pond.
+## in it at the model's markers (see tools/build_world1.py): the raccoon, the camera, Crumbs,
+## Bottlecaps, cats, trash cans, wires, the race, the trampoline, trellises and the pool. Paints the
+## model with the Banjo-style textures (TEXTURES).
 ## Keeps the score and his hearts.
 
 signal crumbs_changed(count: int, total: int)
@@ -18,6 +19,20 @@ const CAP_NAMES := {
 	"cats": "Cat scrap",
 	"race": "Alley dash",
 	"hidden": "Under the porch",
+}
+
+## The world model's materials that are painted: material -> [texture in textures/, metres to a repeat, tint].
+## The rest keep their own colour. (The user, 2026-11-01: "we'll need banjo kazooie style textures".)
+const TEXTURES := {
+	"grass": ["grass", 2.0, Color.WHITE], "dirt": ["dirt", 2.0, Color.WHITE],
+	"asphalt": ["asphalt", 3.0, Color.WHITE], "concrete": ["concrete", 2.0, Color.WHITE],
+	"brick": ["brick", 1.4, Color.WHITE], "stone": ["stone", 1.5, Color.WHITE],
+	"siding": ["siding", 1.6, Color.WHITE], "siding2": ["siding", 1.6, Color(1.6, 1.25, 0.62)],
+	"siding3": ["siding", 1.6, Color(1.0, 1.18, 0.74)],
+	"roof": ["shingles", 1.4, Color.WHITE], "roof2": ["shingles", 1.4, Color(0.62, 0.72, 1.1)],
+	"wood": ["planks", 1.2, Color.WHITE], "darkwood": ["planks", 1.2, Color(0.62, 0.6, 0.6)],
+	"fence": ["fence", 1.4, Color.WHITE], "pole": ["planks", 1.0, Color(0.6, 0.55, 0.5)],
+	"metal": ["metal", 1.0, Color.WHITE], "bin": ["metal", 1.0, Color(0.55, 0.85, 0.62)],
 }
 
 @export var model: PackedScene = preload("res://models/world1.glb")
@@ -68,7 +83,7 @@ func _ready() -> void:
 	add_child(hud)
 	var touch := TouchControls.new()
 	# (he sprints only for the sprint button, not for a stick pushed right over: the user, 2026-11-01)
-	touch.sprint_rim = 100.0
+	touch.sprint_rim = 100.0  # (and a full push of the stick sprints by itself: Player.auto_sprint)
 	touch.set_anchors_preset(Control.PRESET_FULL_RECT)
 	var touch_layer := CanvasLayer.new()
 	touch_layer.layer = 3
@@ -138,6 +153,12 @@ func _dress(level: Node) -> void:
 				var material := ShaderMaterial.new()
 				material.shader = WORLD_SHADER
 				var colour := (original as BaseMaterial3D).albedo_color if original is BaseMaterial3D else Color.WHITE
+				if TEXTURES.has(key):
+					var paint: Array = TEXTURES[key]
+					colour = paint[2]
+					material.set_shader_parameter(&"tex", load("res://textures/%s.png" % paint[0]))
+					material.set_shader_parameter(&"textured", true)
+					material.set_shader_parameter(&"tile", paint[1])
 				material.set_shader_parameter(&"albedo", colour)
 				material.set_shader_parameter(&"emission", 0.9 if key == "window" else 0.0)
 				made[key] = material
@@ -164,10 +185,24 @@ func _place_things() -> void:
 			cat.position = at
 			cat.target = player
 			cat.beaten.connect(_on_cat_beaten)
+			cat.add_to_group(&"interest")
 			add_child(cat)
 			_cats_left += 1
 		elif name.begins_with("check_"):
 			_checkpoints.append(at)
+		elif name.begins_with("ladder_"):
+			# (ladder_<name>_<centimetres high>)
+			var ladder := Ladder.new()
+			ladder.height = float(name.get_slice("_", name.get_slice_count("_") - 1)) / 100.0
+			ladder.transform = markers[name]
+			add_child(ladder)
+		elif name.begins_with("can_"):
+			var can := TrashCan.make(_can_material())
+			can.position = at
+			can.rotation.y = randf() * TAU
+			can.spilled.connect(_on_spilled)
+			add_child(can)
+			crumbs_total += can.holds
 	var k_wire := 0
 	while markers.has("wire_%d_a" % k_wire):
 		var wire := Wire.new()
@@ -182,15 +217,11 @@ func _place_things() -> void:
 		var bed := Trampoline.new()
 		bed.position = markers["trampoline"].origin
 		add_child(bed)
-	if markers.has("ladder"):
-		var ladder := Ladder.new()
-		ladder.height = 1.8
-		ladder.transform = markers["ladder"]
-		add_child(ladder)
-	if markers.has("pond"):
+	if markers.has("pool"):
 		var pool := Pool.new()
-		pool.size = Vector3(8.8, 1.7, 7.2)
-		pool.position = markers["pond"].origin
+		# (its size comes as a marker's position: width, depth, length)
+		pool.size = markers.get("pool_size", Transform3D(Basis.IDENTITY, Vector3(4.0, 1.0, 4.0))).origin
+		pool.position = markers["pool"].origin
 		add_child(pool)
 	if markers.has("race_start"):
 		race = Race.new()
@@ -203,6 +234,26 @@ func _place_things() -> void:
 		race.lost.connect(func() -> void: said.emit("Too slow! Try the stopwatch again."))
 		race.won.connect(func() -> void: _reveal("race"))
 		add_child(race)
+
+
+## The trash cans' painted metal, a dull green.
+func _can_material() -> ShaderMaterial:
+	var material := ShaderMaterial.new()
+	material.shader = WORLD_SHADER
+	material.set_shader_parameter(&"tex", load("res://textures/metal.png"))
+	material.set_shader_parameter(&"textured", true)
+	material.set_shader_parameter(&"box_mapped", true)
+	material.set_shader_parameter(&"tile", 0.5)
+	material.set_shader_parameter(&"albedo", Color(0.62, 0.8, 0.66))
+	return material
+
+
+## Crumbs out of a can knocked over.
+func _on_spilled(spots: Array[Vector3]) -> void:
+	for at in spots:
+		var crumb := Pickup.make(Pickup.Kind.CRUMB, at)
+		crumb.taken.connect(_on_crumb)
+		add_child.call_deferred(crumb)
 
 
 func _add_cap(called: String, at: Vector3) -> void:

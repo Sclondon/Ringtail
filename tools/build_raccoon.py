@@ -189,14 +189,43 @@ def nose(b):
     b.ellipsoid(HEAD_CENTRE + Vector((0.0, -0.024, 0.218)), Vector((0.024, 0.018, 0.016)), None, 12, 6)
 
 
-def whiskers(b):
-    # Three to a side, out from the snout behind the nose, fanned and drooping a little (the user asked for them)
+def whiskers(_b):
+    """Three to a side, out from the snout behind the nose, fanned and drooping a little (the user asked for them),
+    springy: tagged as spikes of his head from root (still) to tip (the user: "his whiskers should also be physics
+    springs"). A finished mesh in Blender's axes."""
+    made = bmesh.new()
+    tags = {}
     for side in (1.0, -1.0):
         for k, (rise, droop) in enumerate(((0.012, 0.004), (0.0, -0.012), (-0.012, -0.03))):
             root = HEAD_CENTRE + Vector((side * 0.034, -0.034 + rise, 0.168 - k * 0.008))
             tip = root + Vector((side * 0.15, droop, -0.045))
-            middle = root.lerp(tip, 0.5) + Vector((0.0, 0.008, 0.0))
-            b.strand([root, middle, tip], [0.0045, 0.0035, 0.002], 5)
+            rings = []
+            steps = 5
+            for s in range(steps + 1):
+                t = s / steps
+                at = root.lerp(tip, t) + Vector((0.0, 0.008 * math.sin(math.pi * t), 0.0))
+                along = (tip - root).normalized()
+                u = along.cross(Y).normalized()
+                w = along.cross(u).normalized()
+                r = 0.0045 * (1.0 - 0.6 * t)
+                ring = []
+                for j in range(4):
+                    a = math.tau * j / 4
+                    vert = made.verts.new(kit.to_blender(reshape(at + (u * math.cos(a) + w * math.sin(a)) * r)))
+                    tags[vert] = (REGION["head"], t)
+                    ring.append(vert)
+                rings.append(ring)
+            for a, b in zip(rings, rings[1:]):
+                for j in range(4):
+                    made.faces.new((a[j], a[(j + 1) % 4], b[(j + 1) % 4], b[j]))
+            made.faces.new(rings[0][::-1])
+            made.faces.new(rings[-1])
+    bmesh.ops.recalc_face_normals(made, faces=made.faces[:])
+    tag_spikes(made, tags)
+    mesh = bpy.data.meshes.new("whiskers")
+    made.to_mesh(mesh)
+    made.free()
+    return mesh
 
 
 def brows(b):
@@ -278,6 +307,24 @@ def tail(b):
     b.tube(kit.dome(rings[0], -TAIL_DIR, 0.02, 2)[::-1] + rings + kit.dome(rings[-1], TAIL_DIR, 0.02, 2), 12)
 
 
+# Every spike carries in its second texture coordinates (the "Metres" layer, which nothing else of the fur uses)
+# which part of him it grows from, and how far out along it each point is, as (region, -flex - 0.001): the game
+# springs each region after its own movement and bends the spikes by it, flex squared (scripts/raccoon_rig.gd,
+# FUR_REGIONS; the user: "his hair fur spikes should react to physics"). Points of everything else keep their
+# Metres coordinates, which are never negative.
+REGION = {"hips": 0, "chest": 1, "upper_arm_l": 2, "forearm_l": 3, "upper_arm_r": 4, "forearm_r": 5, "thigh_l": 6,
+          "shin_l": 7, "thigh_r": 8, "shin_r": 9, "tail_0": 10, "head": 16}
+
+
+def tag_spikes(made, tags):
+    """Writes each point's (region, flex) from `tags` (BMVert -> (region, flex)) into the Metres coordinates."""
+    layer = made.loops.layers.uv.new(kit.METRES)
+    for face in made.faces:
+        for loop in face.loops:
+            region, flex = tags.get(loop.vert, (0, 0.0))
+            loop[layer].uv = (float(region), -flex - 0.001)
+
+
 # The rings are spiky cones, one after another down the tail, each flaring out towards the tip in a zigzag of
 # spikes (the user, 2026-11-01: "his tail rings should be spiky cones sorta like zigzagoon"), grey and dark by turns.
 CONES = 8
@@ -288,8 +335,9 @@ def cones(dark):
     """The grey cones (or the dark ones), as a finished mesh in Blender's axes."""
     up = TAIL_DIR.cross(X).normalized()
     made = bmesh.new()
+    tags = {}
 
-    def ring(t, radius, spiky=False):
+    def ring(t, radius, spiky=False, region=10):
         loop = []
         count = SPIKES * 2 if spiky else SPIKES
         for j in range(count):
@@ -298,7 +346,9 @@ def cones(dark):
             # (spike tips lean back towards the tip of the tail)
             along = t + (0.035 if spiky and j % 2 == 0 else 0.0)
             p = tail_point(along) + (X * math.cos(a) + up * math.sin(a)) * r
-            loop.append(made.verts.new(kit.to_blender(reshape(p))))
+            vert = made.verts.new(kit.to_blender(reshape(p)))
+            tags[vert] = (region, (1.0 if j % 2 == 0 else 0.45) if spiky else 0.0)
+            loop.append(vert)
         return loop
 
     def join(a, b):
@@ -320,20 +370,23 @@ def cones(dark):
         start = 0.05 + k * step - 0.04
         end = 0.05 + (k + 1) * step
         last = k == CONES - 1
-        base = ring(start, tail_radius(start) * 0.5)
-        rim = ring(end - 0.01, tail_radius(min(end, 0.97)) * (1.3 if not last else 1.1), True)
+        region = REGION["tail_0"] + min(TAIL_BONES - 1, int((start + end) * 0.5 * TAIL_BONES))
+        base = ring(start, tail_radius(start) * 0.5, region=region)
+        rim = ring(end - 0.01, tail_radius(min(end, 0.97)) * (1.3 if not last else 1.1), True, region)
         join(base, rim)
         if last:
             tip = made.verts.new(kit.to_blender(reshape(tail_point(1.06))))
+            tags[tip] = (region, 1.0)
             for j in range(len(rim)):
                 made.faces.new((rim[j], rim[(j + 1) % len(rim)], tip))
         else:
-            back = ring(end + 0.005, tail_radius(end) * 0.5)
+            back = ring(end + 0.005, tail_radius(end) * 0.5, region=region)
             join(back, rim)
         made.faces.new(base[::-1])
         if not last:
             made.faces.new(back)
     bmesh.ops.recalc_face_normals(made, faces=made.faces[:])
+    tag_spikes(made, tags)
     mesh = bpy.data.meshes.new("cones")
     made.to_mesh(mesh)
     made.free()
@@ -353,15 +406,18 @@ def ruffs(_b):
     as cuffs at the elbows and knees, and as shaggy layers round his body (the user: "bushy", not thin; and their
     photos: a fluffy body, sleek forearms and shins). A finished mesh in Blender's axes."""
     made = bmesh.new()
+    tags = {}
 
-    def ring(centre, axis, u, v, radius, lean=0.0, spiky=False, wide=1.0):
+    def ring(centre, axis, u, v, radius, lean=0.0, spiky=False, wide=1.0, region=0):
         loop = []
         count = SPIKES * 2 if spiky else SPIKES
         for j in range(count):
             a = math.tau * j / count + 0.3
             r = radius * (1.0 if not spiky or j % 2 == 0 else 0.62)
             p = centre + axis * (lean if spiky and j % 2 == 0 else 0.0) + (u * math.cos(a) * wide + v * math.sin(a)) * r
-            loop.append(made.verts.new(kit.to_blender(reshape(p))))
+            vert = made.verts.new(kit.to_blender(reshape(p)))
+            tags[vert] = (region, (1.0 if j % 2 == 0 else 0.45) if spiky else 0.0)
+            loop.append(vert)
         return loop
 
     def join(a, b):
@@ -374,13 +430,13 @@ def ruffs(_b):
             else:
                 made.faces.new((a[k0], a[k1], b[j1], b[j]))
 
-    def ruff(centre, axis, radius, flare, lean=0.075, wide=1.0):
+    def ruff(centre, axis, radius, flare, region, lean=0.075, wide=1.0):
         # (axis points down the limb: the spikes lean that way)
         u = axis.cross(Z if abs(axis.z) < 0.9 else X).normalized()
         v = axis.cross(u).normalized()
-        base = ring(centre - axis * 0.035, axis, u, v, radius * 0.7, wide=wide)
-        rim = ring(centre, axis, u, v, radius * flare, lean, True, wide)
-        back = ring(centre + axis * 0.01, axis, u, v, radius * 0.7, wide=wide)
+        base = ring(centre - axis * 0.035, axis, u, v, radius * 0.7, wide=wide, region=region)
+        rim = ring(centre, axis, u, v, radius * flare, lean, True, wide, region)
+        back = ring(centre + axis * 0.01, axis, u, v, radius * 0.7, wide=wide, region=region)
         join(base, rim)
         join(back, rim)
         made.faces.new(base[::-1])
@@ -388,16 +444,19 @@ def ruffs(_b):
 
     for side in (1.0, -1.0):
         out = X * side
+        suffix = "_l" if side > 0 else "_r"
         # Arms: along X from the shoulder (as drawn)
         for d, r, flare in ((0.07, 0.05, 1.9), (0.14, 0.046, 1.8), (UPPER_ARM, 0.043, 1.6)):
-            ruff(Vector((side * (SHOULDER.x + d), SHOULDER.y, 0.0)), out, r, flare)
+            ruff(Vector((side * (SHOULDER.x + d), SHOULDER.y, 0.0)), out, r, flare,
+                 REGION[("upper_arm" if d < UPPER_ARM else "forearm") + suffix])
         # Legs: down from the hip
         for y, r, flare in ((HIP_Y - 0.04, 0.085, 1.7), (0.33, 0.072, 1.7), (KNEE_Y, 0.056, 1.5)):
-            ruff(Vector((side * HIP_X, y, 0.0)), -Y, r, flare)
+            ruff(Vector((side * HIP_X, y, 0.0)), -Y, r, flare, REGION[("thigh" if y > KNEE_Y else "shin") + suffix])
     # Shaggy layers round his body, widest at the belly
     for y, depth, wide, flare in ((0.47, 0.142, 1.15, 1.7), (0.6, 0.162, 1.16, 1.58), (0.73, 0.134, 1.2, 1.55)):
-        ruff(Vector((0.0, y, 0.006)), -Y, depth, flare, 0.09, wide)
+        ruff(Vector((0.0, y, 0.006)), -Y, depth, flare, REGION["chest" if y > 0.7 else "hips"], 0.09, wide)
     bmesh.ops.recalc_face_normals(made, faces=made.faces[:])
+    tag_spikes(made, tags)
     mesh = bpy.data.meshes.new("ruffs")
     made.to_mesh(mesh)
     made.free()

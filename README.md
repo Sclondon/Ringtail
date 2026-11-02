@@ -1,52 +1,52 @@
 # Ringtail (working title)
 
 A 3D collect-a-thon platformer in the spirit of Banjo-Kazooie, played as a raccoon. Godot 4.7, GL Compatibility,
-Jolt physics, with an N64 look (Liquid Metal's screen filter, plus world corners snapped to a coarse grid). Desktop
-first. Local repo only for now.
+Jolt physics, with an N64 look (Liquid Metal's screen filter, softened; world corners snapped to a grid) and
+Banjo-style painted textures. Desktop first. Local repo only for now.
 
 ## Playing
 
 | Do | Keys | Pad | On screen |
 | --- | --- | --- | --- |
-| Move | WASD / arrows | left stick | (touch: stick on the left) |
+| Move; **stick all the way: run on all fours, bounding** (partway: walk or run upright) | WASD / arrows (Alt: walk) | left stick | (touch: stick) |
 | Camera | right mouse drag | right stick | (touch: drag on the right) |
-| Jump; **hold on the way down to twirl the tail and fall slowly** | Space | A | ⤒ |
-| Duck: **duck-walk on all fours**, crawl under low things | C / Ctrl | B | ⤓ |
-| Sprint (only on the button): **on all fours, bounding leaps** | Shift | LB / LT | » |
-| Tail: a **spin**, hitting all round him (in the air it lifts him a little, once a jump) | E / K | X | spiral |
+| Jump; **hold on the way down: he hangs from his tail whirled as a rotor and comes down slowly** | Space | A | ⤒ |
+| Duck: **duck-walk on all fours**, crawl under low things; at a full run, **slide** | C / Ctrl | X | ⤓ |
+| **Long jump** (Mario 64): sliding (or ducking at a run), jump | duck, then Space | X, then A | ⤓ then ⤒ |
+| Tail: a **spin** (crouch, wind up, whip round), hitting all round him; **in the air, a second jump** | E / K | B | spiral |
 
-Everything else the GameCommon character controller does works too: ledge catching (jump again to climb up),
-wall kicks, dives and rolls, ladders, swimming, picking up and throwing.
+Also: leap on all fours when jumping from a bound; a big leap out of water; **wires to walk along and bounce on**
+(jump at the bottom of a bounce to go higher); everything GameCommon's character controller does (ledge catching,
+jump again to climb up; wall kicks; ladders; swimming; picking up and throwing). Left alone over a minute he sits.
+He looks at things near him and now and then sniffs the air. His fur and whiskers spring as he moves.
 
-**World 1** (a placeholder setting): a back yard and the alley behind it at dusk. 99 Crumbs and 5 Bottlecaps
-(placeholder names). The Bottlecaps:
+**World 1** (a placeholder): an alley between the backs of two rows of houses, with yards behind fences, back
+porches, rooftops to run along (wires across the gaps), power poles with phone lines, trash cans to knock over
+(Crumbs spill out), a pool, a trampoline, yard cats. 218 Crumbs and 5 Bottlecaps (placeholder names):
 
-- **Up the chimney**: crates to the porch roof, the trellis up to the house roof, catch the chimney top from the ridge.
-- **The billboard**: dumpster, pallets, catch the power pole's crossarm, then glide 6 m along the alley to the catwalk.
-- **Cat scrap**: beat all three yard cats (tail spin); the cap appears on the porch.
-- **Alley dash**: run into the stopwatch by the gate and take the 8 glowing crumbs in 25 s.
-- **Under the porch**: duck-walk into the crawlspace at the front of the porch.
+- **Up the chimney**: on the tallest house (east, second from the south).
+- **The billboard**: on the north wall; glide to its catwalk from the roofs.
+- **Cat scrap**: beat every cat (tail spin); the cap appears mid-alley.
+- **Alley dash**: run into the stopwatch at the south end and take the 8 glowing crumbs in 25 s.
+- **Under the porch**: crawl under the back porch of the east house second from the south.
 
-Three hearts; a cat's pounce takes one; out of hearts, or off the world, back to the last checkpoint. A Bottlecap
-fills the hearts.
+Three hearts; a cat's pounce takes one; out of hearts, or off the world, back to the last checkpoint.
 
 ## Layout
 
-- `raccoon.tscn`: the Player (GameCommon's `player.tscn`) with `RaccoonRig` (`scripts/raccoon_rig.gd`) and `TailMoves`.
-- `scripts/raccoon_rig.gd`: his poses laid over the boy's rig: on all fours for duck-walk and sprint, the tail as
-  a chain on springs, the tail moves.
-- `scripts/tail_moves.gd`: spin, twirl; hits anything in the group `tail_hittable`.
-- `scripts/world.gd` (`World`): loads `models/world1.glb`, makes its materials N64 ones and its meshes solid
-  (not those named `nocol_`), places things at the model's markers, keeps score and hearts.
-- `scripts/pickup.gd`, `yard_cat.gd`, `trampoline.gd`, `race.gd`, `hud.gd`, `icon.gd`, `n64_filter.gd`.
-- `scenes/world1.tscn` (= `main.tscn`), `scenes/playground.tscn` (a bare test yard).
-- Models, each from a Blender script in `tools/` (the .blend files are kept beside them):
-  `build_raccoon.py` (raccoon, on GameCommon's `build_character.py`), `build_world1.py` (the level and its
-  markers), `build_props.py` (crumb, cap, stopwatch, cat). Run with
-  `blender -b --factory-startup --python tools/build_x.py [-- <picture folder>]`, then `godot --headless --path . --import`.
-- GameCommon `godot/character-controller` is installed as it is (`scripts/player.gd`, `character_rig.gd`,
-  `follow_camera.gd`, `touch_controls.gd`, `toon.gd`, `pool.gd`, `ladder.gd`, ...). Don't edit those here;
-  improve them in GameCommon.
+- `raccoon.tscn`: GameCommon's `player.tscn` with `RaccoonRig`, `TailMoves`, `WaterLeap`, `LongJump`, `CloudDust`.
+- `scripts/raccoon_rig.gd`: his poses over the boy's rig (all fours, bound, leap, spin, rotor), the tail spring
+  chain, sniffing, and the springing fur (spikes tagged in the model; `_spring_fur`, a fur version of Toon's shader).
+- `scripts/tail_moves.gd` (spin, air spin, twirl), `long_jump.gd`, `water_leap.gd`, `cloud_dust.gd`, `wire.gd`.
+- `scripts/world.gd` (`World`): loads `models/world1.glb`, paints it (`TEXTURES`, `shaders/world.gdshader`), makes
+  its meshes solid (not `nocol_`), places things at the model's markers, keeps score and hearts.
+- `scripts/pickup.gd`, `trash_can.gd`, `yard_cat.gd` + `cat_rig.gd`, `trampoline.gd`, `race.gd`, `hud.gd`, `icon.gd`,
+  `n64_filter.gd`; `critter_rig.gd` + `critter.gd` (fox, skunk, badger, rabbit: built, not yet in the game).
+- Models, each from a Blender script in `tools/` (the .blend files are kept beside them): `build_raccoon.py`,
+  `build_cat.py`, `build_critters.py`, `build_world1.py` (the level and its markers), `build_props.py` (crumb, cap,
+  stopwatch, trash can). `blender -b --factory-startup --python tools/build_x.py [-- <picture folder>]`, then
+  `godot --headless --path . --import`. Textures: `godot --headless --path . -s res://tools/make_textures.gd`.
+- GameCommon `godot/character-controller` is installed as it is. Don't edit those files here; improve them in GameCommon.
 
 ## Tests
 
@@ -55,8 +55,10 @@ G="/c/Program Files (x86)/Steam/steamapps/common/Godot Engine/godot.windows.opt.
 "$G" --headless --path . --audio-driver Dummy --fixed-fps 60 -s res://tests/smoke.gd            # PASSED / FAILED
 "$G" --path . --audio-driver Dummy --fixed-fps 60 --resolution 1280x720 -s res://tests/shots.gd -- --out=<dir>
 "$G" --path . --audio-driver Dummy --fixed-fps 60 --resolution 960x540 -s res://tests/pose_shots.gd -- --out=<dir> [moves]
+"$G" --path . --audio-driver Dummy --fixed-fps 60 --resolution 960x540 -s res://tests/cat_shots.gd -- --out=<dir>
+"$G" --path . --audio-driver Dummy --fixed-fps 60 --resolution 960x540 -s res://tests/critter_shots.gd -- --out=<dir>
 ```
 
-`pose_shots` photographs each move (stand, walk, run, sprint, duckwalk, duck, jump, glide, spin, air_spin) from four
-sides, and `bound` is eight pictures through one bound from the side. A dev panel (in the editor, with `--dev`, or `?dev` on the web) toggles the N64 filter and jumps to each
-Bottlecap.
+`pose_shots` moves: stand, walk, run, sprint, duckwalk, duck, jump, glide, spin, air_spin, and filmstrips bound,
+leap, spin_film, heli, long_jump. A dev panel (in the editor, `--dev`, or `?dev` on the web) toggles the N64 filter
+and jumps to each Bottlecap.

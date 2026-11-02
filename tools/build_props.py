@@ -3,7 +3,8 @@
     crumb      a cookie crumb with chocolate chips (the Crumbs, ~100 to a world)
     cap        a shiny bottle cap with a crimped edge (the Bottlecaps, 5 to a world)
     stopwatch  the race's stopwatch
-    cat        a ginger yard cat, crouched to pounce (posed and moved whole in code)
+    trashcan   a ribbed metal trash can (its lid is trashlid), to knock over
+    (the cat is tools/build_cat.py's now: this script must not write models/cat.glb)
 
 Run from the project root:
     blender -b --factory-startup --python tools/build_props.py [-- <folder>]   # the folder gets a picture of each from four sides
@@ -37,6 +38,7 @@ COLOURS = {
     "cream": (0.98, 0.90, 0.78),
     "pink": (0.95, 0.55, 0.60),
     "eye": (0.70, 0.90, 0.30),
+    "metal": (0.66, 0.70, 0.72),
 }
 
 
@@ -180,33 +182,28 @@ def stopwatch():
     return m.done(smooth=False)
 
 
-def cat():
-    m = Model("cat")
-    # Crouched low, ready to pounce: about 0.55 m long, facing +Z
-    m.blob((0, 0.24, -0.02), (0.13, 0.12, 0.27), "ginger")
-    for z in (-0.18, -0.06, 0.06):
-        m.blob((0, 0.33, z), (0.11, 0.035, 0.035), "stripe")
-    m.blob((0, 0.2, 0.12), (0.10, 0.09, 0.12), "cream")
-    m.blob((0, 0.36, 0.29), (0.115, 0.10, 0.10), "ginger")
-    m.blob((0, 0.33, 0.37), (0.055, 0.045, 0.045), "cream")
-    m.blob((0, 0.35, 0.405), (0.016, 0.012, 0.01), "pink")
+def trashcan():
+    m = Model("trashcan")
+    # Ribbed, a little wider at the top, with a handle each side; 0.85 m tall, its base at 0
+    rings = 14
+    for k in range(rings):
+        y0 = 0.04 + 0.8 * k / rings
+        y1 = 0.04 + 0.8 * (k + 1) / rings
+        r = 0.30 + 0.03 * (y0 / 0.85) + (0.012 if k % 2 else 0.0)
+        m.disc((0, y0, 0), r, y1 - y0, "metal", 16)
+    m.disc((0, 0.0, 0), 0.29, 0.05, "metal", 16)
+    m.disc((0, 0.8, 0), 0.345, 0.05, "metal", 16)
     for side in (1, -1):
-        m.blob((side * 0.045, 0.385, 0.375), (0.022, 0.026, 0.014), "eye", segments=8, rings=4)
-        m.blob((side * 0.045, 0.385, 0.386), (0.007, 0.02, 0.006), "ink", segments=6, rings=4)
-        # Ears: flattened cones made of squashed blobs
-        m.blob((side * 0.07, 0.465, 0.27), (0.04, 0.06, 0.02), "ginger", Matrix.Rotation(side * -0.35, 3, Vector((0, 0, 1))), 8, 5)
-        m.blob((side * 0.068, 0.46, 0.278), (0.024, 0.04, 0.01), "pink", Matrix.Rotation(side * -0.35, 3, Vector((0, 0, 1))), 8, 5)
-        # Legs folded under, paws forward
-        m.blob((side * 0.09, 0.07, 0.17), (0.045, 0.07, 0.05), "ginger")
-        m.blob((side * 0.08, 0.025, 0.24), (0.04, 0.025, 0.06), "cream")
-        m.blob((side * 0.1, 0.11, -0.2), (0.06, 0.1, 0.11), "ginger")
-        m.blob((side * 0.09, 0.025, -0.12), (0.04, 0.025, 0.07), "cream")
-        # Whiskers
-        m.tube([(side * 0.04, 0.33, 0.39), (side * 0.15, 0.345, 0.4)], [0.003, 0.002], "cream", 4)
-    # The tail, up and curled at the tip
-    tail = [(0, 0.28, -0.27), (0, 0.33, -0.38), (0, 0.45, -0.44), (0, 0.58, -0.42), (0, 0.64, -0.36)]
-    m.tube(tail, [0.035, 0.032, 0.03, 0.028, 0.02], "ginger", 8)
-    return m.done()
+        m.tube([(side * 0.33, 0.6, -0.08), (side * 0.38, 0.62, 0.0), (side * 0.33, 0.6, 0.08)], [0.015, 0.015, 0.015], "metal", 6)
+    return m.done(smooth=False)
+
+
+def trashlid():
+    m = Model("trashlid")
+    m.disc((0, 0.0, 0), 0.36, 0.04, "metal", 16)
+    m.disc((0, 0.04, 0), 0.3, 0.04, "metal", 16)
+    m.tube([(-0.08, 0.08, 0), (0.0, 0.13, 0), (0.08, 0.08, 0)], [0.018, 0.018, 0.018], "metal", 6)
+    return m.done(smooth=False)
 
 
 def look(folder, obj):
@@ -238,7 +235,7 @@ def look(folder, obj):
 
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
-made = [crumb(), cap(), stopwatch(), cat()]
+made = [crumb(), cap(), stopwatch(), trashcan(), trashlid()]
 bpy.ops.wm.save_as_mainfile(filepath=os.path.join(ROOT, "tools", "props.blend"))
 for obj in made:
     bpy.ops.object.select_all(action="DESELECT")

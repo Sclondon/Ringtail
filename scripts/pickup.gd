@@ -32,6 +32,8 @@ static func make(what: Kind, at: Vector3, called := "") -> Pickup:
 
 func _ready() -> void:
 	add_to_group(&"pickups")
+	# (he looks at it as he passes)
+	add_to_group(&"interest")
 	collision_layer = 0
 	collision_mask = 2
 	monitorable = false

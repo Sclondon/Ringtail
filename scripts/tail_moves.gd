@@ -4,8 +4,8 @@ extends Node
 ## it there and poses them):
 ##
 ## - Spin (the tail button; the user, 2026-11-01: "the tail attack should be a spin"):
-##   once round with the tail flung out, hitting everything around him. In the air it
-##   also lifts him a little, once a jump.
+##   wound up, then once round with the tail flung out, hitting everything around him. In the air it
+##   is a second jump, once a jump.
 ## - Twirl (jump held while falling): the tail whirled over his head, and he comes down slowly.
 ##
 ## Anything in the group `tail_hittable` with a `tail_hit(from: Vector3, push: Vector3)`
@@ -13,9 +13,11 @@ extends Node
 
 signal struck(what: Node)
 
-@export var spin_time := 0.4
+@export var spin_time := 0.65
 @export var spin_reach := 1.35
-@export var spin_lift := 2.2
+## The spin in the air is a second jump (the user, 2026-11-01: "The tail attack in the air should be like a double
+## jump as well"): this share of a jump from the ground.
+@export var spin_jump := 0.95
 ## How fast he may fall while twirling.
 @export var glide_fall := 1.25
 ## He has to have been off the ground this long before a held jump twirls.
@@ -67,14 +69,14 @@ func _physics_process(delta: float) -> void:
 		spin = 0.0
 		if not grounded:
 			_spun_this_jump = true
-			_player.velocity.y = maxf(_player.velocity.y, spin_lift)
+			_player.velocity.y = maxf(_player.velocity.y, 2.0 * _player.jump_height / _player.time_to_apex * sqrt(spin_jump))
 		_struck.clear()
 	_pressed = false
 
 	if spin < 1.0:
 		spin = minf(spin + delta / spin_time, 1.0)
 		# (it hits as he whips round, not while he winds up)
-		if spin > 0.22 and spin < 0.8:
+		if spin > RaccoonRig.SPIN_WIND and spin < RaccoonRig.SPIN_TURNED:
 			_strike(spin_reach, PI)
 
 	# The twirl: jump held on the way down.
