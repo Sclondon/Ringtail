@@ -34,6 +34,10 @@ func _enter_tree() -> void:
 
 func _ready() -> void:
 	_player = get_parent() as Player
+	# (little blue sparkles on what can be climbed, while scurry is held)
+	var glints := ClimbGlints.new()
+	glints.scurry = self
+	add_child(glints)
 	if not InputMap.has_action(&"scurry"):
 		InputMap.add_action(&"scurry", 0.3)
 		var key := InputEventKey.new()
