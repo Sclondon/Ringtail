@@ -161,26 +161,29 @@ func _run() -> void:
 	await _frames(5)
 	_check(world.caps.has("roof"), "a Bottlecap taken")
 
-	# Dropped onto a wire he lands on it, rides it, and bounces off it higher than a jump
-	var wire: Wire
+	# Dropped onto a wire (GameCommon's Tightrope, Warren's) he lands on it and walks it; duck and he hangs under it
+	var wire: Tightrope
 	for node in world.get_children():
-		if node is Wire:
+		if node is Tightrope:
 			wire = node
 			break
 	_check(wire != null, "the world has wires")
 	if wire:
-		await _put(wire.point(0.5) + Vector3.UP * 1.2)
-		await _frames(40)
-		_check(wire.riding and absf(player.global_position.y - wire.point(wire.t).y) < 0.15, "lands on a wire and stays on it")
-		var on := player.global_position.y
-		Input.action_press(&"jump")
-		player._queue_jump()
-		var top := on
-		for _i in 60:
-			await physics_frame
-			top = maxf(top, player.global_position.y)
-		Input.action_release(&"jump")
-		_check(top - on > player.jump_height + 0.2, "a jump off a wire goes higher (%.2f m)" % (top - on))
+		_release()
+		player.global_position = wire.point_at_distance(wire.span() * 0.5) + Vector3.UP * 1.0
+		player.velocity = Vector3.ZERO
+		wire.bodies_now()
+		await _frames(60)
+		_check(player.tightrope > 0.0 and wire.distance_to(player.global_position) < 0.3, "lands on a wire and walks it")
+		Input.action_press(&"duck")
+		await _frames(4)
+		Input.action_release(&"duck")
+		await _frames(20)
+		_check(player.state == Player.State.HANG, "ducks to hang under a wire")
+		Input.action_press(&"duck")
+		await _frames(4)
+		Input.action_release(&"duck")
+		await _frames(30)
 
 	# Swimming, a jump is a big leap out of the water
 	var pond: Pool = null

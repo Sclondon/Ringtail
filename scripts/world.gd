@@ -205,12 +205,12 @@ func _place_things() -> void:
 			crumbs_total += can.holds
 	var k_wire := 0
 	while markers.has("wire_%d_a" % k_wire):
-		var wire := Wire.new()
+		# (Warren's tightrope, from GameCommon godot/tightrope: the user, 2026-11-01, "it should work identical to Warren")
+		var wire := Tightrope.new()
 		wire.from = markers["wire_%d_a" % k_wire].origin
 		wire.to = markers["wire_%d_b" % k_wire].origin
 		# (the same sag as tools/build_world1.py lays its crumbs along)
-		wire.sag = 0.03 * wire.from.distance_to(wire.to)
-		wire.rider = player
+		wire.most_sag = 0.03 * wire.from.distance_to(wire.to)
 		add_child(wire)
 		k_wire += 1
 	if markers.has("trampoline"):
