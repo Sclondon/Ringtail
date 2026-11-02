@@ -63,7 +63,12 @@ Read README.md first. Started 2026-11-01.
 - Done: the raccoon and his moves, the alley World 1 (all five Bottlecaps placed; routes not yet re-walked in the
   alley), HUD, smoke test passing (20 checks).
 - Not done: re-walking the alley's routes (chimney, billboard glide, porch crawl) headless; the animals' role; phone
-  layout; sounds; a title; a web build; a GitHub repo; an arcade cart. The trampoline bed doesn't sag.
+  layout; sounds; a title. The trampoline bed doesn't sag.
+- On the arcade since 2026-11-02 (the user: "Let's do it", asked whether it was on the arcade): repo
+  github.com/Sclondon/Ringtail (public, Pages from `master` /), build in build/ (`--export-release "Web"`), cart
+  "Ringtail" in games.tsx (site PR #202): early access, no leaderboard, desktop only, film `tests/attract.gd`.
+  Those cart settings are Claude's picks. In the browser the page sits frozen about 80 s building the hill after
+  Godot's load bar, with no progress shown: a loading screen or lighter start is still to do.
 
 ## Later on 2026-11-01 (the user's calls, in their words where quoted)
 
