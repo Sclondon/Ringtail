@@ -98,9 +98,8 @@ func _process(delta: float) -> void:
 		rate = 16.0
 	var moves := _player.get_node_or_null(^"TailMoves") as TailMoves
 	# (only while the tail sweeps round: not during the crouch and wind-up before it)
-	var spinning := moves != null and moves.spin > RaccoonRig.SPIN_WIND and moves.spin < RaccoonRig.SPIN_TURNED and on_ground
-	if spinning:
-		rate = 18.0
+	# (no ring of dust as he spins: the tail leaves its trail instead; the user, 2026-11-02)
+	var spinning := false
 	_step += rate * delta
 	while _step >= 1.0:
 		_step -= 1.0
