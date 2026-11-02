@@ -17,9 +17,10 @@ signal stepped(at: Vector3)
 
 const TAIL_BONES := 6
 ## The spin: how far through it the wind-up ends and the turn is done, and how far round he winds up.
-const SPIN_WIND := 0.22
+## (a quick wind-up, a few frames: it started up too slowly, the user, 2026-11-02, "the tail swipe starts up too slow")
+const SPIN_WIND := 0.09
 const SPIN_TURNED := 0.8
-const SPIN_BACK := 0.7
+const SPIN_BACK := 0.45
 ## Where each foot is in the cycle when it comes down: [hind left, hind right, fore left, fore right].
 const WALK_FEET := [0.0, 0.5, 0.25, 0.75]
 ## Sprinting he bounds: both hind feet push off nearly together, he flies stretched out, lands on both

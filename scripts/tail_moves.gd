@@ -13,7 +13,7 @@ extends Node
 
 signal struck(what: Node)
 
-@export var spin_time := 0.65
+@export var spin_time := 0.55
 @export var spin_reach := 1.35
 ## The spin in the air is a second jump (the user, 2026-11-01: "The tail attack in the air should be like a double
 ## jump as well"): this share of a jump from the ground.
