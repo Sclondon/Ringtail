@@ -191,6 +191,16 @@ const PRESETS := {
 		gravitropism = 0.25, droop = 0.3, wildness = 0.25, leaf_style = Leaves.NEEDLES, leaf_reach = 1.0, fill = 0.6,
 		fullness = 0.55, sprigs = 1, leaves_inner = Color(0.07, 0.17, 0.14), leaves_outer = Color(0.17, 0.34, 0.25),
 		leaves_tips = Color(0.32, 0.5, 0.34), rim = 0.0},
+	# (the giant firs between the grove's rings of trees, for the raccoons to be in: "a couple big trees for npcs to be in.
+	# There should be like leaf platforms to stand on in the big trees", "the firs don't fit in with the other trees at
+	# all": Ringtail, 2026-11-02. A Douglas fir's needled tiers on a huge climbable trunk, a pad on every second limb)
+	"Giant fir": {climbable = true, height = 30.0, trunk_radius = 1.1, trunk_base = 0.15, children = 60, whorl = 5, lean = 0.01, bend = 0.03,
+		root_flare = 0.7, roots = 7, bark = Color(0.33, 0.24, 0.19), levels = 2, twigs = 5, branch_angle = 84.0, twig_angle = 55.0,
+		angle_random = 6.0, length = 0.2, twig_length = 0.42, start = 0.3, end = 0.9, crown_shape = Crown.CONICAL, apical = 1.0,
+		gravitropism = 0.25, droop = 0.3, wildness = 0.25, leaf_style = Leaves.NEEDLES, leaf_reach = 1.0, fill = 0.6, fullness = 0.6,
+		sprigs = 1, leaves_inner = Color(0.07, 0.17, 0.14), leaves_outer = Color(0.17, 0.34, 0.25), leaves_tips = Color(0.32, 0.5, 0.34),
+		rim = 0.0, limbs = 10, first_limb = 3.5, limb_step = 1.6, limb_turn = 1.4, limb_length = 5.5, limb_radius = 0.32, limb_rise = 0.0,
+		walk_width = 0.7, leaf_pads = 2, pad_width = 3.4, pad_at = 0.7},
 	"Spruce": {height = 10.0, trunk_radius = 0.22, trunk_base = 0.12, lean = 0.03, bend = 0.04, root_flare = 0.6,
 		bark = Color(0.34, 0.24, 0.18), levels = 1, children = 135, whorl = 9, branch_angle = 92.0, angle_random = 6.0,
 		length = 0.2, crown_shape = Crown.CONICAL, apical = 1.0, gravitropism = 0.2, droop = 0.85, wildness = 0.3,
@@ -805,8 +815,10 @@ func _build(variant_seed: int) -> ArrayMesh:
 						_fronds(leaves, b)
 				if apical >= 0.6:
 					_leader(leaves)
-		if leaf_style == Leaves.FLUFFY:
-			for top: Vector3 in _last_pads:
+		for top: Vector3 in _last_pads:
+			if leaf_style == Leaves.NEEDLES:
+				_pad_needles(leaves, top, draw)
+			elif leaf_style == Leaves.FLUFFY:
 				_pad_leaves(leaves, top, draw)
 		if fill > 0.0:
 			_fill(solid, leaf_spots.filter(func(s: Array) -> bool: return s[2]), draw)
@@ -934,6 +946,22 @@ func _pad_leaves(buf: _Buf, top: Vector3, rng: RandomNumberGenerator) -> void:
 			var at: Vector3 = top + Vector3(cos(a), 0.0, sin(a)) * pad_width * float(ring[0]) + Vector3.DOWN * size * 0.3
 			_fluffy(buf, at, size * rng.randf_range(0.85, 1.1), rng)
 	pads = flat
+
+
+## A needled leaf pad: flat fronds fanned out from its middle in two layers, drooping a little at their tips.
+func _pad_needles(buf: _Buf, top: Vector3, rng: RandomNumberGenerator) -> void:
+	var up_tree := clampf(top.y / maxf(_top, 0.1), 0.0, 1.0)
+	for layer in 2:
+		var spokes := 12 if layer == 0 else 9
+		for k in spokes:
+			var a := TAU * (k + 0.5 * layer) / spokes + rng.randf_range(-0.12, 0.12)
+			var out := Vector3(cos(a), 0.0, sin(a))
+			var reach := pad_width * 0.5 * rng.randf_range(0.85, 1.05) * (1.0 if layer == 0 else 0.7)
+			var line: Array[Vector3] = []
+			for s in 5:
+				var f := s / 4.0
+				line.append(top + out * reach * f + Vector3.DOWN * (0.12 + 0.1 * layer + f * f * 0.35))
+			_needle_card(buf, line, pad_width * 0.15, 0.0, Vector3.UP, up_tree)
 
 
 ## Whether a clump of leaves at `p`, `size` across, would sit over (or on) the inner part of a walkable

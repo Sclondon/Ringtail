@@ -306,6 +306,18 @@ func _place_things() -> void:
 			body.scale = Vector3.ONE * float(parts[3]) / 100.0
 			body.add_to_group(&"climbable")
 			add_child(body)
+		elif name.begins_with("giantfir_"):
+			# (giantfir_<n>_<seed>: a giant fir between the grove's rings, its leaf pads perches for the villagers; the user,
+			# 2026-11-02, "the firs don't fit in with the other trees at all": TreeGen "Giant fir", as the other trees are)
+			var fir := TreeGen.preset("Giant fir")
+			fir.seed = int(name.get_slice("_", 2))
+			var fir_body := fir.body()
+			fir_body.position = at
+			fir_body.rotation.y = fir.seed * 0.9
+			fir_body.add_to_group(&"climbable")
+			add_child(fir_body)
+			for top: Vector3 in fir.pad_tops():
+				_pad_perches.append(fir_body.transform * top)
 		elif name.begins_with("tree_"):
 			# (tree_<n>_<seed>_<size%>: a climbable tree of the grove, GameCommon's TreeGen, its limbs to stand on)
 			var parts := name.split("_")
