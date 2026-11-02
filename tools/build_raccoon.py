@@ -1029,6 +1029,8 @@ def look_at(folder, name):
 LEG_SCALE = 0.82
 ARM_SCALE = 0.7  # (a little shorter again: the user, 2026-11-02, "his limbs are a little too long, his arms")
 HEAD_SCALE = 1.2
+## How much shorter his neck is made (m): everything above it comes down by as much.
+NECK_DROP = 0.035
 HEAD_PIVOT = HEAD.y  # (as drawn)
 DROP = (HIP_Y - ANKLE_Y) * (1.0 - LEG_SCALE)
 ARM_BAND = (SHOULDER.y - 0.09, SHOULDER.y + 0.09)
@@ -1053,6 +1055,8 @@ def reshape(p):
     grow = head_grow(p.y)
     if grow > 1.0:
         p = Vector((0.0, HEAD_PIVOT, 0.0)) + (p - Vector((0.0, HEAD_PIVOT, 0.0))) * grow
+    # The neck: shorter, the head sat lower on his shoulders (the user, 2026-11-02, "he should have a shorter neck")
+    p.y -= NECK_DROP * blend(NECK.y - 0.02, HEAD.y, p.y)
     # The legs: shorter between the ankle and the hip, and all above coming down by as much.
     if p.y > HIP_Y:
         p.y -= DROP
@@ -1068,6 +1072,7 @@ def as_drawn(p):
         p.y += DROP
     elif p.y > ANKLE_Y:
         p.y = ANKLE_Y + (p.y - ANKLE_Y) / LEG_SCALE
+    p.y += NECK_DROP * blend(NECK.y - 0.02, HEAD.y, p.y + NECK_DROP * 0.5)
     # (the head's growth undone with the height it would have had: one step is close enough)
     grow = head_grow(HEAD_PIVOT + (p.y - HEAD_PIVOT) / HEAD_SCALE if p.y > HEAD_PIVOT else p.y)
     if grow > 1.0:

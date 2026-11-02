@@ -50,6 +50,7 @@ func _run(world: World) -> void:
 		await physics_frame
 	_check(not is_instance_valid(cage), "three hits break the cage")
 	_check(kit in kits.following and kit.leader == player and kits.found == 0 and told.is_empty(), "found, it follows him (not home yet)")
+	_check(kits.rider == kit and kit.global_position.distance_to(player.global_position) < 0.8, "a kit climbs onto his back (%.2f m from him)" % kit.global_position.distance_to(player.global_position))
 	# (he walks it home: it comes after him, and counts once it is in the grove)
 	player.global_position = heart + Vector3(0.0, 0.3, 0.0)
 	var home := false

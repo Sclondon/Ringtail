@@ -165,6 +165,13 @@ var _sphase := 0.0
 var _hunch := 0.0
 ## How far over onto his back he is, lying down to sleep (_pose_sleep).
 var _sleep_w := 0.0
+## Crying (a lost kit, the user, 2026-11-02: "the kits need a crying animation") and clinging to his back (a found one:
+## "the kits should be able to cling to your back"): 0..1, set from outside; and how far into each it is.
+var crying := 0.0
+var clinging := 0.0
+var _cry_w := 0.0
+var _cling_w := 0.0
+var _tears: CPUParticles3D
 ## What he is doing standing about (rub, tall, lean, crack, stretch), how long, and how long he has: _pose_hunch.
 var _idle := &"rub"
 var _idle_t := 0.0
@@ -286,6 +293,13 @@ func _pose_extra(delta: float) -> void:
 	_sleep_w = smoothstep(0.0, 1.0, _lie_at)
 	if _sleep_w > 0.002:
 		_pose_sleep(_sleep_w)
+	# A lost kit crying in its cage, and a found one clinging to his back (LostKits sets `crying` and `clinging`)
+	_cry_w = _approach(_cry_w, crying, 4.0, delta)
+	if _cry_w > 0.002:
+		_pose_cry(smoothstep(0.0, 1.0, _cry_w), delta)
+	_cling_w = _approach(_cling_w, clinging, 8.0, delta)
+	if _cling_w > 0.002:
+		_pose_cling(smoothstep(0.0, 1.0, _cling_w))
 	# (his fingers together, not splayed, in most of what he does: the user, 2026-11-02, "the fingers shouldnt be
 	# splayed in the idle or most poses"; spread only where a paw is set on something: on all fours, climbing, hanging)
 	var spread := maxf(_quad, maxf(_climb_w, minf(_hang, 1.0)))
@@ -953,6 +967,63 @@ func _pose_hunch(w: float, still: float, delta: float) -> void:
 		_close_paw(i, side, 0.5, rub)
 		# (the paws hanging, fingers pointing down, not up: the user, "his hands should be pointed down not up in his idle")
 		_lay_hand(i, side, forward, (forward * 0.35 + Vector3.DOWN - global_basis.x.normalized() * side * 0.3).normalized(), rub * 0.8)
+
+
+## Crying: sat up, head hung, paws rubbing at its eyes, shoulders heaving with each sob, tears dropping.
+func _pose_cry(w: float, delta: float) -> void:
+	var sob := maxf(sin(_time * 7.0), 0.0) * (0.6 + 0.4 * sin(_time * 1.3))
+	_spine.basis = _slerp(_spine.basis, Basis(Vector3.RIGHT, 0.32 + 0.1 * sob) * _spine.basis, w)
+	if _neck:
+		_neck.basis = _slerp(_neck.basis, Basis(Vector3.RIGHT, 0.35) * _neck.basis, w)
+	_head.basis = _slerp(_head.basis, Basis(Vector3.RIGHT, 0.2 + 0.08 * sob) * Basis(Vector3.BACK, sin(_time * 2.3) * 0.12) * _head.basis, w)
+	for i in 2:
+		var side := 1.0 if i == 0 else -1.0
+		var shoulder := to_local(_shoulders[i].global_position)
+		shoulder.y += 0.012 * sob
+		_shoulders[i].position.y += 0.012 * sob * w
+		# (paws up at its eyes, rubbing)
+		var eye := to_local(_head.global_position) + Vector3(side * 0.035 + sin(_time * 6.0 + side) * 0.01, -0.01, 0.07)
+		_solve_arm(i, side, to_global(eye), _forearm, w)
+		_close_paw(i, side, 0.7, w)
+	express(&"hurt", 0.3)
+	if _tears == null:
+		_tears = CPUParticles3D.new()
+		_tears.top_level = true
+		_tears.amount = 10
+		_tears.lifetime = 0.7
+		_tears.direction = Vector3.UP
+		_tears.spread = 60.0
+		_tears.initial_velocity_min = 0.3
+		_tears.initial_velocity_max = 0.6
+		_tears.gravity = Vector3(0.0, -4.0, 0.0)
+		var drop := SphereMesh.new()
+		drop.radius = 0.008
+		drop.height = 0.022
+		var wet := StandardMaterial3D.new()
+		wet.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		wet.albedo_color = Color(0.55, 0.8, 1.0)
+		drop.material = wet
+		_tears.mesh = drop
+		add_child(_tears)
+	_tears.emitting = w > 0.5
+	_tears.global_position = _head.global_position + global_basis.z.normalized() * 0.05 * global_basis.get_scale().y
+
+
+## Clinging to his back: set against it facing the way he faces (LostKits carries it there, turned as his body is),
+## arms reaching round him, legs drawn up gripping his sides, head peeping over his shoulder.
+func _pose_cling(w: float) -> void:
+	_hips.basis = _slerp(_hips.basis, Basis(Vector3.RIGHT, 0.15), w)
+	_spine.basis = _slerp(_spine.basis, Basis(Vector3.RIGHT, 0.2), w)
+	if _neck:
+		_neck.basis = _slerp(_neck.basis, Basis(Vector3.RIGHT, -0.25) * Basis(Vector3.UP, 0.4), w)
+	var hips_inverse := _hips.transform.affine_inverse()
+	for i in 2:
+		var side := 1.0 if i == 0 else -1.0
+		var shoulder := to_local(_shoulders[i].global_position)
+		_solve_arm(i, side, to_global(shoulder + Vector3(side * 0.03, -0.05, 0.16)), _forearm, w)
+		_close_paw(i, side, 1.0, w)
+		# (knees up and round his sides, feet tucked in front of it)
+		_set_leg(i, side, hips_inverse * (_hips.position + Vector3(side * 0.12, -0.04, 0.14)), _hips.basis.inverse() * Basis(Vector3.RIGHT, -0.8), w)
 
 
 ## Asleep on his back, lounging: belly up, his paws behind his head, one knee up and the other leg out, breathing

@@ -34,6 +34,9 @@ var heart := Vector3.ZERO
 var lost: Array[Villager] = []
 ## Found, following him home.
 var following: Array[Villager] = []
+## The found kit riding on his back (the user, 2026-11-02, "the kits should be able to cling to your back"): one at a
+## time; any others follow on foot.
+var rider: Villager
 var found := 0
 var total := 0
 
@@ -61,6 +64,10 @@ static func place(world: Node3D, markers: Dictionary, band: Villagers, hero: Pla
 		kit.add_collision_exception_with(cage)
 		cage.broken.connect(kits._found.bind(kit))
 		kit.set_meta(&"cage", cage)
+		# (a kit sits up in its cage and cries: the user, 2026-11-02, "the kits need a crying animation")
+		if not grown and kit.rig:
+			kit.rig.always_on_fours = false
+			kit.rig.crying = 1.0
 		if grown:
 			kit.say([ADULT_NAMES[(k / ADULT_EVERY) % ADULT_NAMES.size()]] + LOST_ADULT)
 		else:
@@ -80,6 +87,8 @@ func _physics_process(_delta: float) -> void:
 		# (one with no cage, found by going up to it)
 		if not kit.has_meta(&"cage") and kit.global_position.distance_to(player.global_position) < REACH:
 			_found(kit)
+	if rider and is_instance_valid(rider):
+		_carry()
 	for kit in following.duplicate():
 		if not is_instance_valid(kit) or kit.dead:
 			following.erase(kit)
@@ -97,16 +106,58 @@ func _found(kit: Villager) -> void:
 	following.append(kit)
 	_puff_at(kit.global_position)
 	if kit.rig:
+		kit.rig.crying = 0.0
+		kit.rig.always_on_fours = kit.kit
+	if kit.rig:
 		kit.rig.express(&"happy", 2.5)
 	kit.stays = false
 	kit.leader = player
+	if kit.kit and rider == null:
+		_ride(kit)
 	kit.say([kit.display_name] + FOLLOWING)
 	kit._choose()
 
 
+## Up onto his back: it goes along with him there (its own steering off) until he brings it home.
+func _ride(kit: Villager) -> void:
+	rider = kit
+	kit.set_physics_process(false)
+	kit.collision_layer = 0
+	kit.collision_mask = 0
+	kit.velocity = Vector3.ZERO
+	if kit.rig:
+		kit.rig.clinging = 1.0
+	_carry()
+
+
+## Where the rider is, each step: against his back, turned as his body is.
+func _carry() -> void:
+	var body := player.get_node_or_null(^"Rig") as RaccoonRig
+	if body == null:
+		return
+	var hips := body._hips.global_transform
+	var turn := hips.basis.orthonormalized()
+	var size := body.global_basis.get_scale().y
+	rider.global_transform = Transform3D(turn, hips.origin - turn.z * 0.12 * size - turn.y * 0.12 * size)
+
+
+## Home: it climbs down off his back onto the ground beside him, and goes about on its own again.
+func _get_down() -> void:
+	var kit := rider
+	rider = null
+	var side := player.global_position + Vector3(0.6, 0.3, 0.0).rotated(Vector3.UP, randf() * TAU)
+	kit.global_transform = Transform3D(Basis(Vector3.UP, randf() * TAU), side)
+	kit.collision_layer = 4
+	kit.collision_mask = 1
+	kit.set_physics_process(true)
+	if kit.rig:
+		kit.rig.clinging = 0.0
+
 ## Led into the grove: it stays, and plays with the others.
 func _home(kit: Villager) -> void:
 	following.erase(kit)
+	if kit == rider:
+		_get_down()
 	found += 1
 	if kit.rig:
 		kit.rig.express(&"happy", 2.5)
