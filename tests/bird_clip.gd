@@ -1,14 +1,16 @@
 extends SceneTree
-## Measures how far the crow's and the owl's folded wings go into their bodies: every wing point (but those at
+## Measures how far the crow's, the owl's and the hawk's folded wings (every bone and feather part) go into their bodies: every wing point (but those at
 ## the shoulder joints) is tested against the body's ellipsoids (as tools/build_birds.py makes them). Prints the
 ## deepest point in mm and PASSED/FAILED (over 4 mm in counts as a clip). Headless:
 ##   godot --headless --path . --audio-driver Dummy -s res://tests/bird_clip.gd
 
-## [centre, radii, tilt] of each body ellipsoid, in the model's space (build_birds.py: crow(), owl()).
+## [centre, radii, tilt] of each body ellipsoid, in the model's space (build_birds.py: crow(), owl(), hawk()).
 const BODIES := {
 	&"crow": [[Vector3(0, 0.23, -0.01), Vector3(0.078, 0.082, 0.15), 0.38], [Vector3(0, 0.265, 0.06), Vector3(0.07, 0.078, 0.07), 0.0]],
 	&"owl": [[Vector3(0, 0.25, -0.01), Vector3(0.135, 0.19, 0.12), 0.12], [Vector3(0, 0.24, 0.035), Vector3(0.12, 0.17, 0.09), 0.0],
 		[Vector3(0, 0.13, 0.02), Vector3(0.11, 0.08, 0.09), 0.0]],
+	&"hawk": [[Vector3(0, 0.25, -0.01), Vector3(0.09, 0.1, 0.17), 0.5], [Vector3(0, 0.27, 0.05), Vector3(0.082, 0.1, 0.075), 0.0],
+		[Vector3(0, 0.2, 0.04), Vector3(0.08, 0.07, 0.07), 0.0]],
 }
 
 

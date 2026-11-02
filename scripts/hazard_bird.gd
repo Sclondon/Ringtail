@@ -1,7 +1,7 @@
 class_name HazardBird
 extends Node3D
-## A crow or a hawk (models/crow.glb: tools/build_birds.py, posed by BirdBody; hawk.glb: tools/build_hazards.py,
-## its wings beaten by turning them at the shoulder), flown by code. Claude's picks for how they behave (placeholders):
+## A crow or a hawk (models/crow.glb, redtail.glb: tools/build_birds.py, posed by BirdBody: wings on a bird's own skeleton
+## with sprung feathers), flown by code. Claude's picks for how they behave (placeholders):
 ##
 ## - HAWK: circles high over its `home`. When the raccoon comes under it, it circles in over him and its shadow on the
 ##   ground darkens and grows (the warning, STALK), then it folds and dives at where he is going; caught, he is hurt.
@@ -14,8 +14,6 @@ signal knocked
 
 enum Kind { CROW, HAWK }
 enum State { GROUND, FLY, STALK, DIVE, CLIMB, KNOCKED, AWAY, PERCH }
-
-const MODELS := {Kind.CROW: "res://models/crow.glb", Kind.HAWK: "res://models/hawk.glb"}
 
 var kind := Kind.CROW
 var home := Vector3.ZERO
@@ -37,7 +35,6 @@ var _stay := randf_range(5.0, 12.0)
 var velocity := Vector3.ZERO
 var _model: Node3D
 var _bird: BirdBody
-var _wings: Array[Node3D] = []
 var _shadow: MeshInstance3D
 var _shadow_look: StandardMaterial3D
 var _t := 0.0
@@ -46,26 +43,17 @@ var _angle := randf() * TAU
 var _target := Vector3.ZERO
 var _hit_done := false
 var _rest_left := 2.0
-var _flap := 0.0
-var _flap_speed := 0.0
 var _spin := 0.0
 
 
 func _ready() -> void:
 	add_to_group(&"tail_hittable")
 	add_to_group(&"hazards")
-	if kind == Kind.CROW:
-		# (the crow is tools/build_birds.py's, posed by BirdBody: wings that fold, a head that looks and pecks)
-		_bird = BirdBody.make(&"crow")
-		_model = _bird
-		add_child(_model)
-	else:
-		_model = (load(MODELS[kind]) as PackedScene).instantiate()
-		add_child(_model)
-		Toon.apply(_model)
-		for node: Node in _model.find_children("*", "Node3D", true, false):
-			if String(node.name).ends_with("_wing_l") or String(node.name).ends_with("_wing_r"):
-				_wings.append(node)
+	# (tools/build_birds.py's, posed by BirdBody: wings that fold, beat and ripple, a head that looks and pecks; the hawk
+	# a red-tailed hawk, moved over from tools/build_hazards.py's plain one with the wings' skeleton)
+	_bird = BirdBody.make(&"crow" if kind == Kind.CROW else &"hawk")
+	_model = _bird
+	add_child(_model)
 	_shadow = MeshInstance3D.new()
 	var disc := CylinderMesh.new()
 	disc.top_radius = 0.5
@@ -297,39 +285,18 @@ func _pose(delta: float) -> void:
 	_model.rotation = Vector3(_spin, 0.0, _spin * 0.6) if state == State.KNOCKED else Vector3.ZERO
 	if state != State.KNOCKED:
 		_spin = 0.0
-	if _bird:
-		_pose_bird()
-		return
-	var beat := 0.0
-	var fold := 0.0
-	match state:
-		State.PERCH:
-			fold = 1.0
-		State.GROUND:
-			fold = 1.0
-			beat = 0.0 if velocity.y <= 0.0 else 0.8
-		State.DIVE:
-			fold = 0.55 if kind == Kind.HAWK else 0.0
-			beat = 0.0 if kind == Kind.HAWK else 1.0
-		State.FLY, State.AWAY, State.CLIMB:
-			# (the hawk mostly soars, beating now and then)
-			beat = 1.0 if kind == Kind.CROW or state == State.CLIMB or sin(_t * 0.6) > 0.6 else 0.15
-		State.STALK:
-			beat = 0.2
-		State.KNOCKED:
-			beat = 1.0
-	_flap_speed = lerpf(_flap_speed, beat, 1.0 - exp(-6.0 * delta))
-	_flap += delta * (13.0 if kind == Kind.CROW else 7.0) * _flap_speed
-	var angle := sin(_flap) * 0.85 * _flap_speed
-	for wing in _wings:
-		var side := 1.0 if String(wing.name).ends_with("_l") else -1.0
-		# (beating: up and down about the shoulder; folded: swept back along the body and down)
-		wing.rotation = Vector3(0.0, side * fold * 1.25, side * (angle * (1.0 - fold) - fold * 0.5))
+	_pose_bird()
 
 
-## The crow (BirdBody): on the ground folded, eyeing him, pecking now and then, a flick of the wings as it hops;
+## The hawk (BirdBody): mostly soaring, wings spread and fingers up, the tail fanned, beating now and then and
+## hard climbing away; circling in over him it holds still on the air; diving it folds half in and throws its
+## talons forward at the end; knocked, flailing.
+## The crow: on the ground folded, eyeing him, pecking now and then, a flick of the wings as it hops;
 ## flying, beating hard, gliding in to land; diving at him half folded; knocked, flailing.
 func _pose_bird() -> void:
+	if kind == Kind.HAWK:
+		_pose_hawk()
+		return
 	var flying := state != State.GROUND and state != State.PERCH
 	_bird.tuck = 1.0 if flying and state != State.KNOCKED else 0.0
 	_bird.flare = 0.0
@@ -363,6 +330,27 @@ func _pose_bird() -> void:
 			_bird.flap = 1.0
 	_bird.look_at_point(_him() if player and state != State.KNOCKED else Vector3.INF)
 
+
+func _pose_hawk() -> void:
+	_bird.tuck = 1.0
+	_bird.flare = 0.0
+	_bird.fold = 0.0
+	match state:
+		State.FLY, State.AWAY:
+			# (soaring, a few beats now and then)
+			_bird.flap = 1.0 if sin(_t * 0.6) > 0.75 else 0.0
+		State.STALK:
+			_bird.flap = 0.0
+		State.DIVE:
+			# (folded half in, stooping; talons thrown forward as it comes to him)
+			var near := global_position.distance_to(_target)
+			_bird.fold = 0.5 if near > 2.5 else 0.15
+			_bird.flap = 0.0
+			_bird.flare = 0.0 if near > 2.5 else 1.0
+			_bird.tuck = 1.0 if near > 2.5 else 0.0
+		State.CLIMB, State.KNOCKED:
+			_bird.flap = 1.0
+	_bird.look_at_point(_him() if player and state != State.KNOCKED else Vector3.INF)
 
 func _place_shadow() -> void:
 	var ground := _ground_below(global_position)

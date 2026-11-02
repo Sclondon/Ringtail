@@ -1,19 +1,26 @@
-"""The crow and the owl (the user, 2026-11-02: "we need to work on a nice owl and crow model as well"), in the
+"""The crow, the owl and the hawk (the user, 2026-11-02: "we need to work on a nice owl and crow model as well"; the hawk
+moved here from tools/build_hazards.py with the wings' skeleton: "The bird wings and animations need to be higher
+quality, with rippling feathers and real wing skeleton not just a simple flap animation"), in the
 raccoon's style: smooth rounded forms with scattered spiky tufts of feather (as his fur is), heavy lids, cel shaded in
 the game (Toon). After photos of a large-billed (jungle) crow and a Eurasian eagle-owl / great horned owl.
 
     crow  glossy blue-black, a big arched bill and steep brow, a shaggy throat, fingered primaries, a wedge of a tail
     owl   tawny, a streaked chest, a mottled back, a pale facial disc rimmed dark, ear tufts, big orange eyes under heavy
           lids, barred broad wings and tail, feathered legs and black talons
+    hawk  a red-tailed hawk: brown above, pale below with a dark belly band, a brick-red tail, a fierce brow, a hooked
+          bill over a yellow cere, broad fingered wings for soaring
 
 Each bird is a tree of parts, each its own object with its origin at its joint, so the game can move them (BirdBody):
 
     <bird>_body
       <bird>_head            (neck)        owl: <bird>_lid_l, _lid_r (eye centres; turned down about X to blink)
-      <bird>_tail            (rump)
+      <bird>_tail            (rump) > <bird>_tail_t0.._t9 (each tail feather, from the bird's left)
       <bird>_leg_l, _leg_r   (hips)
-      <bird>_wing_l          (shoulder) > <bird>_wing_l_fore (elbow) > <bird>_wing_l_hand (wrist) > _p0.._p6 (each
-                             primary, at its root); and _r
+      <bird>_wing_l          (humerus, at the shoulder; tertials _tert<n>)
+        _wing_l_fore         (ulna and radius, at the elbow; secondaries _s<n>, covert layers _c0 greater, _c1 median)
+          _wing_l_hand       (carpometacarpus, at the wrist; inner primaries _p<n>, primary coverts _c2, _alula)
+            _wing_l_digit    (the outer digit; the outermost primaries)
+                             and the same for _r; every feather part's origin is at its root
 
 Wings are built spread flat (the plane of the wing level, the bird's left out along +X), the rest pose of every part
 is no turn at all, and BirdBody folds them. Godot axes in the code: Y up, +Z ahead, +X the bird's left.
@@ -21,7 +28,7 @@ is no turn at all, and BirdBody folds them. Godot axes in the code: Y up, +Z ahe
 Run from the project root:
     blender -b --factory-startup --python tools/build_birds.py [-- <folder>]   # the folder gets four sides of each
 
-Writes models/crow.glb, models/owl.glb and tools/birds.blend. (The first, plainer crow was tools/build_hazards.py's.)
+Writes models/crow.glb, owl.glb, redtail.glb (the hawk) and tools/birds.blend. (The first, plainer crow was tools/build_hazards.py's.)
 """
 
 import math
@@ -52,6 +59,15 @@ COLOURS = {
     "owlrim": (0.16, 0.11, 0.07),
     "owlbib": (0.93, 0.9, 0.82),
     "owlbeak": (0.16, 0.16, 0.18),
+    # hawk (a red-tailed hawk)
+    "hawk": (0.42, 0.27, 0.15),
+    "hawkdark": (0.22, 0.14, 0.08),
+    "hawklight": (0.62, 0.45, 0.28),
+    "hawkpale": (0.92, 0.87, 0.76),
+    "hawkred": (0.74, 0.34, 0.17),
+    "hawkcere": (0.95, 0.78, 0.25),
+    "hawkbeak": (0.2, 0.2, 0.23),
+    "hawkiris": (0.4, 0.22, 0.09),
     "talon": (0.07, 0.07, 0.08),
     # eyes (Toon.apply gives these three a wet glint)
     "iris": (1.0, 0.52, 0.08),
@@ -207,8 +223,9 @@ class Part:
         d = tip - root
         side = d.cross(Vector(up)).normalized()
         normal = side.cross(d).normalized()
-        steps = [0.0, 0.3, 0.66, 0.92] if not rounded else [0.0, 0.3, 0.7, 0.95]
-        profile = [0.5, 1.0, 0.85, 0.45] if not rounded else [0.55, 1.0, 1.0, 0.65]
+        # (a pointed feather in four steps; a rounded one, blunt at the tip, in three)
+        steps = [0.0, 0.3, 0.66, 0.92] if not rounded else [0.0, 0.4, 0.9]
+        profile = [0.5, 1.0, 0.85, 0.45] if not rounded else [0.55, 1.0, 0.8]
         spine = [root + d * t + normal * (-sag * math.sin(math.pi * t)) for t in steps]
         left = [self._v(p + side * width * 0.5 * f) for p, f in zip(spine, profile)]
         right = [self._v(p - side * width * 0.5 * f) for p, f in zip(spine, profile)]
@@ -226,6 +243,24 @@ class Part:
             self.bm.faces.new((a[-1], end, b[-1])).material_index = m
         m = self._index(mats[0])
         self.bm.faces.new((left[0], bottom[0], right[0], top[0])).material_index = m
+
+    def scale(self, root, tip, width, mat, thick=0.0025):
+        """A small covert feather, cheap: a flat rounded lozenge from `root` to `tip`, lying level (a top and a
+        bottom face and a thin edge): rows of them lie like scales."""
+        root, tip = Vector(root), Vector(tip)
+        d = tip - root
+        side = d.cross(Vector((0, 1, 0))).normalized()
+        normal = side.cross(d).normalized()
+        outline = [root, root + d * 0.35 + side * width * 0.5, root + d * 0.8 + side * width * 0.32, tip,
+                   root + d * 0.8 - side * width * 0.32, root + d * 0.35 - side * width * 0.5]
+        top = [self._v(p + normal * thick) for p in outline]
+        bottom = [self._v(p - normal * thick) for p in outline]
+        index = self._index(mat)
+        self.bm.faces.new(top).material_index = index
+        self.bm.faces.new(bottom[::-1]).material_index = index
+        n = len(outline)
+        for k in range(n):
+            self.bm.faces.new((top[k], bottom[k], bottom[(k + 1) % n], top[(k + 1) % n])).material_index = index
 
     def done(self, smooth=True):
         bmesh.ops.remove_doubles(self.bm, verts=self.bm.verts[:], dist=0.00005)
@@ -252,49 +287,127 @@ def mirror(p, side):
     return Vector((p[0] * side, p[1], p[2]))
 
 
-def wing(name, body, side, shoulder, arm, fore, hand, secondaries, primaries, covert, mats, flight_mats, rounded):
-    """One wing, spread: three parts (shoulder > elbow > wrist). `arm`, `fore`, `hand` are lengths out along X;
-    `secondaries` (count, length, width), `primaries` (count, shortest, longest, width, fingers spread)."""
+def wing(name, body, side, shoulder, w, mats, flight_mats, rounded):
+    """One wing, spread flat, on a bird's own skeleton (after the wing skeleton and wing feather diagrams on Wikimedia
+    Commons): the humerus (`_wing_l`, at the shoulder) > the ulna and radius (`_fore`, at the elbow) > the
+    carpometacarpus (`_hand`, at the wrist) > the outer digit's phalanges (`_digit`), and the alula on the thumb at
+    the wrist (`_alula`). Every flight feather is a part of its own, rooted on the bone it grows from, so each can
+    flex and ripple: tertials on the humerus by the body (`_tert<n>`), secondaries along the forearm (`_s<n>`, from
+    the wrist in), primaries on the hand and the outermost on the digit (`_p<n>`, from the wrist out). The covert rows
+    are layers of their own over them: greater (`_c0`) and median (`_c1`) coverts on the forearm, primary coverts
+    (`_c2`) on the hand. The lesser coverts and the leading edge (the patagium) are drawn on the bones themselves.
+
+    `w`: lengths of "arm", "fore", "hand" out along X; "lead" the leading edge's radius at shoulder, elbow, wrist
+    and tip; "tert" (count, length, width); "sec" (count, length, width); "prim" (count, shortest, longest, width,
+    spread in degrees, how many outer ones are fingered); "covert" the greater coverts' share of a secondary;
+    "under" the colour of the wing's underside coverts (none: as above)."""
     suffix = "_wing_l" if side > 0 else "_wing_r"
+    arm, fore, hand = w["arm"], w["fore"], w["hand"]
+    lead = w["lead"]
     s = Vector(shoulder)
     e = s + Vector((arm * side, 0.0, -arm * 0.06))
-    w = e + Vector((fore * side, 0.0, fore * 0.12))
-    made = []
+    wr = e + Vector((fore * side, 0.0, fore * 0.12))
+    d = wr + Vector((hand * 0.6 * side, 0.0, -hand * 0.09))
+    end = wr + Vector((hand * side, 0.0, -hand * 0.15))
     upper = Part(name + suffix, s, body)
     lower = Part(name + suffix + "_fore", e, upper)
-    tip = Part(name + suffix + "_hand", w, lower)
-    count, length, width = secondaries
-    # The arm and forearm: a rounded leading edge, coverts over, secondaries trailing back; each part's feathers
-    # reach a little past its joint so no gap opens as they fold
-    for part, a, b, lead in ((upper, s, e, (0.03, 0.022)), (lower, e, w, (0.022, 0.015))):
-        part.tube([a + Vector((-0.01 * side, 0, 0)), b + Vector((0.008 * side, 0, 0))], [lead[0], lead[1]], mats[0], 8, (1.0, 0.7))
-        for k in range(count):
-            t = (k + 0.5) / count
-            root = a.lerp(b, t) + Vector((0, -0.004, -0.005))
-            splay = 0.12 * side * (t - 0.3)
-            part.feather(root, root + Vector((splay * length, -0.01, -length * random.uniform(0.95, 1.05))), width,
-                         flight_mats, sag=0.012, rounded=rounded)
-        for k in range(count + 1):
-            t = k / count
-            root = a.lerp(b, t) + Vector((0, 0.006, 0.006))
-            part.feather(root, root + Vector((0.03 * side * (t - 0.5), 0.0, -length * covert)), width * 1.25,
-                         mats, sag=0.006, rounded=True)
-    # The hand: primaries fanned from the wrist out to the tip, the outer ones fingered
-    count, shortest, longest, pwidth, spread = primaries
-    tip.tube([w, w + Vector((hand * side, 0.0, -hand * 0.15))], [0.015, 0.008], mats[0], 8, (1.0, 0.7))
+    palm = Part(name + suffix + "_hand", wr, lower)
+    digit = Part(name + suffix + "_digit", d, palm)
+    made = [upper, lower, palm, digit]
+    # The bones under their skin and small feathers: a rounded leading edge, thinning out to the tip; each reaching a
+    # little past its joint so no gap opens as it bends
+    upper.tube([s + Vector((-0.01 * side, 0, 0)), e + Vector((0.008 * side, 0, 0))], [lead[0], lead[1]], mats[0], 8, (1.0, 0.7))
+    lower.tube([e + Vector((-0.004 * side, 0, 0)), wr + Vector((0.008 * side, 0, 0))], [lead[1], lead[2]], mats[0], 8, (1.0, 0.7))
+    palm.tube([wr, d + Vector((0.006 * side, 0, 0))], [lead[2], lead[3] * 1.3], mats[0], 6, (1.0, 0.7))
+    digit.tube([d, end], [lead[3], lead[3] * 0.4], mats[0], 6, (1.0, 0.7))
+    count, length, width = w["sec"]
+    # Tertials: long, broad, on the humerus by the body, covering the inner secondaries; a row of humeral coverts
+    tcount, tlength, twidth = w["tert"]
+    for k in range(tcount):
+        t = 0.25 + 0.7 * (k + 0.5) / tcount
+        root = s.lerp(e, t) + Vector((0, -0.002, -0.006))
+        feather = Part(name + suffix + "_tert%d" % k, root, upper)
+        feather.feather(root, root + Vector((-0.06 * side * tlength, -0.01, -tlength)), twidth, flight_mats, sag=0.01,
+                        rounded=True)
+        made.append(feather)
+    for k in range(tcount + 1):
+        t = 0.1 + 0.85 * k / tcount
+        root = s.lerp(e, t) + Vector((0, 0.008, 0.008))
+        upper.scale(root, root + Vector((0.0, 0.0, -tlength * 0.42)), twidth * 1.2, mats[k % len(mats)])
+    # Secondaries along the forearm, splayed a little towards the wrist; the lesser coverts in a row over the bone
     for k in range(count):
-        t = k / max(count - 1, 1)
-        root = w + Vector((hand * side * t, 0.0, -0.01 - hand * 0.15 * t))
+        t = 1.0 - (k + 0.5) / count
+        root = e.lerp(wr, t) + Vector((0, -0.004, -0.005))
+        splay = 0.12 * side * (t - 0.3)
+        feather = Part(name + suffix + "_s%d" % k, root, lower)
+        feather.feather(root, root + Vector((splay * length, -0.01, -length * random.uniform(0.97, 1.03))), width,
+                        flight_mats, sag=0.012, rounded=True)
+        made.append(feather)
+    for k in range(count + 1):
+        t = k / count
+        root = e.lerp(wr, t) + Vector((0, 0.012, 0.014))
+        lower.scale(root, root + Vector((0.0, 0.0, -length * 0.2)), width * 0.95, mats[(k + 1) % len(mats)])
+    # The covert rows, each a layer: greater over the secondaries' roots, median over those
+    greater = Part(name + suffix + "_c0", e, lower)
+    median = Part(name + suffix + "_c1", e, lower)
+    for k in range(count + 1):
+        t = k / count
+        root = e.lerp(wr, t) + Vector((0, 0.006, 0.004))
+        greater.scale(root, root + Vector((0.03 * side * (t - 0.5), -0.002, -length * w["covert"])), width * 1.25,
+                      mats[k % len(mats)])
+        root = e.lerp(wr, (k + 0.5) / (count + 1)) + Vector((0, 0.01, 0.01))
+        median.scale(root, root + Vector((0.0, -0.001, -length * w["covert"] * 0.55)), width * 1.1, mats[(k + 1) % len(mats)])
+    made += [greater, median]
+    # The primaries, fanned from the wrist out to the tip, the outer ones fingered (narrowing to slotted tips);
+    # those past the digit's joint grow from the digit. Their coverts a layer on the hand.
+    pcount, shortest, longest, pwidth, spread, fingers = w["prim"]
+    coverts = Part(name + suffix + "_c2", wr, palm)
+    for k in range(pcount):
+        t = k / max(pcount - 1, 1)
+        root = wr + Vector((hand * side * t, 0.0, -0.01 - hand * 0.15 * t))
         angle = math.radians(-12 + spread * t)
-        length = shortest + (longest - shortest) * math.sin(t * math.pi * 0.62)
+        plength = shortest + (longest - shortest) * math.sin(t * math.pi * 0.62)
         direction = Vector((math.sin(angle) * side, -0.03, -math.cos(angle)))
-        # (each primary its own part, so the fold can lay them all back together)
-        primary = Part(name + suffix + "_p%d" % k, root, tip)
-        primary.feather(root, root + direction * length, pwidth * (1.0 - 0.25 * t), flight_mats, sag=0.015, rounded=rounded)
+        fingered = k >= pcount - fingers
+        on = digit if hand * t > hand * 0.6 - 0.004 else palm
+        primary = Part(name + suffix + "_p%d" % k, root, on)
+        primary.feather(root, root + direction * plength, pwidth * (1.0 - 0.25 * t) * (0.78 if fingered else 1.0),
+                        flight_mats, sag=0.015, rounded=rounded or not fingered)
         made.append(primary)
-        tip.feather(root + Vector((0, 0.006, 0.008)), root + Vector((0, 0.006, 0.008)) + direction * length * covert * 0.8,
-                    pwidth * 1.2, mats, sag=0.006, rounded=True)
-    return [upper, lower, tip] + made
+        croot = root + Vector((0, 0.006, 0.008))
+        coverts.scale(croot, croot + direction * plength * w["covert"] * 0.75, pwidth * 1.2, mats[k % len(mats)])
+    made.append(coverts)
+    # The alula: three small stiff feathers on the thumb, along the leading edge at the wrist (raised to keep the air
+    # on the wing at low speed: landing)
+    alula = Part(name + suffix + "_alula", wr, palm)
+    for k in range(3):
+        root = wr + Vector((side * 0.006 * k, 0.006, 0.006 - 0.004 * k))
+        alula.feather(root, root + Vector((side * 0.85, 0.02, -0.25 - 0.12 * k)).normalized() * hand * (0.55 - 0.1 * k),
+                      pwidth * 0.55, mats, sag=-0.003, rounded=True)
+    made.append(alula)
+    return made
+
+
+def tail(name, body, root, count, lengths, width, spread, droop, mats, coverts, seed):
+    """The tail: a part at the rump (the pygostyle) with each tail feather a part of its own on it (`_tail_t<n>`,
+    from the bird's left), fanned `spread` radians edge to edge, drooping `droop` (down for every metre back);
+    `lengths(offset)` gives a feather's length by its offset from the middle (-1..1); `mats` its bands root to tip.
+    A tuft of tail coverts over the roots."""
+    tail_part = Part(name + "_tail", root, body)
+    made = [tail_part]
+    middle = (count - 1) * 0.5
+    for k in range(count):
+        offset = (middle - k) / middle
+        a = offset * spread * 0.5
+        at = Vector(root) + Vector((math.sin(a) * 0.02, abs(offset) * 0.003, 0.004))
+        length = lengths(offset)
+        feather = Part(name + "_tail_t%d" % k, at, tail_part)
+        feather.feather(at, at + Vector((math.sin(a), -droop, -math.cos(a))).normalized() * length, width,
+                        mats(k) if callable(mats) else mats, sag=-0.006, rounded=True)
+        made.append(feather)
+    tail_part.tufts(Vector(root) + Vector((0, 0.005, 0.0)), (0.04, 0.03, 0.04), 10, coverts, (0.025, 0.04),
+                    (0, -0.2, -1), lie=0.85, seed=seed)
+    return made
 
 
 def crow():
@@ -340,16 +453,9 @@ def crow():
         head.cap(eye, 0.019, (side * 0.3, 1.0, -0.75), 1.45, "crow", 12, 5)
         head.spike(eye + Vector((side * 0.006, 0.018, -0.004)), (side * 0.6, 0.35, -1), 0.03, 0.01, "crowdeep")
     made.append(head)
-    # A wedge of a tail
-    tail = Part("crow_tail", (0, 0.2, -0.13), body)
-    for k in range(7):
-        a = (k - 3) * 0.09
-        root = Vector((math.sin(a) * 0.02, 0.2 + abs(k - 3) * 0.002, -0.12))
-        length = 0.16 - abs(k - 3) * 0.012
-        tail.feather(root, root + Vector((math.sin(a) * length, -0.04, -math.cos(a) * length)), 0.04,
-                     ["crowdeep"] if k % 2 else ["crow"], sag=-0.006, rounded=True)
-    tail.tufts((0, 0.205, -0.12), (0.04, 0.03, 0.04), 10, shade, (0.025, 0.04), (0, -0.2, -1), lie=0.85, seed=8)
-    made.append(tail)
+    # A wedge of a tail: ten feathers, the middle ones longest
+    made += tail("crow", body, (0, 0.2, -0.125), 10, lambda o: 0.165 - abs(o) * 0.045, 0.036, 0.55, 0.25,
+                 lambda k: ["crowdeep"] if k % 2 else ["crow"], shade, 8)
     # Legs: a feathered thigh, a scaled shank, three toes ahead and one behind, with claws
     for side, suffix in ((1, "_leg_l"), (-1, "_leg_r")):
         hip = Vector((side * 0.035, 0.155, 0.0))
@@ -365,8 +471,10 @@ def crow():
             leg.tube([end, end + Vector((math.sin(a) * 0.008, -0.004, math.cos(a) * 0.008))], [0.003, 0.0008], "talon", 4)
         made.append(leg)
     for side in (1, -1):
-        made += wing("crow", body, side, (side * 0.06, 0.29, 0.04), 0.11, 0.12, 0.07, (4, 0.16, 0.05),
-                     (7, 0.17, 0.25, 0.042, 62), 0.45, ["crow", "crowsheen"], ["crowdeep"], False)
+        made += wing("crow", body, side, (side * 0.06, 0.29, 0.04),
+                     {"arm": 0.11, "fore": 0.12, "hand": 0.07, "lead": (0.03, 0.022, 0.015, 0.009),
+                      "tert": (3, 0.15, 0.055), "sec": (8, 0.16, 0.04), "prim": (9, 0.15, 0.25, 0.04, 66, 5),
+                      "covert": 0.45}, ["crow", "crowsheen"], ["crowdeep"], False)
     return made
 
 
@@ -433,14 +541,8 @@ def owl():
                  [0.005, 0.006, 0.005], "owlrim", 6)
         made.append(lid)
     # Tail: short and rounded, barred, hanging down behind
-    tail = Part("owl_tail", (0, 0.12, -0.09), body)
-    for k in range(7):
-        a = (k - 3) * 0.13
-        root = Vector((math.sin(a) * 0.03, 0.12, -0.09))
-        direction = Vector((math.sin(a) * 0.5, -0.75, -0.75)).normalized()
-        tail.feather(root, root + direction * (0.15 - abs(k - 3) * 0.008), 0.05, ["owl", "owldark", "owllight", "owldark", "owl"],
-                     sag=-0.008, rounded=True)
-    made.append(tail)
+    made += tail("owl", body, (0, 0.12, -0.09), 10, lambda o: 0.15 - o * o * 0.02, 0.046, 0.8, 1.0,
+                 ["owl", "owldark", "owllight", "owldark", "owl"], back, 9)
     # Legs: fluffy feathered legs down to big black talons
     for side, suffix in ((1, "_leg_l"), (-1, "_leg_r")):
         hip = Vector((side * 0.055, 0.1, 0.04))
@@ -456,8 +558,78 @@ def owl():
                       end + Vector((math.sin(a) * 0.02 * side, -0.016, math.cos(a) * 0.02))], [0.006, 0.004, 0.0008], "talon", 5)
         made.append(leg)
     for side in (1, -1):
-        made += wing("owl", body, side, (side * 0.115, 0.36, -0.005), 0.13, 0.15, 0.09, (5, 0.23, 0.07),
-                     (7, 0.24, 0.31, 0.06, 55), 0.42, ["owl", "owldark"], ["owl", "owldark", "owllight", "owldark", "owl"], True)
+        made += wing("owl", body, side, (side * 0.115, 0.36, -0.005),
+                     {"arm": 0.13, "fore": 0.15, "hand": 0.09, "lead": (0.03, 0.024, 0.016, 0.01),
+                      "tert": (4, 0.22, 0.07), "sec": (9, 0.23, 0.058), "prim": (9, 0.22, 0.31, 0.055, 58, 2),
+                      "covert": 0.42}, ["owl", "owldark"], ["owl", "owldark", "owllight", "owldark", "owl"], True)
+    return made
+
+
+def hawk():
+    """A red-tailed hawk (the Pacific Northwest's roadside hawk; after Wikimedia Commons photos of red-tails perched
+    and in flight): rich brown above, a pale chest with a band of dark streaks across the belly, a dark bar along the
+    front of the wing, a brick-red tail with a thin dark band near its pale tip; a fierce brow, a hooked dark bill
+    over a yellow cere, yellow feet. Broad wings with five fingered primaries, a broad rounded tail for soaring."""
+    random.seed(47)
+    body = Part("hawk_body")
+    back = ["hawk", "hawk", "hawkdark", "hawklight"]
+    # A deep chest, the body carried upright; the pale front
+    body.blob((0, 0.25, -0.01), (0.09, 0.1, 0.17), "hawk", 16, 10, tilt=0.5)
+    body.blob((0, 0.27, 0.05), (0.082, 0.1, 0.075), "hawkpale", 14, 9)
+    body.blob((0, 0.2, 0.04), (0.08, 0.07, 0.07), "hawkpale", 12, 8)
+    body.tufts((0, 0.25, -0.01), (0.09, 0.1, 0.17), 70, back, (0.025, 0.05), (0, -0.4, -1), tilt=0.5, lie=0.8, seed=3,
+               keep=lambda p: p.z < 0.03)
+    # (the belly band: dark streaks across the lower chest; pale tufts above it)
+    body.tufts((0, 0.2, 0.04), (0.08, 0.07, 0.07), 26, ["hawkdark", "hawkdark", "hawk"], (0.02, 0.035), (0, -1, 0.1),
+               lie=0.9, width=0.35, seed=4, keep=lambda p: p.z > 0.0)
+    body.tufts((0, 0.27, 0.05), (0.082, 0.1, 0.075), 22, ["hawkpale", "hawklight"], (0.02, 0.03), (0, -1, 0.2),
+               lie=0.85, seed=5, keep=lambda p: p.z > 0.02)
+    made = [body]
+    # The head: flat crowned, a heavy brow over the eye, the hooked bill over a yellow cere
+    head = Part("hawk_head", (0, 0.35, 0.07), body)
+    head.blob((0, 0.4, 0.1), (0.058, 0.056, 0.068), "hawk", 14, 9)
+    head.blob((0, 0.37, 0.1), (0.05, 0.05, 0.05), "hawklight", 12, 8)
+    head.tufts((0, 0.4, 0.1), (0.058, 0.056, 0.068), 28, back, (0.018, 0.032), (0, 0.15, -1), lie=0.85, seed=6,
+               keep=lambda p: p.z < 0.03)
+    head.tufts((0, 0.37, 0.1), (0.05, 0.05, 0.05), 10, ["hawkpale", "hawklight"], (0.015, 0.025), (0, -1, 0.1), lie=0.85,
+               seed=7, keep=lambda p: p.z > 0.0)
+    head.tube([(0, 0.405, 0.155), (0, 0.405, 0.172)], [0.017, 0.015], "hawkcere", 8, (0.85, 0.9))
+    head.tube([(0, 0.405, 0.17), (0, 0.404, 0.19), (0, 0.392, 0.205), (0, 0.372, 0.206), (0, 0.362, 0.198)],
+              [0.015, 0.012, 0.008, 0.004, 0.001], "hawkbeak", 8, (0.75, 1.1))
+    for side in (1, -1):
+        eye = Vector((side * 0.04, 0.412, 0.14))
+        head.blob(eye, (0.015, 0.016, 0.012), "hawkiris", 10, 7)
+        head.blob(eye + Vector((side * 0.004, 0.0, 0.005)), (0.01, 0.011, 0.007), "pupil", 8, 6)
+        head.blob(eye + Vector((side * 0.0055, 0.003, 0.007)), (0.004, 0.004, 0.003), "eyewhite", 6, 5)
+        # (the brow: a hard shelf over the eye, the fierce look)
+        head.tube([eye + Vector((-side * 0.014, 0.014, 0.012)), eye + Vector((side * 0.006, 0.017, 0.0)),
+                   eye + Vector((side * 0.016, 0.012, -0.016))], [0.006, 0.008, 0.005], "hawk", 6)
+        # (a dark stripe back from the gape)
+        head.spike(eye + Vector((side * 0.004, -0.02, -0.004)), (side * 0.3, -0.3, -1), 0.03, 0.01, "hawkdark")
+    made.append(head)
+    # The tail: broad, rounded, brick red with a thin dark band near its pale tip
+    made += tail("hawk", body, (0, 0.165, -0.15), 10, lambda o: 0.19 - o * o * 0.02, 0.05, 0.6, 0.3,
+                 ["hawkred", "hawkred", "hawkred", "hawkred", "hawkred", "hawkred", "hawkdark", "hawklight"], back, 8)
+    # Legs: feathered thighs ("pants"), yellow scaled shanks, strong toes, black talons
+    for side, suffix in ((1, "_leg_l"), (-1, "_leg_r")):
+        hip = Vector((side * 0.04, 0.165, 0.02))
+        leg = Part("hawk" + suffix, hip, body)
+        leg.blob(hip + Vector((side * 0.006, -0.01, 0.0)), (0.03, 0.042, 0.034), "hawkpale", 10, 7)
+        leg.tufts(hip + Vector((side * 0.006, -0.01, 0.0)), (0.03, 0.042, 0.034), 8, ["hawkpale", "hawklight"], (0.015, 0.025),
+                  (0, -1, -0.2), lie=0.8, seed=11 + side)
+        foot = Vector((side * 0.045, 0.014, 0.02))
+        leg.tube([hip + Vector((0, -0.03, 0.0)), foot], [0.01, 0.008], "hawkcere", 6)
+        for a, toe in ((-0.45, 0.045), (0.0, 0.052), (0.45, 0.045), (math.pi, 0.035)):
+            end = foot + Vector((math.sin(a) * toe, -0.008, math.cos(a) * toe))
+            leg.tube([foot, end], [0.006, 0.005], "hawkcere", 5)
+            leg.tube([end, end + Vector((math.sin(a) * 0.01, -0.004, math.cos(a) * 0.01)),
+                      end + Vector((math.sin(a) * 0.013, -0.014, math.cos(a) * 0.013))], [0.004, 0.003, 0.0008], "talon", 5)
+        made.append(leg)
+    for side in (1, -1):
+        made += wing("hawk", body, side, (side * 0.07, 0.3, 0.03),
+                     {"arm": 0.14, "fore": 0.16, "hand": 0.095, "lead": (0.032, 0.024, 0.014, 0.009),
+                      "tert": (3, 0.22, 0.065), "sec": (9, 0.25, 0.054), "prim": (9, 0.22, 0.33, 0.058, 62, 5),
+                      "covert": 0.42}, ["hawkdark", "hawk"], ["hawk", "hawk", "hawkdark", "hawk", "hawkdark"], False)
     return made
 
 
@@ -509,7 +681,8 @@ def look(folder, name, objects):
 
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
-models = {"crow": build(crow()), "owl": build(owl())}
+# (the hawk's file is redtail.glb: tools/build_hazards.py still writes its old plain hawk.glb)
+models = {"crow": build(crow()), "owl": build(owl()), "redtail": build(hawk())}
 bpy.ops.wm.save_as_mainfile(filepath=os.path.join(ROOT, "tools", "birds.blend"))
 for name, objects in models.items():
     export(name, objects)

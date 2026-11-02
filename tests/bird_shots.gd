@@ -1,6 +1,7 @@
 extends SceneTree
-## Pictures of the crow and the owl (BirdBody) from four sides and close up, in each pose: folded standing, wings up,
-## wings down, gliding, a peck, the owl blinking and its head turned round. For checking the models and their poses.
+## Pictures of the crow, the owl and the hawk (BirdBody) from four sides and close up, in each pose: folded standing, wings up,
+## wings down, gliding, a peck, the owl blinking and its head turned round; a beat filmed live
+## (its feathers rippling: `<kind>_live<n>`) and a glide close up. For checking the models and their poses.
 ##   godot --path . --audio-driver Dummy --fixed-fps 60 --resolution 1600x900 -s res://tests/bird_shots.gd -- --out=<dir>
 ## Needs a window (kept off the screen).
 
@@ -39,7 +40,7 @@ func _initialize() -> void:
 	camera = Camera3D.new()
 	camera.fov = 30.0
 	stage.add_child(camera)
-	for kind: StringName in [&"crow", &"owl"]:
+	for kind: StringName in [&"crow", &"owl", &"hawk"]:
 		var bird := BirdBody.make(kind)
 		stage.add_child(bird)
 		bird.visible = false
@@ -74,7 +75,7 @@ func _round(bird: BirdBody, name: String, height: float, distance: float, rise :
 func _run() -> void:
 	for kind: StringName in birds:
 		var bird: BirdBody = birds[kind]
-		var big := 1.0 if kind == &"crow" else 1.4
+		var big: float = {&"crow": 1.0, &"owl": 1.4, &"hawk": 1.2}[kind]
 		for other: StringName in birds:
 			birds[other].visible = other == kind
 		# Standing, folded
@@ -124,9 +125,19 @@ func _run() -> void:
 			await _shot("%s_beat_front%d" % [kind, k])
 			_view(bird, 0.3 * big, 2.4 * big, PI * 0.3, 0.9)
 			await _shot("%s_beat_above%d" % [kind, k])
+		# A beat filmed live (the springs see the wing move), every third frame
+		bird.flap_rate = {&"crow": 17.0, &"owl": 10.0, &"hawk": 11.0}[kind]
+		for k in 12:
+			bird.position = Vector3(0.0, 0.8, 0.0)
+			await _frames(3)
+			_view(bird, 0.3 * big, 2.0 * big, PI * 0.3, 0.35)
+			await _shot("%s_live%d" % [kind, k])
+		bird.flap_rate = 0.0
 		bird.flap = 0.0
 		await _frames(60)
 		await _round(bird, "%s_glide" % kind, 0.3 * big, 2.6 * big, 0.6)
+		_view(bird, 0.3 * big, 1.1 * big, PI * 0.35, 0.8)
+		await _shot("%s_glide_close" % kind)
 		bird.flare = 1.0
 		bird.tuck = 0.0
 		await _frames(60)
