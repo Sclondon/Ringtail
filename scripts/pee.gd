@@ -17,7 +17,12 @@ const SPEED_FAR := 1.9
 var _player: Player
 var _rig: RaccoonRig
 var _stream: CPUParticles3D
+## A tiny splash where it lands (the user, 2026-11-02: "it needs a tiny splashy particle").
+var _splash: CPUParticles3D
 var _puddle: MeshInstance3D
+## Every puddle still lying about, oldest first (at most MOST_PUDDLES: sweeping the aim leaves a trail of them).
+var _puddles: Array[MeshInstance3D] = []
+const MOST_PUDDLES := 40
 var _puddle_size := 0.0
 var _puddle_age := 0.0
 ## For tests: held as if the button were.
@@ -58,6 +63,20 @@ func _ready() -> void:
 	drop.material = wet
 	_stream.mesh = drop
 	add_child(_stream)
+	_splash = CPUParticles3D.new()
+	_splash.top_level = true
+	_splash.emitting = false
+	_splash.amount = 24
+	_splash.lifetime = 0.3
+	_splash.direction = Vector3.UP
+	_splash.spread = 55.0
+	_splash.initial_velocity_min = 0.5
+	_splash.initial_velocity_max = 1.0
+	_splash.gravity = Vector3(0.0, -9.8, 0.0)
+	_splash.scale_amount_min = 0.4
+	_splash.scale_amount_max = 0.8
+	_splash.mesh = drop
+	add_child(_splash)
 
 
 func _physics_process(delta: float) -> void:
@@ -88,6 +107,7 @@ func _physics_process(delta: float) -> void:
 		_rig.pee_aim = aim
 	var flowing := going and _rig != null and _rig._pee_w > 0.8
 	_stream.emitting = flowing
+	_splash.emitting = false if not flowing else _splash.emitting
 	if _rig:
 		var size := _rig.global_basis.get_scale().y
 		var ahead := _rig.global_basis.z.normalized()
@@ -132,7 +152,10 @@ func _wet(delta: float) -> void:
 	if hit.is_empty():
 		return
 	var at: Vector3 = hit.position
-	if _puddle == null or _puddle.global_position.distance_to(at) > 0.3:
+	_splash.global_position = at + (hit.normal as Vector3) * 0.01
+	_splash.emitting = true
+	# (each puddle stays where it formed; aimed off it, a new one starts there: the user, "aiming shouldn't move the puddle")
+	if _puddle == null or _puddle.global_position.distance_to(at) > maxf(_puddle_size * 0.5, 0.06):
 		if _puddle:
 			_puddle_age = 0.0
 		_puddle = MeshInstance3D.new()
@@ -150,13 +173,18 @@ func _wet(delta: float) -> void:
 		_puddle.material_override = shine
 		_puddle.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		_player.get_parent().add_child(_puddle)
+		_puddles.append(_puddle)
+		while _puddles.size() > MOST_PUDDLES:
+			var old: MeshInstance3D = _puddles.pop_front()
+			if is_instance_valid(old):
+				old.queue_free()
 		_puddle_size = 0.02
+		var up := hit.normal as Vector3
+		_puddle.global_transform = Transform3D(Basis(Quaternion(Vector3.UP, up)), at + up * 0.006)
 		# (a puddle left behind soaks away by itself)
 		get_tree().create_timer(SOAK).timeout.connect(_soak.bind(_puddle))
 	_puddle_age = 0.0
 	_puddle_size = minf(_puddle_size + delta * 0.08, PUDDLE_MOST)
-	var up := hit.normal as Vector3
-	_puddle.global_transform = Transform3D(Basis(Quaternion(Vector3.UP, up)), at + up * 0.006)
 	_puddle.scale = Vector3(_puddle_size, 1.0, _puddle_size * 0.8)
 	(_puddle.material_override as StandardMaterial3D).albedo_color.a = 0.55
 

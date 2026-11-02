@@ -34,6 +34,7 @@ func _run(world: World) -> void:
 		await physics_frame
 	_check(pee.going and rig._pee_w > 0.8, "held, he stands at it (%.2f)" % rig._pee_w)
 	_check(pee._stream.emitting, "the trickle runs")
+	_check(pee._splash.emitting, "it splashes where it lands")
 	_check(pee._puddle != null and pee._puddle.scale.x > 0.05, "a puddle spreads")
 	if out != "":
 		for c in world.find_children("*", "CanvasLayer", true, false):
@@ -52,6 +53,7 @@ func _run(world: World) -> void:
 			for _i in 4:
 				await process_frame
 			root.get_viewport().get_texture().get_image().save_png("%s/pee_%d.png" % [out, k])
+	var first: Vector3 = pee._puddle.global_position
 	# The stick aims it, he stays put
 	var stood := him.global_position
 	var was: Vector3 = pee._stream.direction
@@ -60,6 +62,7 @@ func _run(world: World) -> void:
 		await physics_frame
 	Input.action_release(&"move_right")
 	_check(him.global_position.distance_to(stood) < 0.1, "he stays put while going")
+	_check(is_instance_valid(pee._puddles[0]) and pee._puddles[0].global_position.distance_to(first) < 0.001 and pee._puddles.size() > 1, "aimed off, the first puddle stays put and new ones start (%d)" % pee._puddles.size())
 	_check(pee._stream.direction.angle_to(was) > 0.4, "the stick aims it (%.2f rad)" % pee._stream.direction.angle_to(was))
 	Input.action_release(&"pee")
 	for _i in 5:
