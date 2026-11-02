@@ -23,9 +23,13 @@ func _run(world: World) -> void:
 		await physics_frame
 	var player := world.player
 	var heart: Vector3 = world.markers["grove_heart"].origin if world.markers.has("grove_heart") else player.global_position
-	var spot := player.global_position + Vector3(6.0, 0.0, 0.0)
+	# (out past the grove, on the ground there)
+	var spot := heart + Vector3(14.0, 0.0, 0.0)
+	var ground := world.get_world_3d().direct_space_state.intersect_ray(PhysicsRayQueryParameters3D.create(spot + Vector3.UP * 30.0, spot + Vector3.DOWN * 30.0, 1))
+	if not ground.is_empty():
+		spot = ground.position
 	var markers := {"grove_heart": Transform3D(Basis.IDENTITY, heart),
-		"kit_0": Transform3D(Basis.IDENTITY, spot), "kit_1": Transform3D(Basis.IDENTITY, spot + Vector3(0.0, 0.0, 6.0))}
+		"kit_0": Transform3D(Basis.IDENTITY, spot), "kit_1": Transform3D(Basis.IDENTITY, spot + Vector3(0.0, 0.5, 3.0))}
 	var kits := LostKits.place(world, markers, world.get_node(^"Villagers") as Villagers, player)
 	var told := []
 	kits.changed.connect(func(home: int, total: int) -> void: told.append([home, total]))
@@ -37,7 +41,15 @@ func _run(world: World) -> void:
 	player.global_position = kit.global_position + Vector3(0.6, 0.2, 0.0)
 	for _i in 10:
 		await physics_frame
-	_check(kits.found == 1 and not kit in kits.lost and told == [[1, 2]], "found, it is home: 1 of 2")
-	_check(kit.global_position.distance_to(heart) < 5.0 and kit.home == heart and not kit.stays, "it is in the grove now")
+	_check(kit in kits.following and kit.leader == player and kits.found == 0 and told.is_empty(), "found, it follows him (not home yet)")
+	# (he walks it home: it comes after him, and counts once it is in the grove)
+	player.global_position = heart + Vector3(0.0, 0.3, 0.0)
+	var home := false
+	for _i in 900:
+		await physics_frame
+		if kits.found == 1:
+			home = true
+			break
+	_check(home and told == [[1, 2]] and kit.home == heart and kit.leader == null, "led into the grove, it is home: 1 of 2")
 	print("PASSED" if failures.is_empty() else "FAILED: " + ", ".join(failures))
 	quit()

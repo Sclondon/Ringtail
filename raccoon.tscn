@@ -12,9 +12,9 @@
 [ext_resource type="Script" path="res://scripts/wire_bounce.gd" id="10"]
 
 [node name="Raccoon" instance=ExtResource("1")]
-walk_speed = 1.2
-run_speed = 4.4
-sprint_speed = 6.2
+walk_speed = 1.0
+run_speed = 3.6
+sprint_speed = 5.2
 sprint_delay = 0.12
 sprint_push = 0.985
 sneak_speed = 0.55
@@ -24,7 +24,7 @@ apex_gravity_scale = 0.35
 flip_lift = 2.2
 flip_time = 0.45
 dive_window = 0.5
-slide_min_speed = 5.0
+slide_min_speed = 4.2
 sleep_after = 75.0
 spin_rate = 28.0
 spin_spinup = 16.0

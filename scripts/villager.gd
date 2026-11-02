@@ -45,6 +45,8 @@ var route: Array[Vector3] = []
 var leg := 0
 ## A kit out with its parent: whom it follows.
 var parent: Villager
+## A lost kit he has found: him, whom it follows home to the grove (LostKits).
+var leader: Node3D
 ## Kits at play: whom it is chasing (or running from), and which way round.
 var playmate: Villager
 var chasing := false
@@ -144,9 +146,16 @@ func _physics_process(delta: float) -> void:
 		Doing.STROLL, Doing.GO:
 			want = _toward(_goal, _pace)
 		Doing.FOLLOW:
-			var heel := parent.global_position - parent.global_basis.z * 0.55 + parent.global_basis.x * sin(Time.get_ticks_msec() * 0.0011 + _seed) * 0.45
-			want = _toward(heel, 1.0)
-			if parent.doing != Doing.GO and _t <= 0.0:
+			if leader:
+				# (at his heels, each a little way behind and to one side of him, coming at a bound when left behind)
+				var yaw: float = leader.get(&"facing_yaw") if &"facing_yaw" in leader else leader.rotation.y
+				var back := -Vector3(sin(yaw), 0.0, cos(yaw))
+				var heel_at := leader.global_position + back * (1.0 + fposmod(_seed, 1.0) * 1.2) + back.cross(Vector3.UP) * sin(_seed * 7.0) * 0.8
+				want = _toward(heel_at, 1.4)
+			else:
+				var heel := parent.global_position - parent.global_basis.z * 0.55 + parent.global_basis.x * sin(Time.get_ticks_msec() * 0.0011 + _seed) * 0.45
+				want = _toward(heel, 1.0)
+			if leader == null and parent.doing != Doing.GO and _t <= 0.0:
 				# (its parent busy, it darts off to nose about and comes back)
 				_go(Doing.SNIFF if randf() < 0.5 else Doing.FOLLOW, randf_range(1.0, 2.5))
 		Doing.PLAY:
@@ -264,6 +273,9 @@ func listen(on: bool) -> void:
 
 ## Picks what to do next.
 func _choose() -> void:
+	if leader:
+		_go(Doing.FOLLOW, 1.0)
+		return
 	if parent and is_instance_valid(parent):
 		_go(Doing.FOLLOW, randf_range(2.0, 5.0))
 		return

@@ -14,8 +14,8 @@ extends Node
 ## How tall his collider is while he scurries (Player.height_cap).
 @export var low_height := 0.62
 ## How fast he scurries along the ground: slower than he runs (the user, 2026-11-02, "scurrying should be slower than
-## running"; his run is 4.4 m/s). Player.speed_cap.
-@export var scurry_speed := 3.2
+## running"; his run is 3.6 m/s). Player.speed_cap.
+@export var scurry_speed := 2.7
 
 var held := false
 var climbing := false
