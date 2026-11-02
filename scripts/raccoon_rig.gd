@@ -154,9 +154,8 @@ func _pose_extra(delta: float) -> void:
 	var flat := Vector3(velocity.x, 0.0, velocity.z)
 	var speed := flat.length()
 	var free: bool = not (&"state" in _player) or _player.state == Player.State.FREE
-	# (ducking he stays upright, as the boy does; crawling under something low, and scurrying, he is on all fours: the
-	# user, 2026-11-01, "rather than duck ... a Scurry button that puts you on all 4s")
-	var low: bool = &"is_crawling" in _player and _player.is_crawling
+	# (ducking, crawling and scurrying he is on all fours: the user, 2026-11-01, "why is duck not on all 4s?")
+	var low: bool = (&"is_ducking" in _player and _player.is_ducking) or (&"is_crawling" in _player and _player.is_crawling)
 	var scurrying: bool = _scurry != null and _scurry.held
 	var climbing: bool = _scurry != null and _scurry.climbing
 	_climb_w = _approach(_climb_w, 1.0 if climbing else 0.0, 10.0, delta)

@@ -81,7 +81,7 @@ Read README.md first. Started 2026-11-01.
 - Run: "higher quality a little bouncier and more raccoonie" (lope: rump thrown high, humped back, waddle, hind feet
   reaching to the fore paws). Dust "exactly on every step ... a few puffs" (RaccoonRig.stepped; CloudDust).
 - Controls: Scurry on the left trigger (and Shift; an on-screen paw button): all fours, climbs anything climbable
-  (poles: meshes named climb_; the grove's trees). "y remains duck" (duck on X and Y: X was the user's earlier
+  (poles: meshes named climb_; the grove's trees). Duck is on all fours too ("why is duck not on all 4s?": I had read the Scurry message as taking all fours off duck). "y remains duck" (duck on X and Y: X was the user's earlier
   call; ask if X should change). Superhero landing "only from tall height" (landing_speeds 15/17/19/21).
 - Hanging from ledges: "swing his legs when hanging and shimmying" (_pose_hang_swing).
 - World: "a little grove on a hill in the center of town" with "birds and other predators to avoid, and people as
