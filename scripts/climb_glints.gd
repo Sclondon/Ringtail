@@ -1,19 +1,21 @@
 class_name ClimbGlints
 extends Node3D
 ## While scurry is held, little blue sparkles twinkle on whatever climbable is near (the user, 2026-11-02: "When you
-## hold scurry nearby climbable objects should have little blue sparkles"): a fan of rays round him at a few heights
+## hold scurry nearby climbable objects should have little blue sparkles"), and from further off ("the blue
+## sparkles should appear from further"): a fan of rays round him at a few heights
 ## finds the climbable faces within `reach`, and a glint comes up here and there on them, twinkles and goes. A child
 ## of Scurry (it makes one).
 
 ## How far round him climbables sparkle, how many glints there are at most, and how often new ones come up.
-@export var reach := 3.5
-const GLINTS := 28
-const EVERY := 0.06
+@export var reach := 8.0
+const GLINTS := 48
+const EVERY := 0.035
 const LIFE := 0.5
 
 var scurry: Scurry
 var _glints: Array[MeshInstance3D] = []
 var _born: Array[float] = []
+var _size: Array[float] = []
 var _next := 0
 var _clock := 0.0
 var _wait := 0.0
@@ -39,6 +41,7 @@ func _ready() -> void:
 		add_child(glint)
 		_glints.append(glint)
 		_born.append(-10.0)
+		_size.append(0.14)
 
 
 func _process(delta: float) -> void:
@@ -58,6 +61,8 @@ func _process(delta: float) -> void:
 			_next = (_next + 1) % GLINTS
 			_glints[k].global_position = at + Vector3(randf_range(-0.12, 0.12), randf_range(-0.25, 0.25), randf_range(-0.12, 0.12))
 			_born[k] = _clock
+			# (bigger further off, so a far one still shows)
+			_size[k] = 0.14 * maxf(1.0, at.distance_to(player.global_position) / 3.0)
 			_glints[k].visible = true
 	else:
 		_hits.clear()
@@ -68,7 +73,7 @@ func _process(delta: float) -> void:
 		if age >= 1.0:
 			_glints[k].visible = false
 			continue
-		_glints[k].scale = Vector3.ONE * maxf(0.14 * sin(PI * age), 0.001)
+		_glints[k].scale = Vector3.ONE * maxf(_size[k] * sin(PI * age), 0.001)
 
 
 ## The climbable faces round him now: where a fan of rays from him meets them.
@@ -77,8 +82,8 @@ func _find(player: Player) -> void:
 	var space := player.get_world_3d().direct_space_state
 	for high: float in [0.3, 1.0, 1.8]:
 		var from := player.global_position + Vector3.UP * high
-		for k in 16:
-			var a := TAU * k / 16.0
+		for k in 32:
+			var a := TAU * k / 32.0
 			var query := PhysicsRayQueryParameters3D.create(from, from + Vector3(cos(a), 0.0, sin(a)) * reach, 1)
 			query.exclude = [player.get_rid()]
 			var hit := space.intersect_ray(query)

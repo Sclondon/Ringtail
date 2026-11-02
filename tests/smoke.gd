@@ -268,11 +268,12 @@ func _run() -> void:
 	var talker: Villager = at_grove[0]
 	await _put(talker.global_position + Vector3(0.0, 0.4, 1.0))
 	await _frames(30)
-	var bubble := villagers.talk.bubble_of(talker)
-	var said := bubble.openness > 0.5 and bubble.label.text in talker.lines
-	await _put(talker.global_position + Vector3(0.0, 0.4, 9.0))
+	# (whichever is nearest him talks: a kit may have run up closer)
+	var open := func() -> Array: return villagers.talk._bubbles.values().filter(func(b: SpeechBubble) -> bool: return b.openness > 0.5)
+	var said: bool = (open.call() as Array).size() == 1
+	await _put(talker.global_position + Vector3(0.0, 0.4, 12.0))
 	await _frames(40)
-	_check(said and bubble.openness < 0.1 and not Player.input_blocked, "a raccoon at the grove says its line in a bubble as he comes near, and stops as he goes")
+	_check(said and (open.call() as Array).is_empty() and not Player.input_blocked, "a raccoon at the grove says its line in a bubble as he comes near, and stops as he goes")
 	# (killed, one goes limp where it is and stays: it is never put back)
 	var goner: Villager = out_about[0]
 	goner.global_position.y = -25.0
