@@ -335,6 +335,16 @@ func _place_things() -> void:
 			can.spilled.connect(_on_spilled)
 			add_child(can)
 			crumbs_total += can.holds
+		elif name.begins_with("dumpster_"):
+			# (one to jump into, Crumbs on its floor: the user, 2026-11-02, "there should be dumpsters to jump into")
+			var bin := Dumpster.new()
+			bin.transform = Transform3D(Basis(Vector3.UP, markers[name].basis.get_euler().y), at)
+			add_child(bin)
+			for spot in bin.inside():
+				var crumb := Pickup.make(Pickup.Kind.CRUMB, spot)
+				crumb.taken.connect(_on_crumb)
+				add_child(crumb)
+				crumbs_total += 1
 	var k_wire := 0
 	while markers.has("wire_%d_a" % k_wire):
 		# (Warren's tightrope, from GameCommon godot/tightrope: the user, 2026-11-01, "it should work identical to Warren")

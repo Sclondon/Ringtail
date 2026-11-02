@@ -34,6 +34,13 @@ var tag := ""
 var _spin: Node3D
 var _t := randf() * TAU
 var _gone := -1.0
+## Who took it, where it was then, and whether it has burst yet.
+var _taker: Node3D
+var _from := Vector3.ZERO
+var _burst_done := false
+## Taken: how long it spins over their head, and how long it takes to fly into them.
+const SHOW_OFF := 0.9
+const DIVE := 0.22
 ## Its sparkles: when each next twinkles, and where.
 var _glints: Array[MeshInstance3D] = []
 var _glint_at: Array[float] = []
@@ -142,41 +149,77 @@ func _food() -> Array:
 func _process(delta: float) -> void:
 	_t += delta
 	if _gone >= 0.0:
-		# (it swells for an instant and is gone, bursting into sparks)
 		_gone += delta
-		_spin.scale = Vector3.ONE * (1.0 + _gone * 6.0 if _gone < 0.06 else 0.0)
-		if _gone > 0.7:
-			queue_free()
+		if _taker == null or not is_instance_valid(_taker):
+			# (no one to go to: it swells for an instant and is gone, bursting into sparks)
+			if not _burst_done:
+				_burst_done = true
+				_burst()
+			_spin.scale = Vector3.ONE * (1.0 + _gone * 6.0 if _gone < 0.06 else 0.0)
+			if _gone > 0.7:
+				queue_free()
+			return
+		# Up over his head, spinning and sparkling, then into him in a burst (the user, 2026-11-02: "instead of just
+		# poofing, the food you collect should spin over your head for a second and sparkle and then fly into you and
+		# poof")
+		var over := _taker.global_position + Vector3.UP * (0.95 + 0.06 * sin(_gone * 8.0))
+		var chest := _taker.global_position + Vector3.UP * 0.35
+		if _gone < SHOW_OFF:
+			var rise := smoothstep(0.0, 0.25, _gone)
+			global_position = _from.lerp(over, rise)
+			_spin.position = Vector3.ZERO
+			_spin.rotation.y += delta * 14.0
+			_spin.scale = Vector3.ONE * lerpf(1.0, 1.35, rise)
+			_twinkle(delta, 0.08)
+		elif _gone < SHOW_OFF + DIVE:
+			var dive := smoothstep(0.0, 1.0, (_gone - SHOW_OFF) / DIVE)
+			global_position = over.lerp(chest, dive)
+			_spin.rotation.y += delta * 22.0
+			_spin.scale = Vector3.ONE * lerpf(1.35, 0.4, dive)
+		else:
+			if not _burst_done:
+				_burst_done = true
+				_spin.visible = false
+				_burst()
+			if _gone > SHOW_OFF + DIVE + 0.7:
+				queue_free()
 		return
+	_twinkle(delta, 1.2)
+	_spin.rotation.y = _t * (1.6 if kind == Kind.CAP else 2.4)
+	_spin.position.y = (0.45 if kind == Kind.CAP else 0.25) + sin(_t * 3.0) * 0.05
+
+
+## Its glints twinkling, the next of each within `most` seconds.
+func _twinkle(_delta: float, most: float) -> void:
 	for k in _glints.size():
 		var since := _t - _glint_at[k]
 		if since > 0.45:
 			# (the next twinkle, somewhere else on it, in a while)
-			_glint_at[k] = _t + randf_range(0.2, 1.2)
+			_glint_at[k] = _t + randf_range(minf(0.2, most), most)
 			var a := randf() * TAU
 			_glints[k].position = Vector3(cos(a) * 0.14, randf_range(-0.06, 0.14), sin(a) * 0.14)
 			since = _t - _glint_at[k]
 		var bright := sin(PI * clampf(since / 0.45, 0.0, 1.0)) if since >= 0.0 else 0.0
 		_glints[k].scale = Vector3.ONE * maxf(0.16 * bright, 0.001)
 		_glints[k].rotation.z = since * 3.0
-	_spin.rotation.y = _t * (1.6 if kind == Kind.CAP else 2.4)
-	_spin.position.y = (0.45 if kind == Kind.CAP else 0.25) + sin(_t * 3.0) * 0.05
 
 
 func _on_body(body: Node) -> void:
 	# (a Crumb is taken by a bird he plays as too: BirdPlayer)
 	if not (body is Player or (body is BirdPlayer and kind == Kind.CRUMB)) or _gone >= 0.0:
 		return
-	take()
+	take(body)
 
 
-## Takes it (as the player running into it does).
-func take() -> void:
+## Takes it (as the player running into it does): `by` whoever took it (it flies up over them and into them), or no
+## one (it bursts where it is).
+func take(by: Node3D = null) -> void:
 	if _gone >= 0.0:
 		return
 	_gone = 0.0
+	_taker = by
+	_from = global_position + _spin.position
 	set_deferred(&"monitoring", false)
-	_burst()
 	taken.emit(self)
 
 

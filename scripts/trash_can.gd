@@ -9,6 +9,7 @@ signal spilled(at: Array[Vector3])
 @export var holds := 3
 
 var tipped := false
+var _bumped := 0.0
 var _lid: RigidBody3D
 
 
@@ -47,6 +48,8 @@ func _ready() -> void:
 	_lid.add_child((load("res://models/trashlid.glb") as PackedScene).instantiate())
 	_lid.position.y = 0.85
 	add_child(_lid)
+	# (the shut lid overlaps the can's rim: without this it pinned the can, which barely moved when knocked)
+	add_collision_exception_with(_lid)
 	var material: Material = get_meta(&"material", null)
 	if material:
 		for mesh: MeshInstance3D in find_children("*", "MeshInstance3D", true, false):
@@ -62,6 +65,18 @@ func tail_hit(_from: Vector3, push: Vector3) -> void:
 func _physics_process(_delta: float) -> void:
 	if not tipped and global_basis.y.dot(Vector3.UP) < 0.45:
 		_tip()
+	# (scurrying into it bowls it over too: the user, 2026-11-02, "trash cans to knock over" / "by scurrying or tail swipe")
+	if not tipped and _bumped <= 0.0:
+		var world := get_parent() as World
+		var him: Player = world.player if world else null
+		if him:
+			var to := global_position - him.global_position
+			var scurry := him.get_node_or_null(^"Scurry") as Scurry
+			var going := Vector3(him.velocity.x, 0.0, him.velocity.z)
+			if scurry and scurry.held and going.length() > 0.8 and Vector2(to.x, to.z).length() < 0.9 and going.dot(to) > 0.0 and absf(to.y) < 0.8:
+				_bumped = 1.0
+				tail_hit(him.global_position, going.normalized() * 5.0 + Vector3.UP * 2.0)
+	_bumped = maxf(_bumped - _delta, 0.0)
 
 
 func _tip() -> void:
