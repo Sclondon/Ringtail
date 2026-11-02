@@ -1,0 +1,18 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="PackedScene" path="res://player.tscn" id="1"]
+[ext_resource type="Script" path="res://scripts/raccoon_rig.gd" id="2"]
+[ext_resource type="Script" path="res://scripts/tail_moves.gd" id="3"]
+[ext_resource type="PackedScene" path="res://models/raccoon.glb" id="4"]
+
+[node name="Raccoon" instance=ExtResource("1")]
+sprint_speed = 6.6
+
+[node name="Rig" parent="." index="1"]
+script = ExtResource("2")
+model = ExtResource("4")
+key_poses = false
+cap_hand = false
+
+[node name="TailMoves" type="Node" parent="." index="2"]
+script = ExtResource("3")
