@@ -118,6 +118,11 @@ static var input_blocked := false
 @export var push_speed := 1.15
 ## Stick deflection at which the walk starts turning into a run.
 @export_range(0.0, 1.0) var run_threshold := 0.55
+## Below this push of the stick he creeps at `sneak_speed` instead of walking (`is_sneaking`; 0: he never does, and
+## any push short of a run is a walk). Ringtail, 2026-11-02: "instead of taking tiny steps when moving slow he
+## should sneak" / "and slowly step".
+@export var sneak_speed := 0.0
+@export_range(0.0, 1.0) var sneak_push := 0.4
 @export var acceleration := 20.0
 @export var deceleration := 26.0
 ## Used while input opposes the current velocity, for snappy reversals.
@@ -295,6 +300,8 @@ var face_toward: Node3D
 var strafing := false
 var is_pushing := false
 var is_sprinting := false
+## Creeping on a light push of the stick (see `sneak_speed`).
+var is_sneaking := false
 ## True while the body is a ragdoll and takes no input.
 var is_limp := false
 var state := State.FREE
@@ -987,8 +994,11 @@ func _move_horizontal(strength: float, grounded: bool, delta: float) -> void:
 	elif grounded:
 		_run_time += delta
 	is_sprinting = _run_time > sprint_delay or (called and flat_out)
+	is_sneaking = sneak_speed > 0.0 and strength > 0.0 and strength < sneak_push + 0.05 and not is_sprinting and grounded
 	if strength > 0.0:
 		target_speed = lerpf(walk_speed, run_speed, smoothstep(run_threshold, run_threshold + 0.2, strength))
+		if sneak_speed > 0.0:
+			target_speed = lerpf(sneak_speed, target_speed, smoothstep(sneak_push - 0.05, sneak_push + 0.05, strength))
 		if is_sprinting:
 			target_speed = sprint_speed
 		if is_pushing:

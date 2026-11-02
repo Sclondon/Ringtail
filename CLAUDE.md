@@ -80,6 +80,17 @@ Read README.md first. Started 2026-11-01.
   from its root; he hangs by his rump below it).
 - Run: "higher quality a little bouncier and more raccoonie" (lope: rump thrown high, humped back, waddle, hind feet
   reaching to the fore paws). Dust "exactly on every step ... a few puffs" (RaccoonRig.stepped; CloudDust).
+- 2026-11-02, gaits: "his all 4s run still needs a lot of work, download reference images ... his back legs seem so
+  mirrored and stiff" gave a gallop after Muybridge's plate 744 (raccoon walking into a gallop): low and long, hind
+  feet a beat apart, hocks flexing, back arched gathering and flat reaching. Then "I liked when the all 4s run was
+  more of basically a jump, the scurry can use this new animation": the full-stick sprint is the bound again
+  (BOUND_FEET), the gallop is Scurry's (SCURRY_FEET; `_scurry_gait`). "Instead of taking tiny steps when moving slow
+  he should sneak" / "and slowly step": under 0.4 stick he creeps at 0.55 m/s (Player.sneak_speed, is_sneaking),
+  upright on tiptoe, hunched, paws up limp (`_pose_sneak`; upright rather than low was Claude's pick, the duck being
+  his low creep). "His regular walking stride needs to be bigger steps" / "but slower": WALK_STRIDE 1.35 on the
+  boy's strides, walk_speed 1.2. tests/gait_check.gd measures foot slip per gait (all under 2 cm when checked);
+  tests/pose_shots.gd films bound, scurry_film, walk_film, sneak_film (it re-presses its input every step and lets go
+  of stray input: a gamepad in use elsewhere reaches its window).
 - Controls: Scurry on the left trigger (and Shift; an on-screen paw button): all fours, climbs anything climbable
   (poles: meshes named climb_; the grove's trees). Duck is on all fours too ("why is duck not on all 4s?": I had read the Scurry message as taking all fours off duck). "y remains duck" (duck on X and Y: X was the user's earlier
   call; ask if X should change). Superhero landing "only from tall height" (landing_speeds 15/17/19/21).

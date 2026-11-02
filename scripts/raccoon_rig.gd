@@ -23,8 +23,24 @@ const SPIN_BACK := 0.7
 ## Where each foot is in the cycle when it comes down: [hind left, hind right, fore left, fore right].
 const WALK_FEET := [0.0, 0.5, 0.25, 0.75]
 ## Sprinting he bounds: both hind feet push off nearly together, he flies stretched out, lands on both
-## fore paws, and gathers his hind feet up under him (the user: "more of a bounding leap").
+## fore paws, and gathers his hind feet up under him (the user: "more of a bounding leap"; and again, 2026-11-02,
+## "I liked when the all 4s run was more of basically a jump").
 const BOUND_FEET := [0.0, 0.04, 0.5, 0.54]
+const BOUND_STRIDE := 1.9
+## Scurrying fast he gallops as a raccoon does (Muybridge, Animal Locomotion plate 744, "Raccoon walking, changing
+## to a gallop"; the user, 2026-11-02, "the scurry can use this new animation"): a hind foot, then the other a beat
+## later (not a mirrored pair: "his back legs seem so mirrored and stiff"), a short flight stretched out, a fore
+## paw, then the other.
+const SCURRY_FEET := [0.0, 0.12, 0.46, 0.6]
+## How long a stride is at that gallop (m), and how high he is thrown in it (of his hip height).
+const SCURRY_STRIDE := 1.7
+const SCURRY_FLIGHT := 0.05
+## Upright, his strides are this much longer than the boy's would be for his legs (the user, 2026-11-02: "his
+## regular walking stride needs to be bigger steps" / "but slower"; raccoon.tscn walks him slower too).
+const WALK_STRIDE := 1.35
+## Sneaking: a stride (two steps) and how much of it each foot is down (both down between steps, a pause).
+const SNEAK_STRIDE := 0.6
+const SNEAK_DUTY := 0.74
 
 ## The tail's shapes, as each segment's angle below straight back (radians), in the hips' own space.
 const TAIL_STAND := [0.95, 0.55, 0.15, -0.25, -0.6, -0.85]
@@ -113,6 +129,10 @@ var _paw_was: Array[float] = [0.0, 0.0, 0.0, 0.0]
 var _quad := 0.0
 var _gallop := 0.0
 var _qphase := 0.0
+var _sneak := 0.0
+var _sphase := 0.0
+## 1 going on all fours in the scurry's gallop, 0 in the sprint's bound.
+var _scurry_gait := 0.0
 var _glide := 0.0
 var _twirl := 0.0
 var _spin_w := 0.0
@@ -124,6 +144,12 @@ var _spin_trail := 0.0
 var _leaping := false
 var _leap_w := 0.0
 var _leap_rise := 0.0
+
+
+func _measure() -> void:
+	super()
+	# (the boy's strides are scaled by this; longer for him: WALK_STRIDE)
+	_leg_scale *= WALK_STRIDE
 
 
 func _init() -> void:
@@ -184,7 +210,8 @@ func _pose_extra(delta: float) -> void:
 	var wanted := 1.0 if free and (((low or fast or scurrying or always_on_fours) and _air < 0.5) or _leaping or climbing) and busy < 0.2 else 0.0
 	_quad = _approach(_quad, wanted, 7.0, delta)
 	_gallop = _approach(_gallop, smoothstep(_player.walk_speed, _player.run_speed * 0.8, speed) if fast else 0.0, 6.0, delta)
-	var stride := lerpf(0.44, 1.9, _gallop)
+	_scurry_gait = _approach(_scurry_gait, 1.0 if scurrying else 0.0, 6.0, delta)
+	var stride := lerpf(0.44, lerpf(BOUND_STRIDE, SCURRY_STRIDE, _scurry_gait), _gallop)
 	_qphase = fposmod(_qphase + speed / stride * delta, 1.0)
 
 	var spin := 1.0
@@ -198,6 +225,11 @@ func _pose_extra(delta: float) -> void:
 
 	if _quad > 0.002:
 		_pose_quad(smoothstep(0.0, 1.0, _quad), speed, stride)
+	var sneaking: bool = &"is_sneaking" in _player and _player.is_sneaking and free and grounded and wanted < 0.5 and not climbing
+	_sneak = _approach(_sneak, 1.0 if sneaking else 0.0, 6.0, delta)
+	_sphase = fposmod(_sphase + speed / SNEAK_STRIDE * delta, 1.0)
+	if _sneak > 0.002:
+		_pose_sneak(smoothstep(0.0, 1.0, _sneak) * (1.0 - _quad), speed)
 	if _climb_w > 0.002:
 		_pose_climb(_climb_w)
 	if _hang > 0.3:
@@ -584,19 +616,34 @@ func _pose_quad(w: float, speed: float, stride: float) -> void:
 	var moving := clampf(speed / 0.5, 0.0, 1.0)
 	var cycle := TAU * _qphase
 	var bounding := moving * _gallop
-	# (bounding, he is thrown up and forward off his hind feet, and hops up a little again off his fore paws)
-	# (a raccoon's run, 2026-11-01, "higher quality a little bouncier and more raccoonie": a bouncy lope, the rump
-	# thrown high, a humped back, a rolling waddle, hind feet reaching up by the fore paws)
+	# (how much of it is the scurry's gallop, and how much the sprint's bound)
+	var s := _scurry_gait
+	var galloping := bounding * s
+	var leaping := bounding * (1.0 - s)
+	# The bound: he is thrown up and forward off his hind feet, and hops up a little again off his fore paws (a
+	# raccoon's run, 2026-11-01, "higher quality a little bouncier and more raccoonie": a bouncy lope, the rump thrown
+	# high, a humped back, a rolling waddle, hind feet reaching up by the fore paws).
 	var flight := _bump(_qphase, 0.2, 0.62) * 0.21 + _bump(fposmod(_qphase - 0.7, 1.0), 0.0, 0.34) * 0.08
-	var hips_y := _hip_height * lerpf(0.72, 0.77, _gallop) + sin(2.0 * cycle) * 0.01 * moving * (1.0 - _gallop) + flight * bounding
+	# The gallop, after the plate: low and long, not thrown high. Gathered (his hind feet swung far forward under his
+	# belly to land just behind his fore paws) his back is arched, the rump its highest point; reaching (after the
+	# hind feet push off, before the fore paws land) he is stretched out long and nearly flat. `gather` is 1 gathered,
+	# 0 stretched out.
+	var gather := 0.5 + 0.5 * cos(TAU * (_qphase - 0.93))
+	var low_flight := (_bump(_qphase, 0.3, 0.5) + 0.6 * _bump(_qphase, 0.86, 1.0)) * SCURRY_FLIGHT * _hip_height
+	var hips_y := _hip_height * lerpf(0.72, lerpf(0.77, 0.69, s), _gallop) + sin(2.0 * cycle) * 0.01 * moving * (1.0 - _gallop) \
+			+ flight * leaping + low_flight * galloping
 	# (rump up, shoulders down, as a raccoon goes: his arms are short)
 	# (bounding, his back stretches out flat in the air and rounds as his hind feet come up under him)
-	var lean := lerpf(1.82, 1.8, _gallop) + cos(TAU * (_qphase - 0.9)) * 0.3 * bounding
+	var lean := lerpf(1.82, lerpf(1.8, 1.78, s), _gallop) + cos(TAU * (_qphase - 0.9)) * 0.3 * leaping
+	# (galloping, gathered, his hips tip back under him as his back arches up behind the shoulders; stretched out
+	# they tip forward)
+	var arch := (gather - 0.4) * galloping
 	# Leaping: stretched out flat going up, rump dropping and front reaching down coming down
 	var up := clampf(_leap_rise, 0.0, 1.0)
 	var down := clampf(-_leap_rise, 0.0, 1.0)
 	hips_y = lerpf(hips_y, _hip_height * (0.8 - 0.06 * down), _leap_w)
 	lean = lerpf(lean, 1.5 - 0.1 * up + 0.25 * down, _leap_w)
+	arch *= 1.0 - _leap_w
 
 	# Where the boy's pose had his feet, in the rig's space, before the hips move.
 	var base_feet: Array[Transform3D] = []
@@ -606,43 +653,49 @@ func _pose_quad(w: float, speed: float, stride: float) -> void:
 	_hips.position = _hips.position.lerp(Vector3(0.0, hips_y, -0.03), w)
 	# (the waddle: his rump rolls and swings from side to side with each bound, more at a walk's amble)
 	var waddle := sin(cycle) * moving * lerpf(0.16, 0.1, _gallop)
-	_hips.basis = _slerp(_hips.basis, Basis(Vector3.UP, waddle * 0.6) * Basis(Vector3.BACK, waddle) * Basis(Vector3.RIGHT, lean * 0.48), w)
-	_spine.basis = _slerp(_spine.basis, Basis(Vector3.RIGHT, lean * 0.33), w)
+	_hips.basis = _slerp(_hips.basis, Basis(Vector3.UP, waddle * 0.6) * Basis(Vector3.BACK, waddle) * Basis(Vector3.RIGHT, lean * 0.48 - arch * 0.42), w)
+	_spine.basis = _slerp(_spine.basis, Basis(Vector3.RIGHT, lean * 0.33 + arch * 0.3), w)
 	if _chest:
-		_chest.basis = _slerp(_chest.basis, Basis(Vector3.RIGHT, lean * 0.19), w)
+		_chest.basis = _slerp(_chest.basis, Basis(Vector3.RIGHT, lean * 0.19 + arch * 0.16), w)
 	if _neck:
-		_neck.basis = _slerp(_neck.basis, Basis(Vector3.RIGHT, -lean * 0.45), w)
-	# (head low and nodding against the bound, steadied against the waddle)
-	_head.basis = _slerp(_head.basis, Basis(Vector3.BACK, -waddle * 0.8) * Basis(Vector3.RIGHT, -lean * 0.55 + 0.1 + sin(cycle * 2.0) * 0.05 * moving + sin(cycle + 2.2) * 0.12 * bounding), w)
+		_neck.basis = _slerp(_neck.basis, Basis(Vector3.RIGHT, -lean * 0.45 - arch * 0.02), w)
+	# (head low and nodding against the bound, steadied against the waddle; galloping, low and level, reaching
+	# forward, held steady against the arching back)
+	_head.basis = _slerp(_head.basis, Basis(Vector3.BACK, -waddle * 0.8) * Basis(Vector3.RIGHT, -lean * 0.55 + 0.1 + sin(cycle * 2.0) * 0.05 * moving + sin(cycle + 2.2) * 0.12 * leaping - arch * 0.02 + 0.05 * galloping), w)
 
 	var duty := lerpf(0.66, 0.3, _gallop)
 	var half := duty * stride * 0.5 * moving
-	var lift := lerpf(0.05, 0.16, _gallop) * moving
+	var lift := lerpf(0.05, lerpf(0.16, 0.1, s), _gallop) * moving
 	var hips_inverse := _hips.transform.affine_inverse()
-	# Hind feet, under the hips
+	# Hind feet, under the hips. Galloping, each its own way: the second down (the leading leg) reaches further and is
+	# lifted a little lower, and each hock flexes through the stride (the heel comes up as the foot pushes off, the
+	# foot hangs folded as it swings forward, and flattens out reaching for the ground).
 	for i in 2:
 		var side := 1.0 if i == 0 else -1.0
-		var at := fposmod(_qphase - lerpf(WALK_FEET[i], BOUND_FEET[i], _gallop), 1.0)
-		var step := _cycle(at, duty, half, lift)
+		var leading := float(i) * galloping
+		var at := fposmod(_qphase - lerpf(WALK_FEET[i], lerpf(BOUND_FEET[i], SCURRY_FEET[i], s), _gallop), 1.0)
+		var step := _cycle(at, duty, half, lift * (1.0 - 0.15 * leading))
 		# (flung out behind him as he leaves the ground)
-		step.x -= _bump(at, duty - 0.02, 0.5) * 0.16 * bounding
-		# (and swung far forward as he gathers, to land up by his fore paws: the paired tracks a raccoon leaves)
-		step.x += _bump(at, 0.55, 1.0) * 0.2 * bounding
-		var point := Vector3(side * 0.11, ANKLE + step.y, -0.07 + step.x)
+		step.x -= _bump(at, duty - 0.02, lerpf(0.5, 0.48, s)) * lerpf(0.16, 0.08, s) * bounding
+		# (and swung far forward as he gathers, to land up by his fore paws)
+		step.x += _bump(at, lerpf(0.55, 0.5, s), 1.0) * (0.2 + 0.05 * leading) * bounding
+		var point := Vector3(side * 0.11, ANKLE + step.y, -0.07 + 0.05 * galloping + step.x)
 		_footfall(i, at, point, w, moving)
 		# (in a leap: flung out behind going up, drawn up under him coming down)
 		point = point.lerp(Vector3(side * 0.1, ANKLE + 0.14 + 0.08 * up - 0.04 * down, -0.36 * up + 0.04 * down - 0.08), _leap_w)
 		var pitch := step.y / maxf(lift, 0.001) * 0.6 if at >= duty else 0.0
+		# (the hock: heel up pushing off, folded swinging forward, flat again to land)
+		pitch = lerpf(pitch, 0.55 * smoothstep(duty * 0.55, duty, at) * float(at < duty) + 0.85 * _bump(at, duty, 1.0) * (1.0 - smoothstep(0.82, 1.0, at)), galloping)
 		var wanted := Transform3D(Basis(Vector3.RIGHT, pitch), point)
 		var blended := base_feet[i].interpolate_with(wanted, w)
 		_solve_leg(i, side, hips_inverse * blended.origin, _hips.basis.inverse() * blended.basis.orthonormalized())
 	# Fore paws, set down flat under the shoulders
 	for i in 2:
 		var side := 1.0 if i == 0 else -1.0
-		var at := fposmod(_qphase - lerpf(WALK_FEET[i + 2], BOUND_FEET[i + 2], _gallop), 1.0)
-		var step := _cycle(at, duty, half, lift * 0.9)
-		# (reaching out ahead for the ground, and swept back as he gathers)
-		step.x += (_bump(at, 0.68, 1.0) * 0.14 - _bump(at, duty - 0.02, 0.55) * 0.08) * bounding
+		var at := fposmod(_qphase - lerpf(WALK_FEET[i + 2], lerpf(BOUND_FEET[i + 2], SCURRY_FEET[i + 2], s), _gallop), 1.0)
+		var step := _cycle(at, duty, half, lift * lerpf(0.9, 0.75, float(i) * galloping))
+		# (reaching out ahead for the ground, further galloping as he stretches out, and swept back as he gathers)
+		step.x += (_bump(at, lerpf(0.68, 0.66, s), 1.0) * (lerpf(0.14, 0.15, s) + 0.03 * float(i) * s) - _bump(at, duty - 0.02, 0.55) * 0.08) * bounding
 		var shoulder := to_local(_shoulders[i].global_position)
 		var fingers := (global_basis * Vector3(-side * 0.12, 0.0, 1.0)).normalized()
 		var point := Vector3(side * 0.095, 0.03 + step.y, shoulder.z + 0.05 + step.x)
@@ -652,6 +705,58 @@ func _pose_quad(w: float, speed: float, stride: float) -> void:
 		var pole := (global_basis * Vector3(side * 0.3, 0.0, -1.0)).normalized()
 		_solve_arm(i, side, to_global(point) - fingers * 0.03, _forearm, w, pole)
 		_lay_hand(i, side, Vector3.UP, fingers, w * (1.0 - 0.6 * clampf(step.y / maxf(lift, 0.001), 0.0, 1.0)))
+
+
+## Creeping, on a light push of the stick (Player.is_sneaking; the user, 2026-11-02: "instead of taking tiny steps
+## when moving slow he should sneak" / "and slowly step"): upright and on tiptoe, cartoon-fashion (Claude's pick: his
+## low creep on all fours is the duck), hunched forward with his paws held up limp before his chest, each foot lifted
+## high, pointed, and set down toes first, both feet down a long while between steps, his head turning to look about.
+func _pose_sneak(w: float, speed: float) -> void:
+	var moving := clampf(speed / 0.3, 0.0, 1.0)
+	var cycle := TAU * _sphase
+	var base_feet: Array[Transform3D] = []
+	for i in 2:
+		base_feet.append(_hips.transform * _feet[i].transform)
+	# (rising onto the foot just set down, sinking into his knees as the other comes through: twice a stride)
+	var rise := (0.5 - 0.5 * cos(2.0 * cycle)) * moving
+	var hunch := 0.62
+	_hips.position = _hips.position.lerp(Vector3(0.0, _hip_height * (0.88 + 0.05 * rise), -0.03), w)
+	_hips.basis = _slerp(_hips.basis, Basis(Vector3.UP, sin(cycle) * 0.1 * moving) * Basis(Vector3.RIGHT, hunch * 0.45), w)
+	_spine.basis = _slerp(_spine.basis, Basis(Vector3.RIGHT, hunch * 0.55), w)
+	if _chest:
+		_chest.basis = _slerp(_chest.basis, Basis(Vector3.UP, -sin(cycle) * 0.08 * moving) * Basis(Vector3.RIGHT, hunch * 0.35), w)
+	if _neck:
+		_neck.basis = _slerp(_neck.basis, Basis(Vector3.RIGHT, -hunch * 0.75), w)
+	# (glancing slowly one way and the other, over what the head would look at anyway)
+	var glance := sin(_time * 0.8) * 0.4 + sin(_time * 2.1) * 0.06
+	_head.basis = Basis(Vector3.UP, glance * w) * Basis(Vector3.RIGHT, -0.12 * w) * _head.basis
+
+	var half := SNEAK_DUTY * SNEAK_STRIDE * 0.5 * moving
+	var hips_inverse := _hips.transform.affine_inverse()
+	for i in 2:
+		var side := 1.0 if i == 0 else -1.0
+		var at := fposmod(_sphase - 0.5 * i, 1.0)
+		var step := _cycle(at, SNEAK_DUTY, half, 0.12 * moving)
+		var swing := (at - SNEAK_DUTY) / (1.0 - SNEAK_DUTY) if at >= SNEAK_DUTY else 0.0
+		# (toes pointed down through the swing and set down first, rolling flat; the heel coming up to push off)
+		var pitch := 0.0
+		if at >= SNEAK_DUTY:
+			pitch = 0.8 * sin(PI * swing) + 0.35 * smoothstep(0.55, 1.0, swing)
+		else:
+			pitch = 0.35 * (1.0 - smoothstep(0.0, 0.14, at)) + 0.3 * smoothstep(SNEAK_DUTY - 0.16, SNEAK_DUTY, at)
+		pitch *= moving
+		var point := Vector3(base_feet[i].origin.x, ANKLE + step.y + 0.06 * sin(pitch), 0.02 + step.x)
+		var wanted := Transform3D(Basis(Vector3.RIGHT, pitch), point)
+		var blended := base_feet[i].interpolate_with(wanted, w)
+		_solve_leg(i, side, hips_inverse * blended.origin, _hips.basis.inverse() * blended.basis.orthonormalized())
+	# (paws up before his chest, hanging limp from the wrists)
+	var forward := global_basis.z.normalized()
+	for i in 2:
+		var side := 1.0 if i == 0 else -1.0
+		var shoulder := to_local(_shoulders[i].global_position)
+		var paw := Vector3(side * 0.07, shoulder.y - 0.05 + 0.012 * rise, shoulder.z + 0.19)
+		_solve_arm(i, side, to_global(paw), _forearm, w)
+		_lay_hand(i, side, forward, (Vector3.DOWN + forward * 0.35).normalized(), w * 0.85)
 
 
 ## 0 outside a..b, rising to 1 halfway between and back down.
