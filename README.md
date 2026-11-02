@@ -63,3 +63,9 @@ G="/c/Program Files (x86)/Steam/steamapps/common/Godot Engine/godot.windows.opt.
 `pose_shots` moves: stand, walk, run, sprint, duckwalk, duck, jump, glide, spin, air_spin, and filmstrips bound,
 leap, spin_film, heli, long_jump. A dev panel (in the editor, `--dev`, or `?dev` on the web) toggles the N64 filter
 and jumps to each Bottlecap.
+
+## Credits
+
+- Font: Pixelify Sans (Stefie Justprince, SIL Open Font License 1.1; `fonts/OFL.txt`), from Google Fonts. The game's
+  default font (project setting `gui/theme/custom_font`), imported without antialiasing so it stays crisp. The
+  user, 2026-11-02: "find a cuter font", "a pixelated one maybe".
