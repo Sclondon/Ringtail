@@ -157,9 +157,10 @@ def hands(b):
         for k in range(4):
             across = (k - 1.5) / 1.5
             root = wrist + Vector((side * 0.050, -0.002, across * 0.026))
-            tip = root + Vector((side * (0.052 - abs(across) * 0.010), -0.010, across * 0.016))
+            # (long, as a raccoon's are: the user, 2026-11-01, "his fingers need to be longer")
+            tip = root + Vector((side * (0.085 - abs(across) * 0.016), -0.014, across * 0.026))
             b.strand([root, root.lerp(tip, 0.55) + Vector((0.0, 0.002, 0.0)), tip], [0.011, 0.010, 0.008])
-        b.strand([wrist + Vector((side * x, y, z)) for x, y, z in ((0.012, -0.004, 0.026), (0.030, -0.008, 0.046), (0.046, -0.010, 0.056))],
+        b.strand([wrist + Vector((side * x, y, z)) for x, y, z in ((0.012, -0.004, 0.026), (0.034, -0.009, 0.054), (0.058, -0.012, 0.072))],
                  [0.011, 0.010, 0.008])
 
 
