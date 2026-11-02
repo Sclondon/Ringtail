@@ -311,7 +311,8 @@ def tail(b):
 # which part of him it grows from, and how far out along it each point is, as (region, -flex - 0.001): the game
 # springs each region after its own movement and bends the spikes by it, flex squared (scripts/raccoon_rig.gd,
 # FUR_REGIONS; the user: "his hair fur spikes should react to physics"). Points of everything else keep their
-# Metres coordinates, which are never negative.
+# Metres coordinates, which are never negative. (glTF flips V on export: in Godot a tagged point reads 1.001 + flex,
+# the rest at most 1.)
 REGION = {"hips": 0, "chest": 1, "upper_arm_l": 2, "forearm_l": 3, "upper_arm_r": 4, "forearm_r": 5, "thigh_l": 6,
           "shin_l": 7, "thigh_r": 8, "shin_r": 9, "tail_0": 10, "head": 16}
 

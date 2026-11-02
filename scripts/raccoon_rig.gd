@@ -39,16 +39,17 @@ const ROTOR_FROM := 4
 ## How much longer his tail is drawn out as he twirls it.
 const ROTOR_STRETCH := 1.9
 ## The fur's springs (see _spring_fur), and which region his head is.
-const FUR_STIFFNESS := 260.0
-const FUR_DAMPING := 11.0
+const FUR_STIFFNESS := 200.0
+const FUR_DAMPING := 8.0
 const FUR_HEAD := 16
-## The fur shader's vertex stage, added to Toon's: a point tagged as a spike (UV2 = region, -flex) is moved by its
-## region's lag, flex squared. (Every other point's UV2 is never negative.)
+## The fur shader's vertex stage, added to Toon's: a point tagged as a spike is moved by its region's lag, flex
+## squared. Tagged in Blender as UV2 (region, -flex - 0.001), it arrives flipped as glTF has it, (region, 1.001 + flex);
+## every other point's arrives at most 1.
 const FUR_VERTEX := """
 uniform vec3 lags[17];
 void vertex() {
-	if (UV2.y < 0.0) {
-		float flex = -UV2.y - 0.001;
+	if (UV2.y > 1.0005) {
+		float flex = UV2.y - 1.001;
 		int region = clamp(int(UV2.x + 0.5), 0, 16);
 		VERTEX += lags[region] * flex * flex;
 	}
@@ -200,11 +201,11 @@ func _spring_fur(delta: float) -> void:
 		_fur_seen[r] = here
 		_fur_speed_was[r] = speed
 		# (a spring on each: thrown back against how it is hurried, and the whiskers flicking as he sniffs)
-		var push := -accel.limit_length(60.0) * 0.9 + Vector3.DOWN * 1.2
+		var push := -accel.limit_length(60.0) * 1.3 + Vector3.DOWN * 1.2
 		if r == FUR_HEAD:
 			push += Vector3(sin(_time * 41.0), sin(_time * 37.0), 0.0) * 18.0 * _sniff
 		_fur_lag_speed[r] += (push - _fur_lag[r] * FUR_STIFFNESS - _fur_lag_speed[r] * FUR_DAMPING) * delta
-		_fur_lag[r] = (_fur_lag[r] + _fur_lag_speed[r] * delta).limit_length(0.09)
+		_fur_lag[r] = (_fur_lag[r] + _fur_lag_speed[r] * delta).limit_length(0.12)
 		_fur_uniform[r] = mesh_basis * _fur_lag[r]
 	for material in _fur_materials:
 		material.set_shader_parameter(&"lags", _fur_uniform)
