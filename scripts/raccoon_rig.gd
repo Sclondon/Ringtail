@@ -156,6 +156,8 @@ var _qphase := 0.0
 var _sneak := 0.0
 var _sphase := 0.0
 var _hunch := 0.0
+## How far over onto his back he is, lying down to sleep (_pose_sleep).
+var _sleep_w := 0.0
 ## What he is doing standing about (rub, tall, lean, crack, stretch), how long, and how long he has: _pose_hunch.
 var _idle := &"rub"
 var _idle_t := 0.0
@@ -272,6 +274,10 @@ func _pose_extra(delta: float) -> void:
 	_still = _approach(_still, 1.0 if speed < 0.2 else 0.0, 4.0, delta)
 	if _hunch > 0.002:
 		_pose_hunch(smoothstep(0.0, 1.0, _hunch) * (1.0 - _quad) * (1.0 - _sneak), _still, delta)
+	# Asleep: on his back, lounging (the user, 2026-11-02: "he needs a sleeping animation where he lounges on his back")
+	_sleep_w = smoothstep(0.0, 1.0, _lie_at)
+	if _sleep_w > 0.002:
+		_pose_sleep(_sleep_w)
 	# (his fingers together, not splayed, in most of what he does: the user, 2026-11-02, "the fingers shouldnt be
 	# splayed in the idle or most poses"; spread only where a paw is set on something: on all fours, climbing, hanging)
 	var spread := maxf(_quad, maxf(_climb_w, minf(_hang, 1.0)))
@@ -936,6 +942,35 @@ func _pose_hunch(w: float, still: float, delta: float) -> void:
 		_lay_hand(i, side, forward, (forward * 0.35 + Vector3.DOWN - global_basis.x.normalized() * side * 0.3).normalized(), rub * 0.8)
 
 
+## Asleep on his back, lounging: belly up, his paws behind his head, one knee up and the other leg out, breathing
+## slow. Over the boy's lying down (curled on his side), by `w`.
+func _pose_sleep(w: float) -> void:
+	var breathe := sin(_time * 1.3) * 0.02
+	_hips.position = _hips.position.lerp(Vector3(0.0, _hip_height * 0.3, 0.05), w)
+	# (over onto his back: his spine along the ground behind him, his belly to the sky)
+	_hips.basis = _slerp(_hips.basis, Basis(Vector3.RIGHT, -1.42) * Basis(Vector3.BACK, 0.08), w)
+	_spine.basis = _slerp(_spine.basis, Basis(Vector3.RIGHT, 0.06 + breathe), w)
+	if _chest:
+		_chest.basis = _slerp(_chest.basis, Basis(Vector3.RIGHT, 0.04 + breathe), w)
+	if _neck:
+		_neck.basis = _slerp(_neck.basis, Basis(Vector3.RIGHT, 0.25), w)
+	_head.basis = _slerp(_head.basis, Basis(Vector3.UP, 0.25) * Basis(Vector3.RIGHT, 0.15), w)
+	# (his paws behind his head, elbows out)
+	var head := to_local(_head.global_position)
+	for i in 2:
+		var side := 1.0 if i == 0 else -1.0
+		var pole := (global_basis * Vector3(side, 0.2, 0.0)).normalized()
+		_solve_arm(i, side, to_global(head + Vector3(side * 0.07, -0.06, -0.04)), _forearm, w, pole)
+		_close_paw(i, side, 0.6, w)
+	# (one knee up, its foot flat by the other's knee; the other leg out along the ground)
+	var hips_inverse := _hips.transform.affine_inverse()
+	for i in 2:
+		var side := 1.0 if i == 0 else -1.0
+		var foot := Vector3(side * 0.09, ANKLE, 0.22) if i == 0 else Vector3(side * 0.13, ANKLE, 0.42)
+		var turn := Basis.IDENTITY if i == 0 else Basis(Vector3.RIGHT, -1.1)
+		_set_leg(i, side, hips_inverse * foot, _hips.basis.inverse() * turn, w)
+
+
 ## Paw `i` with its fingers drawn together and curled `curl` (0 flat .. 1.4 a fist; below 0: as curled as it is), by
 ## `w`, over what the rig set.
 func _close_paw(i: int, side: float, curl: float, w: float) -> void:
@@ -1050,6 +1085,12 @@ func _tail_shape(speed: float, spin: float) -> Array[Vector3]:
 			# "the tail shouldnt be perfectly straight for the attack")
 			var angle := PI - (1.7 + 0.12 * k) * wound + 0.16 * k * (1.0 - wound)
 			dirs[k] = dirs[k].slerp(Vector3(sin(angle), 0.12 - 0.035 * k + 0.05 * wound, cos(angle)).normalized(), _spin_w)
+	# (asleep on his back: the tail out along the ground beside him, curling round towards his feet)
+	if _sleep_w > 0.001:
+		for k in TAIL_BONES:
+			var curl := float(k) / TAIL_BONES
+			var lying_dir := Vector3(0.85 - 0.5 * curl, -0.3 - 0.6 * curl, 0.12).normalized()
+			dirs[k] = dirs[k].slerp(lying_dir, _sleep_w)
 	return dirs
 
 
