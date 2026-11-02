@@ -1037,14 +1037,17 @@ def beyond():
     rng = random.Random(3)
     streak = [rng.uniform(0.38, 0.6) for _ in range(segs)]
     ring_pts = []
+    # (cut off at `top_cut` of its height, flat: above that the cone ran up nearly straight, a chimney; the user,
+    # 2026-11-02, "the volcano goes too high lol cut it about there")
+    top_cut = 0.78
     for j in range(rows + 1):
-        s = j / rows
+        s = top_cut * j / rows
         radius = top_r + (foot_r - top_r) * (1.0 - s) ** 2.4
         ring_pts.append([(vx + math.cos(math.tau * k / segs) * radius, foot_y + height * s, vz + math.sin(math.tau * k / segs) * radius) for k in range(segs)])
     for j in range(rows):
-        s = (j + 0.5) / rows
+        s = top_cut * (j + 0.5) / rows
         for k in range(segs):
-            snow = s > 0.66 or s > streak[k] and k % 3 != 1
+            snow = s > 0.6 or s > streak[k] and k % 3 != 1
             q = [ring_pts[j][k], ring_pts[j][(k + 1) % segs], ring_pts[j + 1][(k + 1) % segs], ring_pts[j + 1][k]]
             light = 0.86 + 0.22 * math.cos(math.tau * (k + 0.5) / segs - 2.4)
             volcano.face(q, "sky_snow" if snow else "sky_rock", light)

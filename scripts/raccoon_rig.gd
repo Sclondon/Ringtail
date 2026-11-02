@@ -539,7 +539,8 @@ func _swoosh(spin: float) -> void:
 			# column over the tail, the user: "the tail spin is broken now")
 			if tip.distance_to(from) > 0.04:
 				var out := Vector3(tip.x - _points[0].x, 0.0, tip.z - _points[0].z).normalized()
-				dust.puff(tip - Vector3.UP * 0.03, out * 0.4, 0.05)
+				# (big enough to see: the user, 2026-11-02, "the dust the tail swipe and helicopter is really tiny")
+				dust.puff(tip - Vector3.UP * 0.07, out * 0.5, 0.16)
 			_trail_tip = tip
 		else:
 			_trail_tip = Vector3.INF
