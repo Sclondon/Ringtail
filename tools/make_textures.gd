@@ -25,6 +25,10 @@ func _initialize() -> void:
 	_save("asphalt", _concrete(Color(0.32, 0.32, 0.35), 0.06))
 	_save("metal", _metal())
 	_save("stone", _stone())
+	_save("blockwall", _blockwall())
+	_save("tiles", _tiles())
+	_save("plaster", _concrete(Color(0.93, 0.9, 0.82), 0.03))
+	_save("thatch", _thatch())
 	print("TEXTURES DONE")
 	quit()
 
@@ -211,4 +215,65 @@ func _stone() -> Image:
 				if d < r:
 					var p := Vector2i((c.x + dx + SIZE) % SIZE, (c.y + dy + SIZE) % SIZE)
 					image.set_pixel(p.x, p.y, _shade(base, 1.15 - 0.35 * (float(dy) / r * 0.5 + 0.5)))
+	return image
+
+
+## The concrete-block retaining walls of the hillside streets (Whisper of the Heart): pale blocks in staggered
+## courses with slanted joints, each with a dark slot pressed in its face.
+func _blockwall() -> Image:
+	var base := Color(0.84, 0.84, 0.8)
+	var image := _blank(base)
+	var course := 16
+	for y in SIZE:
+		var row := y / course
+		var within := y % course
+		for x in SIZE:
+			# (the joints between blocks lean one way on one course, the other way on the next)
+			var lean := (within - course / 2) * (1 if row % 2 == 0 else -1) / 2
+			var u := (x + lean + (16 if row % 2 == 1 else 0) + SIZE) % 32
+			var shade := 1.0 + _n(x * 2.0, y * 2.0) * 0.08
+			if within == 0:
+				shade = 1.12
+			elif within >= course - 1 or u == 0:
+				shade = 0.62
+			elif u == 1:
+				shade = 1.1
+			# the slot in the block's face
+			var slot_y := within - course / 2
+			if absi(slot_y) <= 1 and u >= 10 and u <= 22 and absi(u - 16) <= 6 - absi(slot_y):
+				shade = 0.55 if slot_y <= 0 else 0.75
+			image.set_pixel(x, y, _shade(base, shade))
+	return image
+
+
+## Japanese roof tiles: rounded rows running down the roof, the courses overlapping across it.
+func _tiles() -> Image:
+	var base := Color(0.62, 0.66, 0.72)
+	var image := _blank(base)
+	var course := 16
+	for y in SIZE:
+		var within := y % course
+		for x in SIZE:
+			var round_x := sin(x * TAU / 16.0)
+			var shade := 1.0 + round_x * 0.16 - 0.18 * float(within) / course + _n(x * 2.0, y * 2.0) * 0.05
+			if within >= course - 2:
+				shade = 0.55 + 0.1 * round_x
+			image.set_pixel(x, y, _shade(base, shade))
+	return image
+
+
+## Thatch: straw laid down the roof in thick rows, lighter at the cut ends.
+func _thatch() -> Image:
+	var base := Color(0.7, 0.58, 0.36)
+	var image := _blank(base)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 31
+	var streak := []
+	for x in SIZE:
+		streak.append(rng.randf_range(0.8, 1.15))
+	for y in SIZE:
+		var within := y % 21
+		for x in SIZE:
+			var shade: float = streak[x] * (1.08 - 0.4 * float(within) / 21.0) + _n(x * 3.0, y) * 0.06
+			image.set_pixel(x, y, _shade(base, shade))
 	return image

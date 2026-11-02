@@ -54,7 +54,7 @@ func _physics_process(delta: float) -> void:
 				_goal = home + Vector3(randf_range(-3.0, 3.0), 0.0, randf_range(-3.0, 3.0))
 				_state_t = 0.0
 			_drive_to(_goal, 0.9)
-			if near < notice and _rest <= 0.0 and absf(to_him.length()) < notice and absf(player.global_position.y - global_position.y) < 1.5:
+			if near < notice and _rest <= 0.0 and not Hazards.safe(player.global_position) and absf(to_him.length()) < notice and absf(player.global_position.y - global_position.y) < 1.5:
 				_go(State.CHASE)
 		State.CHASE:
 			drive = to_him.normalized() * chase_speed
@@ -62,7 +62,7 @@ func _physics_process(delta: float) -> void:
 				drive = Vector3.ZERO
 				Hazards.hurt(self, global_position)
 				_go(State.BITE)
-			elif near > give_up or _state_t > chase_time or absf(player.global_position.y - global_position.y) > 1.8:
+			elif near > give_up or _state_t > chase_time or Hazards.safe(player.global_position) or absf(player.global_position.y - global_position.y) > 1.8:
 				_rest = 4.0
 				_go(State.HOME)
 		State.BITE:

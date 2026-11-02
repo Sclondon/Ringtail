@@ -12,6 +12,8 @@ class_name Hazards
 ##     crows_<n>           where a little band of crows hangs about
 ##     den_<n>             where a fox lives
 ## Anything that hurts him calls the game's `hurt(from)` (World.hurt).
+##     grove_heart         the middle of the grove: nothing hunts him within HAVEN_RADIUS of it (the user, 2026-11-02:
+##                         "you should spawn in the center of the grove and there shouldnt be enemies there")
 
 ## How many of each, per marker (Claude's picks).
 const CARS_PER_LOOP := 2
@@ -19,12 +21,17 @@ const PEOPLE_PER_WALK := 2
 const CROWS_PER_BAND := 4
 ## How far right of a road's centre line its cars keep.
 const LANE := 1.6
+## How far round the grove's heart he is safe: nothing chases, stalks or dives at him there (the hill and its slopes).
+const HAVEN_RADIUS := 21.0
+
+static var haven := Vector3(0.0, -1000.0, 0.0)
 ## Paint the cars come in.
 const PAINTS := [Color(0.85, 0.22, 0.18), Color(0.2, 0.45, 0.8), Color(0.95, 0.78, 0.2), Color(0.3, 0.65, 0.35),
 	Color(0.92, 0.92, 0.9), Color(0.55, 0.3, 0.6)]
 
 
 static func place(world: Node3D, markers: Dictionary, player: Player) -> void:
+	haven = (markers["grove_heart"] as Transform3D).origin if markers.has("grove_heart") else Vector3(0.0, -1000.0, 0.0)
 	for loop: PackedVector3Array in _lines(markers, "road"):
 		var lane := _lane(loop)
 		for k in CARS_PER_LOOP:
@@ -64,6 +71,11 @@ static func place(world: Node3D, markers: Dictionary, player: Player) -> void:
 			fox.player = player
 			fox.position = at
 			world.add_child(fox)
+
+
+## Whether `at` is in the grove, where nothing hunts him.
+static func safe(at: Vector3) -> bool:
+	return Vector2(at.x - haven.x, at.z - haven.z).length() < HAVEN_RADIUS
 
 
 ## The game's hurt (World.hurt), from `at`.

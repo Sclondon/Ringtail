@@ -119,6 +119,35 @@ Read README.md first. Started 2026-11-01.
   (Villager.die: a car, a fall over SquadRaccoon.DEADLY_FALL, off the world).
 - Claude's placeholders: every villager's name and line (hello-level chatter), their tints and sizes.
 
+## 2026-11-02: the town after Pom Poko and Whisper of the Heart
+
+- The user: "Why is there a wall around the town? the town should be inspired by pom poko and whisper of the heart,
+  please look up art of that to reference" (references: Studio Ghibli's official stills, ghibli.jp/gallery
+  mimi###.jpg and tanuki###.jpg; kept out of the repo). Then "you should spawn in the center of the grove and there
+  shouldnt be enemies there", "why is the sky gray", "the camera should be zoomed in more" (FollowCamera distance
+  5.5 -> 4.0).
+- tools/build_town.py: no wall. Lots on terraces above the road held up by concrete-block retaining walls (texture
+  blockwall), concrete steps with handrails up from the pavement; two-storey plaster houses under tiled hip roofs
+  (tiles) with a second row behind, two danchi blocks, a bath house whose chimney is `climb_chimney` (the "Up the
+  chimney" Bottlecap is on top: scurry up it), two shops with vending machines, the red antique shop with a gambrel
+  roof and balcony on a paved plaza; concrete poles with transformers and power lines; in the grove a shrine, a torii
+  where the path comes up, stone lanterns, a thatched hut, pampas grass. Past the back of the lots a rail, then the
+  land falls away to the rest of the town in the valley (houses, danchi rows, cedars as cones) and low hills: all
+  `nocol_`. **`hidden_bound`** (World hides `hidden_` meshes, keeps their collision) is the unseen wall at the brink.
+  If it ever shows, it reads as a huge wall round the map (it did once, built before World hid it).
+- "...and remember realistic big houses and apartment buildings" (the user): houses about 11 x 9 m, eaves at 6 m,
+  framed windows, door canopies, balconies with laundry poles, block garden walls with gate pillars (1.1 m: a jump
+  gets him on top); danchi of five 2.8 m storeys, a balcony and divider to every flat, laundry rails, two stairwells
+  behind rising to rooftop houses, a tank on legs. The raccoon is about 0.6 m tall.
+- Spawn and `check_top` are in the grove beside `grove_heart`; `haunt_<n>` mark spots for wandering raccoons.
+  Hazards.safe(): nothing chases, stalks or dives within Hazards.HAVEN_RADIUS (21 m) of grove_heart; no people walk
+  up the hill now; the hawk circles over the north-west houses, the fox's den is in a back garden.
+- Claude's picks: which building stands on which lot, lot heights, summer daylight (blue sky, pale warm horizon,
+  fog matched to it), every colour. Unverified: the five Bottlecap routes re-walked in this layout (the billboard
+  glide from the great tree, the race).
+- Check it with `tests/town_shots.gd -- --out=<dir>` (start, shrine, street, steps, plaza, bath house, over the rail,
+  out to the edge from the grove and the road).
+
 ## 2026-11-02: the crow and the owl
 
 - The user: "we need to work on a nice owl and crow model as well", then "the bird wings need joints not just simple

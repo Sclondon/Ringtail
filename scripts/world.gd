@@ -31,8 +31,13 @@ const TEXTURES := {
 	"siding3": ["siding", 1.6, Color(1.0, 1.18, 0.74)],
 	"roof": ["shingles", 1.4, Color.WHITE], "roof2": ["shingles", 1.4, Color(0.62, 0.72, 1.1)],
 	"wood": ["planks", 1.2, Color.WHITE], "darkwood": ["planks", 1.2, Color(0.62, 0.6, 0.6)],
-	"fence": ["fence", 1.4, Color.WHITE], "pole": ["planks", 1.0, Color(0.6, 0.55, 0.5)],
+	"fence": ["fence", 1.4, Color.WHITE], "pole": ["concrete", 1.0, Color(1.25, 1.25, 1.22)],
 	"metal": ["metal", 1.0, Color.WHITE], "bin": ["metal", 1.0, Color(0.55, 0.85, 0.62)],
+	# (the town after Pom Poko and Whisper of the Heart: block retaining walls, tiled roofs, plaster, thatch)
+	"blockwall": ["blockwall", 2.0, Color.WHITE], "kawara": ["tiles", 1.6, Color.WHITE],
+	"kawara2": ["tiles", 1.6, Color(1.3, 0.72, 0.52)], "kawara3": ["tiles", 1.6, Color(0.66, 0.66, 0.72)],
+	"plaster": ["plaster", 2.0, Color.WHITE], "plaster2": ["plaster", 2.0, Color(0.92, 0.94, 0.96)],
+	"shopred": ["plaster", 2.0, Color(0.82, 0.44, 0.3)], "thatch": ["thatch", 1.6, Color.WHITE],
 }
 
 @export var model: PackedScene = preload("res://models/world1.glb")
@@ -74,7 +79,8 @@ func _ready() -> void:
 	camera = FollowCamera.new()
 	camera.target = player
 	camera.mode = FollowCamera.Mode.ORBIT
-	camera.distance = 5.5
+	# (closer in: the user, 2026-11-02, "the camera should be zoomed in more")
+	camera.distance = 4.0
 	add_child(camera)
 
 	_place_things()
@@ -128,28 +134,32 @@ func _controls() -> void:
 func _environment() -> void:
 	var sun := DirectionalLight3D.new()
 	_sun = sun
-	# Low evening sun from over the alley
-	sun.rotation_degrees = Vector3(-28.0, 60.0, 0.0)
-	sun.light_color = Color(1.0, 0.78, 0.58)
-	sun.light_energy = 1.1
+	# A summer afternoon after the films' skies (Claude's pick, with the user's "why is the sky gray", 2026-11-02):
+	# a high warm sun, a clear blue sky, a pale warm horizon, a thin blue haze over the town below
+	sun.rotation_degrees = Vector3(-48.0, 50.0, 0.0)
+	sun.light_color = Color(1.0, 0.96, 0.86)
+	sun.light_energy = 1.15
 	sun.shadow_enabled = true
-	sun.directional_shadow_max_distance = 40.0
+	sun.directional_shadow_max_distance = 45.0
 	add_child(sun)
 	var sky := ProceduralSkyMaterial.new()
-	sky.sky_top_color = Color(0.22, 0.28, 0.52)
-	sky.sky_horizon_color = Color(0.98, 0.62, 0.45)
-	sky.ground_horizon_color = Color(0.6, 0.45, 0.4)
-	sky.ground_bottom_color = Color(0.2, 0.18, 0.2)
+	sky.sky_top_color = Color(0.16, 0.42, 0.82)
+	sky.sky_horizon_color = Color(0.7, 0.84, 0.94)
+	sky.sky_curve = 0.12
+	sky.ground_horizon_color = Color(0.7, 0.84, 0.94)
+	sky.ground_bottom_color = Color(0.36, 0.5, 0.4)
+	sky.sun_angle_max = 20.0
 	var environment := Environment.new()
 	environment.background_mode = Environment.BG_SKY
 	environment.sky = Sky.new()
 	environment.sky.sky_material = sky
 	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	environment.ambient_light_color = Color(0.55, 0.52, 0.7)
-	environment.ambient_light_energy = 0.75
+	environment.ambient_light_color = Color(0.62, 0.72, 0.86)
+	environment.ambient_light_energy = 0.8
 	environment.fog_enabled = true
-	environment.fog_light_color = Color(0.72, 0.62, 0.66)
-	environment.fog_density = 0.0035
+	environment.fog_light_color = Color(0.7, 0.84, 0.94)
+	environment.fog_density = 0.0022
+	environment.fog_sky_affect = 0.0
 	var world_environment := WorldEnvironment.new()
 	world_environment.environment = environment
 	add_child(world_environment)
@@ -176,6 +186,9 @@ func _dress(level: Node) -> void:
 				material.set_shader_parameter(&"emission", 0.9 if key == "window" else 0.0)
 				made[key] = material
 			mesh.set_surface_override_material(k, made[key])
+		# (anything named `hidden_` is solid but not seen: the wall round the brink that keeps him in)
+		if String(mesh.name).begins_with("hidden_"):
+			mesh.visible = false
 		# (anything named `climb_` he can scurry up: Scurry)
 		if String(mesh.name).begins_with("climb_"):
 			mesh.add_to_group(&"climbable")

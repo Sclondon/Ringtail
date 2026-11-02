@@ -29,7 +29,7 @@ func _physics_process(delta: float) -> void:
 	if player == null:
 		return
 	_wait -= delta
-	if _wait > 0.0 or player.global_position.distance_to(home) > notice:
+	if _wait > 0.0 or player.global_position.distance_to(home) > notice or Hazards.safe(player.global_position):
 		return
 	_wait = randf_range(every.x, every.y)
 	crows.shuffle()
