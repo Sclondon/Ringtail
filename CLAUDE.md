@@ -411,6 +411,32 @@ Read README.md first. Started 2026-11-01.
   anything named "glass" at night as house windows. Checks: vehicle_test.gd (every wheel within 5 cm of its road:
   about 1 mm), vehicle_hill_shots.gd -- --out=<dir> [night] (the sharpest sloped hairpin from the side; ZoneStreaming
   is freed and the hour held there).
+- Then "the cars need to be way faster like hard to dodge": cruise 20 (hatchback), 21 (taxi), 17 (keis), 13 (bus)
+  m/s, up from 11/11.5/9.5/7.5. Each brakes at BRAKE 14 m/s² (bus 0.7x, keis 0.85x) planned over the 44 m ahead, so it
+  comes into every bend at that bend's speed (`bend_at`: the turn between the 4 m chords either side, not the road's
+  segments, which aliased); it holds that speed till its rear bumper is out, then pulls away at PULL 7 m/s². It
+  follows no faster than it could brake to the one in front's speed by GAP. vehicle_test: each kind past 70% of its
+  cruise, no bend entered over 1 m/s too fast (bend_speed/bend_sharp), the pull-up from its braking distance. Warning
+  cues: headlights only (the vehicles have no sound).
+- Then "there should be people in the cars": CarRider (scripts/car_rider.gd), one of the town's people (boy_tp.glb,
+  CharacterLook, a HeadShape mask head) at RIDER_SIZE 1.25 (about 1.56 m: the walkers' 1.4 did not fit under a
+  hatchback's roof), no body of its own; HazardCar seats a driver always and each other seat at RIDING 0.35 (a bus's
+  BUS_RIDING 0.5; `seat_chance` overrides). Its SeatedRig lays the pose over the rig standing still: hips SEAT_HIP over
+  the seat leant back SEAT_LEAN, feet down to the kind's "floor" and forward within the seat in front's `legroom`,
+  driver's hands on the wheel's grips, others' in their lap, a glance out now and then. Seats, grips and the steering
+  wheel are in the models (build_vehicles.py cabin(): empties `<kind>_seat_<n>`, seat 0 the driver's on the right,
+  `<kind>_grip_l/_r`; seats() cushions and leant backs). Bodies are now see-through: Part.shell paints below the
+  waist (`belt`), glass up to `top` (level faces, the roof, painted), a rail round the glass and pillars; lining()
+  is the inside, dark, facing in. HazardCar draws "carglass" see-through (both faces). Far from the camera riders are
+  posed every 2nd/3rd frame (RIDER_FAR 14/26 m), held still past 40 m, hidden past 70 m; they go with their vehicle
+  (paused by ZoneStreaming, put away at night). Cost (perf_zones.gd, A/B with RINGTAIL_NO_RIDERS=1): +6.7k nodes,
+  about 1-3 ms a frame on the sides, within the test's noise in the grove.
+- Checks: `tests/rider_fit.gd` (headless: every seat filled; every rider's skinned points, and their bone-held pieces,
+  have the shell over, under and beside them with at least 1 cm to the roof and sides, and none is through a seat's
+  back); vehicle_shots.gd adds "window" and "windscreen" views (every seat filled).
+- Seen while doing this (the TOWN fork's working world, not committed): the face roads have steps of up to 2.8 m
+  under the road_<n> routes (the routes and the road surface disagree), so vehicle_test's wheel check fails there;
+  on the last committed world the wheels were within 1 mm at the new speeds.
 
 ## The one-hand handstand on points (2026-11-02)
 

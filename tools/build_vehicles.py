@@ -44,6 +44,8 @@ COLOURS = {
     "sign": (0.98, 0.93, 0.55),
     "bed": (0.55, 0.55, 0.57),
     "plate": (0.95, 0.95, 0.9),
+    "lining": (0.2, 0.2, 0.22),
+    "seat": (0.3, 0.27, 0.25),
 }
 
 
@@ -100,23 +102,40 @@ class Part:
         for q in ((0, 1, 3, 2), (4, 6, 7, 5), (0, 4, 5, 1), (2, 3, 7, 6), (0, 2, 6, 4), (1, 5, 7, 3)):
             self.face([c[i] for i in q], mat)
 
-    def prism(self, profile, half_width, mat, side_mat=None):
-        """A side profile [(z, y), ...] (going round, front to back over the top) extruded across ±half_width: the
-        body of a car seen from the side."""
-        left = [(half_width, y, z) for z, y in profile]
-        right = [(-half_width, y, z) for z, y in profile]
-        self.face(left, side_mat or mat)
-        self.face(right[::-1], side_mat or mat)
-        n = len(profile)
-        for i in range(n):
-            j = (i + 1) % n
-            self.face([left[i], right[i], right[j], left[j]], mat)
-
-    def pane(self, points, mat, out=0.012):
-        """A flat panel (a window, a sign) laid on a face, lifted `out` off it along its own normal."""
-        a, b, c = (Vector(p) for p in points[:3])
-        normal = (b - a).cross(c - a).normalized()
-        self.face([tuple(Vector(p) + normal * out) for p in points], mat)
+    def shell(self, profile, half_width, belt, top, paint, glass, pillars=()):
+        """A side profile [(z, y), ...] (going round, front to back over the top) extruded across ±half_width, as a
+        body you can see into (the user, 2026-11-02: "there should be people in the cars"): painted below `belt`,
+        glass from there up to `top` (the windows all round: the windscreen, the sides, the back; its nearly level
+        faces, the roof, painted), painted again above `top`. No faces where the pieces meet, so it is one shell. A
+        painted rail round the glass's edges at each side, and a pillar up through it at each z in `pillars`.
+        Returns the pieces' outlines, for the lining."""
+        pieces = [(clip(profile, belt, True), False), (clip(clip(profile, belt, False), top, True), True),
+                  (clip(profile, top, False), False)]
+        for outline, is_glass in pieces:
+            if len(outline) < 3:
+                continue
+            left = [(half_width, y, z) for z, y in outline]
+            right = [(-half_width, y, z) for z, y in outline]
+            self.face(left, glass if is_glass else paint)
+            self.face(right[::-1], glass if is_glass else paint)
+            n = len(outline)
+            for i in range(n):
+                j = (i + 1) % n
+                (za, ya), (zb, yb) = outline[i], outline[j]
+                # (none along a cut: the pieces join there)
+                if any(abs(ya - cut) < 1e-4 and abs(yb - cut) < 1e-4 for cut in (belt, top)):
+                    continue
+                level = abs(yb - ya) < 0.35 * abs(zb - za)
+                self.face([left[i], right[i], right[j], left[j]], paint if (level or not is_glass) else glass)
+                if is_glass:
+                    for side in (1, -1):
+                        self.tube([(side * half_width, ya, za), (side * half_width, yb, zb)], [0.03, 0.03], paint, 5)
+            if is_glass:
+                for z in pillars:
+                    high = band_top(outline, z)
+                    for side in (1, -1):
+                        self.box((side * half_width, (belt + high) / 2, z), (0.03, high - belt, 0.1), paint)
+        return [outline for outline, _ in pieces]
 
     def tube(self, points, radii, mat, segments=10):
         index = self._index(mat)
@@ -134,9 +153,11 @@ class Part:
         for ring in (rings[0], rings[-1][::-1]):
             self.bm.faces.new(ring[::-1]).material_index = index
 
-    def done(self):
+    def done(self, inward=False):
         bmesh.ops.remove_doubles(self.bm, verts=self.bm.verts[:], dist=0.0002)
         bmesh.ops.recalc_face_normals(self.bm, faces=self.bm.faces[:])
+        if inward:
+            bmesh.ops.reverse_faces(self.bm, faces=self.bm.faces[:])
         mesh = bpy.data.meshes.new(self.name)
         self.bm.to_mesh(mesh)
         self.bm.free()
@@ -146,6 +167,92 @@ class Part:
         obj.location = to_blender(self.origin)
         bpy.context.collection.objects.link(obj)
         return obj
+
+
+def clip(outline, cut, below):
+    """The part of a closed outline [(z, y), ...] below (or above) the height `cut`."""
+    out = []
+    n = len(outline)
+    for i in range(n):
+        a, b = outline[i], outline[(i + 1) % n]
+        a_in = a[1] <= cut + 1e-6 if below else a[1] >= cut - 1e-6
+        b_in = b[1] <= cut + 1e-6 if below else b[1] >= cut - 1e-6
+        if a_in:
+            out.append(a)
+        if a_in != b_in:
+            t = (cut - a[1]) / (b[1] - a[1])
+            out.append((a[0] + (b[0] - a[0]) * t, cut))
+    # (no point twice in a row)
+    kept = []
+    for p in out:
+        if not kept or abs(p[0] - kept[-1][0]) > 1e-5 or abs(p[1] - kept[-1][1]) > 1e-5:
+            kept.append(p)
+    if len(kept) > 1 and abs(kept[0][0] - kept[-1][0]) < 1e-5 and abs(kept[0][1] - kept[-1][1]) < 1e-5:
+        kept.pop()
+    return kept
+
+
+def band_top(outline, z):
+    """How high an outline reaches at `z`."""
+    best = -1e9
+    n = len(outline)
+    for i in range(n):
+        (za, ya), (zb, yb) = outline[i], outline[(i + 1) % n]
+        if min(za, zb) - 1e-6 <= z <= max(za, zb) + 1e-6 and abs(zb - za) > 1e-6:
+            best = max(best, ya + (yb - ya) * (z - za) / (zb - za))
+    return best
+
+
+def lining(kind, made, outlines, half_width, belt, top):
+    """The inside of the body, seen through its windows: its painted pieces again a little inside it, facing in, in a
+    dark lining (the floor, the walls below the windows, the roof)."""
+    inside = Part("%s_lining" % kind)
+    w = half_width - 0.025
+    for k, outline in enumerate(outlines):
+        if len(outline) < 3:
+            continue
+        cz = sum(p[0] for p in outline) / len(outline)
+        cy = sum(p[1] for p in outline) / len(outline)
+        span_z = max(p[0] for p in outline) - min(p[0] for p in outline)
+        span_y = max(p[1] for p in outline) - min(p[1] for p in outline)
+        sz = 1.0 - 0.05 / max(span_z, 0.1)
+        sy = 1.0 - 0.05 / max(span_y, 0.1)
+        shrunk = [(cz + (z - cz) * sz, cy + (y - cy) * sy) for z, y in outline]
+        is_band = k == 1
+        n = len(shrunk)
+        if not is_band:
+            inside.face([(w, y, z) for z, y in shrunk], "lining")
+            inside.face([(-w, y, z) for z, y in shrunk][::-1], "lining")
+        for i in range(n):
+            j = (i + 1) % n
+            (za, ya), (zb, yb) = outline[i], outline[(i + 1) % n]
+            if any(abs(ya - cut) < 1e-4 and abs(yb - cut) < 1e-4 for cut in (belt, top)):
+                continue
+            if is_band and abs(yb - ya) >= 0.35 * abs(zb - za):
+                continue
+            (qa, ra), (qb, rb) = shrunk[i], shrunk[j]
+            inside.face([(w, ra, qa), (-w, ra, qa), (-w, rb, qb), (w, rb, qb)], "lining")
+    made.append(inside.done(inward=True))
+
+
+def seats(kind, made, seats_at):
+    """A seat at each: a cushion under the sitter and a back leant back behind them."""
+    chairs = Part("%s_seats" % kind)
+    for x, y, z in seats_at:
+        chairs.box((x, y - 0.06, z + 0.04), (0.46, 0.12, 0.46), "seat")
+        # (the back: from behind the hips, clear of their hair, leant back 0.2 rad, 0.62 high, 0.1 thick)
+        lean = 0.2
+        up = Vector((0.0, math.cos(lean), -math.sin(lean)))
+        back = Vector((0.0, math.sin(lean), math.cos(lean)))
+        foot = Vector((x, y - 0.02, z - 0.24))
+        corners = []
+        for sx in (-0.23, 0.23):
+            for h in (0.0, 0.62):
+                for d in (0.0, -0.1):
+                    corners.append(tuple(foot + Vector((sx, 0.0, 0.0)) + up * h + back * d))
+        for q in ((0, 1, 3, 2), (4, 6, 7, 5), (0, 4, 5, 1), (2, 3, 7, 6), (0, 2, 6, 4), (1, 5, 7, 3)):
+            chairs.face([corners[i] for i in q], "seat")
+    made.append(chairs.done())
 
 
 def wheels(kind, made, places, radius, width):
@@ -180,15 +287,6 @@ def wheels(kind, made, places, radius, width):
         made.append(wheel.done())
 
 
-def side_windows(body, half_width, spans, y0, y1, mat="carglass"):
-    """Windows along both sides: each span (z_front, z_back) from y0 up to y1."""
-    for side in (1, -1):
-        x = side * (half_width + 0.004)
-        for zf, zb in spans:
-            quad = [(x, y0, zf), (x, y1, zf), (x, y1, zb), (x, y0, zb)]
-            body.face(quad if side < 0 else quad[::-1], mat)
-
-
 def lamps(body, half_width, front_z, back_z, y, size=0.13):
     for side in (1, -1):
         body.box((side * (half_width - 0.22), y, front_z + 0.01), (size * 2.2, size, 0.04), "lamp")
@@ -199,6 +297,40 @@ def lamps(body, half_width, front_z, back_z, y, size=0.13):
     body.box((0, y - 0.15, front_z + 0.03), (0.34, 0.16, 0.02), "plate")
 
 
+def cabin(kind, made, steer, seats_at):
+    """Who sits where (the user, 2026-11-02: "there should be people in the cars"): an empty `<kind>_seat_<n>` at each
+    seat, at the seat's surface under the sitter's hips (seat 0 the driver's: on the right, as in Japan), facing ahead;
+    a steering wheel before the driver, round `steer`, its rim leant back towards them, and `<kind>_grip_l`/`_r` where
+    the hands go on it (at ten to two)."""
+    tilt = 0.5
+    radius = 0.19 if kind != "bus" else 0.24
+    cx, cy, cz = steer
+    up = Vector((0.0, math.cos(tilt), -math.sin(tilt)))
+
+    def rim_point(angle, r=radius):
+        return (cx + math.cos(angle) * r, cy + up.y * math.sin(angle) * r, cz + up.z * math.sin(angle) * r)
+
+    wheel = Part("%s_steer" % kind, steer)
+    wheel.tube([rim_point(math.tau * k / 18) for k in range(19)], [0.017] * 19, "trim", 6)
+    wheel.tube([rim_point(0.0, 0.02), rim_point(0.0, radius)], [0.012, 0.012], "trim", 5)
+    wheel.tube([rim_point(math.pi, 0.02), rim_point(math.pi, radius)], [0.012, 0.012], "trim", 5)
+    # (the column, down and forward into the dash)
+    wheel.tube([steer, (cx, cy - 0.16, cz + 0.32)], [0.035, 0.03], "trim", 6)
+    made.append(wheel.done())
+    for name, angle in (("l", math.radians(30)), ("r", math.radians(150))):
+        made.append(empty("%s_grip_%s" % (kind, name), rim_point(angle)))
+    for n, at in enumerate(seats_at):
+        made.append(empty("%s_seat_%d" % (kind, n), at))
+    seats(kind, made, seats_at)
+
+
+def empty(name, at):
+    obj = bpy.data.objects.new(name, None)
+    obj.location = to_blender(Vector(at))
+    bpy.context.collection.objects.link(obj)
+    return obj
+
+
 def hatchback():
     made = []
     body = Part("hatchback_body")
@@ -206,14 +338,13 @@ def hatchback():
     # From the front bumper, over the bonnet, up the windscreen, over the roof, down the hatch, back under
     profile = [(2.0, 0.3), (2.05, 0.62), (1.9, 0.85), (1.05, 0.95), (0.45, 1.42), (-0.9, 1.48), (-1.75, 1.3),
                (-1.98, 0.9), (-1.98, 0.3)]
-    body.prism(profile, w, "paint")
-    # Glass: windscreen, hatch, the side windows
-    body.pane([(-w + 0.06, 0.98, 1.0), (w - 0.06, 0.98, 1.0), (w - 0.1, 1.38, 0.5), (-w + 0.1, 1.38, 0.5)], "carglass")
-    body.pane([(w - 0.1, 1.27, -1.72), (-w + 0.1, 1.27, -1.72), (-w + 0.08, 0.98, -1.92), (w - 0.08, 0.98, -1.92)], "carglass")
-    side_windows(body, w, [(0.85, -0.05), (-0.15, -1.5)], 1.0, 1.36)
+    # (glass above the waist, all round; a pillar between the doors)
+    outlines = body.shell(profile, w, 0.97, 9.0, "paint", "carglass", (-0.1,))
     lamps(body, w, 2.05, -1.98, 0.72)
     made.append(body.done())
     wheels("hatchback", made, (("fl", 0.78, 1.28), ("fr", -0.78, 1.28), ("rl", 0.78, -1.28), ("rr", -0.78, -1.28)), 0.33, 0.24)
+    lining("hatchback", made, outlines, w, 0.97, 9.0)
+    cabin("hatchback", made, (-0.36, 0.92, 0.36), [(-0.36, 0.46, -0.08), (0.36, 0.46, -0.08), (0.36, 0.46, -1.0), (-0.36, 0.46, -1.0)])
     return made
 
 
@@ -223,10 +354,7 @@ def taxi():
     w = 0.85
     profile = [(2.3, 0.3), (2.35, 0.75), (1.25, 0.88), (0.65, 1.42), (-0.85, 1.45), (-1.45, 0.95), (-2.3, 0.88),
                (-2.32, 0.3)]
-    body.prism(profile, w, "paint")
-    body.pane([(-w + 0.06, 0.92, 1.2), (w - 0.06, 0.92, 1.2), (w - 0.1, 1.38, 0.7), (-w + 0.1, 1.38, 0.7)], "carglass")
-    body.pane([(w - 0.08, 1.4, -0.9), (-w + 0.08, 1.4, -0.9), (-w + 0.06, 0.96, -1.4), (w - 0.06, 0.96, -1.4)], "carglass")
-    side_windows(body, w, [(1.05, 0.0), (-0.1, -1.1)], 0.95, 1.36)
+    outlines = body.shell(profile, w, 0.92, 9.0, "paint", "carglass", (-0.05,))
     # The white band along each side, and the lit sign on the roof
     for side in (1, -1):
         body.box((side * (w + 0.005), 0.66, 0.0), (0.012, 0.1, 4.4), "paint2")
@@ -234,6 +362,8 @@ def taxi():
     lamps(body, w, 2.35, -2.32, 0.7)
     made.append(body.done())
     wheels("taxi", made, (("fl", 0.78, 1.45), ("fr", -0.78, 1.45), ("rl", 0.78, -1.45), ("rr", -0.78, -1.45)), 0.33, 0.24)
+    lining("taxi", made, outlines, w, 0.92, 9.0)
+    cabin("taxi", made, (-0.36, 0.9, 0.66), [(-0.36, 0.43, 0.2), (0.36, 0.43, 0.2), (0.36, 0.43, -0.68), (-0.36, 0.43, -0.68)])
     return made
 
 
@@ -243,10 +373,7 @@ def kei_truck():
     w = 0.74
     # The cab over the front wheels, flat-fronted
     cab = [(1.7, 0.4), (1.72, 1.15), (1.55, 1.8), (0.6, 1.8), (0.6, 0.4)]
-    body.prism(cab, w, "paint")
-    body.pane([(-w + 0.06, 1.2, 1.72), (w - 0.06, 1.2, 1.72), (w - 0.08, 1.72, 1.57), (-w + 0.08, 1.72, 1.57)], "carglass")
-    side_windows(body, w, [(1.5, 0.7)], 1.15, 1.7)
-    body.pane([(w - 0.08, 1.2, 0.59), (-w + 0.08, 1.2, 0.59), (-w + 0.08, 1.7, 0.59), (w - 0.08, 1.7, 0.59)], "carglass", -0.012)
+    outlines = body.shell(cab, w, 1.15, 1.72, "paint", "carglass")
     # The flat bed and its low drop sides, a frame under it
     body.box((0, 0.68, -0.55), (w * 2, 0.08, 2.3), "bed")
     for side in (1, -1):
@@ -257,6 +384,8 @@ def kei_truck():
     lamps(body, w, 1.72, -1.7, 0.62, 0.1)
     made.append(body.done())
     wheels("kei_truck", made, (("fl", 0.66, 1.15), ("fr", -0.66, 1.15), ("rl", 0.66, -1.05), ("rr", -0.66, -1.05)), 0.29, 0.2)
+    lining("kei_truck", made, outlines, w, 1.15, 1.72)
+    cabin("kei_truck", made, (-0.33, 1.18, 1.46), [(-0.33, 0.76, 1.0), (0.33, 0.76, 1.0)])
     return made
 
 
@@ -265,16 +394,15 @@ def kei_van():
     body = Part("kei_van_body")
     w = 0.74
     profile = [(1.7, 0.35), (1.72, 1.0), (1.45, 1.85), (-1.68, 1.88), (-1.7, 0.35)]
-    body.prism(profile, w, "paint")
-    body.pane([(-w + 0.06, 1.05, 1.68), (w - 0.06, 1.05, 1.68), (w - 0.08, 1.78, 1.48), (-w + 0.08, 1.78, 1.48)], "carglass")
-    side_windows(body, w, [(1.35, 0.55), (0.4, -0.6), (-0.75, -1.5)], 1.12, 1.7)
-    body.pane([(w - 0.12, 1.15, -1.7), (-w + 0.12, 1.15, -1.7), (-w + 0.12, 1.72, -1.7), (w - 0.12, 1.72, -1.7)], "carglass", -0.012)
+    outlines = body.shell(profile, w, 1.1, 1.74, "paint", "carglass", (0.48, -0.68))
     # A sliding door's runner, a stripe
     for side in (1, -1):
         body.box((side * (w + 0.006), 0.8, -0.1), (0.012, 0.08, 3.3), "paint2")
     lamps(body, w, 1.72, -1.7, 0.6, 0.1)
     made.append(body.done())
     wheels("kei_van", made, (("fl", 0.66, 1.15), ("fr", -0.66, 1.15), ("rl", 0.66, -1.1), ("rr", -0.66, -1.1)), 0.29, 0.2)
+    lining("kei_van", made, outlines, w, 1.1, 1.74)
+    cabin("kei_van", made, (-0.33, 1.12, 1.3), [(-0.33, 0.72, 0.85), (0.33, 0.72, 0.85), (0.33, 0.72, -0.25), (-0.33, 0.72, -0.25)])
     return made
 
 
@@ -283,15 +411,13 @@ def bus():
     body = Part("bus_body")
     w = 1.25
     profile = [(5.25, 0.35), (5.3, 2.4), (5.05, 3.05), (-5.1, 3.05), (-5.25, 2.6), (-5.25, 0.35)]
-    body.prism(profile, w, "paint2")
+    # (the window band all round; pillars between the side windows)
+    outlines = body.shell(profile, w, 1.5, 2.55, "paint2", "carglass", [3.15 - k * 1.25 for k in range(7)])
     # The lower half in the colour, a stripe, the window band
     for side in (1, -1):
         x = side * (w + 0.006)
         quad = [(x, 0.36, 5.2), (x, 1.15, 5.2), (x, 1.15, -5.2), (x, 0.36, -5.2)]
         body.face(quad if side < 0 else quad[::-1], "paint")
-    side_windows(body, w, [(4.3 - k * 1.25, 3.25 - k * 1.25) for k in range(7)], 1.5, 2.55)
-    body.pane([(-w + 0.1, 1.2, 5.27), (w - 0.1, 1.2, 5.27), (w - 0.12, 2.38, 5.31), (-w + 0.12, 2.38, 5.31)], "carglass", 0.008)
-    body.pane([(w - 0.15, 1.6, -5.25), (-w + 0.15, 1.6, -5.25), (-w + 0.15, 2.45, -5.25), (w - 0.15, 2.45, -5.25)], "carglass", -0.012)
     # The doors on the kerb side (left, +X, as Japan drives on the left), and the lit route sign over the screen
     for zf, zb in ((4.95, 4.05), (0.6, -0.3)):
         quad = [(w + 0.012, 0.36, zf), (w + 0.012, 2.5, zf), (w + 0.012, 2.5, zb), (w + 0.012, 0.36, zb)]
@@ -301,6 +427,10 @@ def bus():
     lamps(body, w, 5.3, -5.25, 0.75, 0.15)
     made.append(body.done())
     wheels("bus", made, (("fl", 1.14, 3.4), ("fr", -1.14, 3.4), ("rl", 1.14, -2.9), ("rr", -1.14, -2.9)), 0.48, 0.3)
+    lining("bus", made, outlines, w, 1.5, 2.55)
+    # (the riders sit along the windows, clear of the doors on the left)
+    riders = [(-0.75, 0.9, 4.25)] + [(side * 0.75, 0.9, z) for z in (2.6, 1.4, -0.9, -2.1, -3.3, -4.3) for side in (1, -1)]
+    cabin("bus", made, (-0.75, 1.4, 4.78), riders)
     return made
 
 
@@ -310,7 +440,7 @@ def export(name, objects):
         obj.select_set(True)
     bpy.ops.export_scene.gltf(filepath=os.path.join(ROOT, "models", "vehicle_%s.glb" % name), export_format="GLB",
                               export_yup=True, use_selection=True, export_animations=False)
-    print("BUILT %s tris=%d" % (name, sum(sum(len(p.vertices) - 2 for p in o.data.polygons) for o in objects)))
+    print("BUILT %s tris=%d" % (name, sum(sum(len(p.vertices) - 2 for p in o.data.polygons) for o in objects if o.type == "MESH")))
 
 
 def look(folder, name, objects):
@@ -331,7 +461,7 @@ def look(folder, name, objects):
     for other in bpy.data.objects:
         if other.type == "MESH":
             other.hide_render = other not in objects
-    corners = [o.matrix_world @ Vector(c) for o in objects for c in o.bound_box]
+    corners = [o.matrix_world @ Vector(c) for o in objects if o.type == "MESH" for c in o.bound_box]
     lo = Vector((min(c.x for c in corners), min(c.y for c in corners), min(c.z for c in corners)))
     hi = Vector((max(c.x for c in corners), max(c.y for c in corners), max(c.z for c in corners)))
     middle = (lo + hi) / 2

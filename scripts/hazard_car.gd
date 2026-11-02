@@ -16,14 +16,14 @@ extends AnimatableBody3D
 ## (`LIT`) throw real beams and red tail light, and every one a soft cone of light ahead. Night is DayNight.current's
 ## (if there is one); `lights` forces it (-1: follow the day; 0 off; 1 on).
 
-## Each kind: its size (width, height to the roof, length), cruising and cornering speeds (m/s), and the radius of its
-## wheels.
+## Each kind: its size (width, height to the roof, length), cruising and cornering speeds (m/s), the radius of its
+## wheels, and the height of its floor inside (where its people's feet go).
 const KINDS := {
-	&"hatchback": {"size": Vector3(1.7, 1.48, 4.05), "cruise": 20.0, "corner": 7.0, "wheel": 0.33},
-	&"taxi": {"size": Vector3(1.7, 1.45, 4.65), "cruise": 21.0, "corner": 7.0, "wheel": 0.33},
-	&"kei_truck": {"size": Vector3(1.48, 1.8, 3.42), "cruise": 17.0, "corner": 6.0, "wheel": 0.29},
-	&"kei_van": {"size": Vector3(1.48, 1.88, 3.42), "cruise": 17.0, "corner": 6.0, "wheel": 0.29},
-	&"bus": {"size": Vector3(2.5, 3.05, 10.55), "cruise": 13.0, "corner": 4.5, "wheel": 0.48},
+	&"hatchback": {"size": Vector3(1.7, 1.48, 4.05), "cruise": 20.0, "corner": 7.0, "wheel": 0.33, "floor": 0.34},
+	&"taxi": {"size": Vector3(1.7, 1.45, 4.65), "cruise": 21.0, "corner": 7.0, "wheel": 0.33, "floor": 0.34},
+	&"kei_truck": {"size": Vector3(1.48, 1.8, 3.42), "cruise": 17.0, "corner": 6.0, "wheel": 0.29, "floor": 0.44},
+	&"kei_van": {"size": Vector3(1.48, 1.88, 3.42), "cruise": 17.0, "corner": 6.0, "wheel": 0.29, "floor": 0.39},
+	&"bus": {"size": Vector3(2.5, 3.05, 10.55), "cruise": 13.0, "corner": 4.5, "wheel": 0.48, "floor": 0.39},
 }
 ## Room kept to whatever is ahead on the road (m).
 const GAP := 3.0
@@ -35,6 +35,13 @@ const KIND_PULL := {&"bus": 0.7, &"kei_truck": 0.85, &"kei_van": 0.85}
 ## How far each wheel may ride up or down on its own (m), and how many cars nearest him throw real light at night.
 const TRAVEL := 0.12
 const LIT := 3
+## People in it (the user, 2026-11-02: "there should be people in the cars"): a driver always, and each other seat taken
+## this often (a bus's more); past these distances from the camera (m) they are posed every 2nd / 3rd frame, not at all,
+## and not drawn (Claude's picks).
+const RIDING := 0.35
+const BUS_RIDING := 0.5
+const RIDER_FAR := [14.0, 26.0, 40.0, 70.0]
+
 
 ## Lights forced on or off for every vehicle (-1: by the time of day).
 static var lights := -1.0
@@ -52,6 +59,8 @@ var cruise := 11.0
 var corner_speed := 4.5
 ## Half its size (width, height, length): what it fills, for anything that would be run over (Villager, SquadRaccoon).
 var half_size := Vector3(0.85, 0.74, 2.0)
+## How likely each seat but the driver's is taken (-1: RIDING, or BUS_RIDING for a bus).
+var seat_chance := -1.0
 ## Where along the loop a bus stops (m), if the road has stops (bus_stop_<n> markers near it).
 var stops: Array[float] = []
 ## How far each wheel's contact is from the road under it, last step (m): for tests.
@@ -87,6 +96,7 @@ var _beams: Array[SpotLight3D] = []
 var _tail_light: OmniLight3D
 var _cones: MeshInstance3D
 var _light_look := randf() * 0.5
+var _riders: Array[CarRider] = []
 
 
 func _ready() -> void:
@@ -123,6 +133,7 @@ func _ready() -> void:
 	collider.position = Vector3(0.0, 0.3 + (size.y - 0.3) * 0.5, 0.0)
 	add_child(collider)
 	_make_lights()
+	_seat_people(model)
 	_measure()
 	along = start * _total
 	_place(0.0)
@@ -208,6 +219,7 @@ func _physics_process(delta: float) -> void:
 	if _light_look <= 0.0:
 		_light_look = 0.5
 		_set_lights()
+		_far_people()
 
 
 ## How sharp the road is at `distance` along its loop, 0 (straight) .. 1 (a hairpin, about 9 m round): the turn between
@@ -350,14 +362,68 @@ func _bump() -> void:
 		player.velocity = Vector3(away.x, 6.0, away.z)
 
 
+## A driver in the driver's seat, and people in some of the others.
+func _seat_people(model: Node3D) -> void:
+	# (none, to measure what they cost: RINGTAIL_NO_RIDERS in the environment)
+	if OS.has_environment("RINGTAIL_NO_RIDERS"):
+		return
+	var seats: Array[Node3D] = []
+	var grips: Array[Node3D] = []
+	var n := 0
+	while true:
+		var seat := model.find_child("%s_seat_%d" % [kind, n], true, false) as Node3D
+		if seat == null:
+			break
+		seats.append(seat)
+		n += 1
+	for side in ["l", "r"]:
+		var grip := model.find_child("%s_grip_%s" % [kind, side], true, false) as Node3D
+		if grip:
+			grips.append(grip)
+	for k in seats.size():
+		var chance := seat_chance if seat_chance >= 0.0 else (BUS_RIDING if kind == &"bus" else RIDING)
+		if k > 0 and randf() >= chance:
+			continue
+		var rider := CarRider.new()
+		rider.seat = seats[k]
+		rider.driver = k == 0
+		rider.grips = grips
+		rider.look_seed = randi() % 10000
+		rider.floor = KINDS.get(kind, KINDS[&"hatchback"])["floor"]
+		# (room for the legs: up to the back of the seat in front, if there is one)
+		for ahead in seats:
+			var to := ahead.position.z - seats[k].position.z
+			if to > 0.1 and absf(ahead.position.x - seats[k].position.x) < 0.2:
+				rider.legroom = minf(rider.legroom, to - 0.4)
+		add_child(rider)
+		_riders.append(rider)
+
+
+## The people in it, by how far it is from the camera: posed less often, then held still, then not drawn.
+func _far_people() -> void:
+	var eye := get_viewport().get_camera_3d() if is_inside_tree() else null
+	var far := global_position.distance_to(eye.global_position) if eye else 0.0
+	for rider in _riders:
+		var shown := far < RIDER_FAR[3]
+		rider.visible = shown
+		rider.process_mode = Node.PROCESS_MODE_INHERIT if shown else Node.PROCESS_MODE_DISABLED
+		if rider.rig:
+			rider.rig.process_mode = Node.PROCESS_MODE_INHERIT if far < RIDER_FAR[2] else Node.PROCESS_MODE_DISABLED
+			rider.rig.lod_every = 1 if far < RIDER_FAR[0] else 2 if far < RIDER_FAR[1] else 3
+
+
 # --- Lights ---------------------------------------------------------------------------------------------------------
 
-## The lamps, signs and tail lights drawn lit, whatever the light falling on them.
+## The lamps, signs and tail lights drawn lit, whatever the light falling on them; the windows see-through, so the people
+## inside show.
 func _glow(model: Node3D) -> void:
 	var lit := {"lamp": Color(1.0, 0.97, 0.82), "tail": Color(1.0, 0.14, 0.1), "sign": Color(1.0, 0.95, 0.6)}
 	for part: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
 		for surface in part.mesh.get_surface_count():
 			var original := part.mesh.surface_get_material(surface)
+			if original != null and original.resource_name == "carglass":
+				part.set_surface_override_material(surface, _glass())
+				continue
 			if original == null or not lit.has(original.resource_name):
 				continue
 			var bright := StandardMaterial3D.new()
@@ -409,6 +475,21 @@ func _make_lights() -> void:
 			Vector3(0.0, lamp_y, half_size.z + 3.5))
 	_cones.visible = false
 	add_child(_cones)
+
+
+static var _window: StandardMaterial3D
+
+
+## The windows: a faint blue-grey tint, a sheen, both faces (a far window seen from inside the car too).
+static func _glass() -> StandardMaterial3D:
+	if _window == null:
+		_window = StandardMaterial3D.new()
+		_window.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		_window.albedo_color = Color(0.55, 0.68, 0.78, 0.28)
+		_window.roughness = 0.15
+		_window.metallic_specular = 0.8
+		_window.cull_mode = BaseMaterial3D.CULL_DISABLED
+	return _window
 
 
 static var _cone: Shader
