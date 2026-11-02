@@ -49,9 +49,6 @@ func _ready() -> void:
 		var pad := InputEventJoypadButton.new()
 		pad.button_index = JOY_BUTTON_X
 		InputMap.action_add_event(&"tail", pad)
-		var mouse := InputEventMouseButton.new()
-		mouse.button_index = MOUSE_BUTTON_LEFT
-		InputMap.action_add_event(&"tail", mouse)
 
 
 ## For the on-screen button (and tests): as if the tail button were pressed.
