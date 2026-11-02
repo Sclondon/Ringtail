@@ -14,7 +14,7 @@ uniform float tile = 1.5;
 uniform bool box_mapped = false;
 uniform float emission = 0.0;
 // Rows of the grid the corners snap to (0: off).
-uniform float snap = 480.0;
+uniform float snap = 0.0;  // (off: the user, 2026-11-01, "the world vibrates slightly when you move things jiggle")
 
 varying vec3 model_pos;
 varying vec3 model_normal;
@@ -22,12 +22,13 @@ varying vec3 model_normal;
 void vertex() {
 	model_pos = VERTEX;
 	model_normal = NORMAL;
+	// (POSITION, once a shader writes it anywhere, is always used: so it is always written)
+	vec4 clip = PROJECTION_MATRIX * MODELVIEW_MATRIX * vec4(VERTEX, 1.0);
 	if (snap > 0.0) {
-		vec4 clip = PROJECTION_MATRIX * MODELVIEW_MATRIX * vec4(VERTEX, 1.0);
 		vec2 grid = vec2(snap * VIEWPORT_SIZE.x / VIEWPORT_SIZE.y, snap) * 0.5;
 		clip.xy = round(clip.xy / clip.w * grid) / grid * clip.w;
-		POSITION = clip;
 	}
+	POSITION = clip;
 }
 
 void fragment() {

@@ -204,9 +204,10 @@ def whiskers(_b):
     made = bmesh.new()
     tags = {}
     for side in (1.0, -1.0):
-        for k, (rise, droop) in enumerate(((0.012, 0.004), (0.0, -0.012), (-0.012, -0.03))):
-            root = HEAD_CENTRE + Vector((side * 0.034, -0.034 + rise, 0.168 - k * 0.008))
-            tip = root + Vector((side * 0.15, droop, -0.045))
+        # (longer and thinner, and each its own length: the user, 2026-11-01)
+        for k, (rise, droop, reach) in enumerate(((0.012, 0.01, 0.27), (0.004, -0.008, 0.21), (-0.006, -0.03, 0.25), (-0.014, -0.05, 0.18))):
+            root = HEAD_CENTRE + Vector((side * 0.034, -0.034 + rise, 0.168 - k * 0.007))
+            tip = root + Vector((side * reach, droop, -0.06 * reach / 0.2))
             rings = []
             steps = 5
             for s in range(steps + 1):
@@ -215,7 +216,7 @@ def whiskers(_b):
                 along = (tip - root).normalized()
                 u = along.cross(Y).normalized()
                 w = along.cross(u).normalized()
-                r = 0.0045 * (1.0 - 0.6 * t)
+                r = 0.0028 * (1.0 - 0.65 * t)
                 ring = []
                 for j in range(4):
                     a = math.tau * j / 4
@@ -245,6 +246,20 @@ def brows(b):
 def eyes(b):
     for side in (1.0, -1.0):
         b.ellipsoid(HEAD_CENTRE + Vector((side * EYE_X, EYE_Y, EYE_Z)), Vector((EYE_R, EYE_R * 1.1, EYE_R)), None, 14, 7)
+
+
+def lids(b):
+    """An upper lid over each eye: the top half of a shell a little larger than the eye, the mask'"'"'s colour. At rest it
+    covers the top half of the eye; the rig rolls it back to open the eye and down over it to blink (bones lid_l,
+    lid_r at each eye'"'"'s middle)."""
+    for side in (1.0, -1.0):
+        centre = HEAD_CENTRE + Vector((side * EYE_X, EYE_Y, EYE_Z))
+        rings = []
+        for k in range(7):
+            phi = math.pi / 2 * k / 6
+            r = EYE_R * 1.16
+            rings.append((centre + Y * r * math.sin(phi) * 1.1, X * r * math.cos(phi), Z * r * math.cos(phi)))
+        b.tube(rings, 16)
 
 
 def pupils(b):
@@ -578,7 +593,13 @@ def weights(part, p):
         return tail_weights(p)
     if part in ("eyes", "pupils"):
         return {"eye" + suffix: 1.0}
-    if part in ("muzzle", "nose", "whiskers", "brows", "mask", "cheeks", "ears", "ear_insides", "head_fur"):
+    if part == "lids":
+        return {"lid" + suffix: 1.0}
+    if part == "brows":
+        return {"brow" + suffix: 1.0}
+    if part in ("ears", "ear_insides"):
+        return {"ear" + suffix: 1.0}
+    if part in ("muzzle", "nose", "whiskers", "mask", "cheeks", "head_fur"):
         return {"head": 1.0}
     if part == "head":
         skull = blend(HEAD.y - 0.03, HEAD.y + 0.03, p.y)
@@ -623,6 +644,10 @@ def bones():
     listed = [("hips", HIPS, None), ("spine", SPINE, "hips"), ("chest", CHEST, "spine"), ("neck", NECK, "chest"), ("head", HEAD, "neck")]
     for side, suffix in ((1.0, "_l"), (-1.0, "_r")):
         listed.append(("eye" + suffix, HEAD_CENTRE + Vector((side * EYE_X, EYE_Y, EYE_Z)), "head"))
+        # (for his expressions: a lid over each eye, a brow over it, and each ear at its root)
+        listed.append(("lid" + suffix, HEAD_CENTRE + Vector((side * EYE_X, EYE_Y, EYE_Z)), "head"))
+        listed.append(("brow" + suffix, HEAD_CENTRE + Vector((side * 0.052, 0.062, 0.072)), "head"))
+        listed.append(("ear" + suffix, HEAD_CENTRE + Vector((side * 0.075, 0.07, -0.02)), "head"))
         shoulder = Vector((side * SHOULDER.x, SHOULDER.y, 0.0))
         listed.append(("upper_arm" + suffix, shoulder, "chest"))
         listed.append(("forearm" + suffix, shoulder + X * side * UPPER_ARM, "upper_arm" + suffix))
@@ -650,6 +675,7 @@ PARTS = [
     ("nose", BLACK, nose, None),
     ("brows", LIGHT, brows, None),
     ("eyes", WHITE, eyes, None),
+    ("lids", DARK, lids, None),
     ("pupils", BLACK, pupils, None),
     ("ears", FUR, ears, None),
     ("ear_insides", LIGHT, ear_insides, None),

@@ -73,6 +73,17 @@ var _fur_uniform := PackedVector3Array()
 var _rotor_disc: MeshInstance3D
 var _rotor_puffs: CPUParticles3D
 var _swoosh_puffs: CPUParticles3D
+var _lids: Array[Node3D] = []
+var _brows: Array[Node3D] = []
+var _brow_rest: Array[Vector3] = []
+var _ears: Array[Node3D] = []
+var _face: Array = []
+var _face_now: StringName = &"neutral"
+var _face_left := 0.0
+var _blink_wait := 2.0
+var _blink_at := 1.0
+var _hearts_were := 3
+var _caps_were := 0
 
 var _tail: Array[Node3D] = []
 var _tail_dir: Array[Vector3] = []
@@ -80,6 +91,8 @@ var _tail_len: Array[float] = []
 var _points := PackedVector3Array()
 var _speeds := PackedVector3Array()
 var _moves: Node
+var _scurry: Node
+var _climb_w := 0.0
 
 var _quad := 0.0
 var _gallop := 0.0
@@ -119,9 +132,11 @@ func _ready() -> void:
 	_speeds.resize(TAIL_BONES + 1)
 	if _player:
 		_moves = _player.get_node_or_null(^"TailMoves")
+		_scurry = _player.get_node_or_null(^"Scurry")
 		if _player.has_signal(&"jumped"):
 			_player.jumped.connect(func() -> void: _leaping = _quad > 0.5 and (_gallop > 0.3 or always_on_fours))
 	_make_fur()
+	_build_face()
 
 
 func _pose_extra(delta: float) -> void:
@@ -129,12 +144,19 @@ func _pose_extra(delta: float) -> void:
 	var flat := Vector3(velocity.x, 0.0, velocity.z)
 	var speed := flat.length()
 	var free: bool = not (&"state" in _player) or _player.state == Player.State.FREE
-	var low: bool = (&"is_ducking" in _player and _player.is_ducking) or (&"is_crawling" in _player and _player.is_crawling)
+	# (ducking he stays upright, as the boy does; crawling under something low, and scurrying, he is on all fours: the
+	# user, 2026-11-01, "rather than duck ... a Scurry button that puts you on all 4s")
+	var low: bool = &"is_crawling" in _player and _player.is_crawling
+	var scurrying: bool = _scurry != null and _scurry.held
+	var climbing: bool = _scurry != null and _scurry.climbing
+	_climb_w = _approach(_climb_w, 1.0 if climbing else 0.0, 10.0, delta)
+	if climbing:
+		speed = absf(velocity.y)
 	# (he runs on all fours, bounding, with the stick pushed all the way, which sprints him: the user, 2026-11-01,
 	# "remove the sprint button he should just run on all 4s", then "he should only run on all 4s if you stick the
 	# joystick all the way"; raccoon.tscn sprints on a full push at once)
 	var sprinting: bool = &"is_sprinting" in _player and _player.is_sprinting
-	var fast: bool = speed > _player.walk_speed * 1.25 and not low and (sprinting or always_on_fours)
+	var fast: bool = speed > _player.walk_speed * 1.25 and not low and (sprinting or scurrying or always_on_fours)
 	var busy := maxf(maxf(_ball, _roll), maxf(_sprawled, _three)) + _carry + smoothstep(0.0, 0.1, _sit_at) + _slide
 	var grounded: bool = _player.is_on_floor()
 	if grounded and _air < 0.2 and velocity.y <= 0.0:
@@ -143,7 +165,7 @@ func _pose_extra(delta: float) -> void:
 		_leaping = false
 	_leap_w = _approach(_leap_w, 1.0 if _leaping and not grounded else 0.0, 12.0, delta)
 	_leap_rise = clampf(velocity.y / 6.0, -1.0, 1.0)
-	var wanted := 1.0 if free and (((low or fast or always_on_fours) and _air < 0.5) or _leaping) and busy < 0.2 else 0.0
+	var wanted := 1.0 if free and (((low or fast or scurrying or always_on_fours) and _air < 0.5) or _leaping or climbing) and busy < 0.2 else 0.0
 	_quad = _approach(_quad, wanted, 7.0, delta)
 	_gallop = _approach(_gallop, smoothstep(_player.walk_speed, _player.run_speed * 0.8, speed) if fast else 0.0, 6.0, delta)
 	var stride := lerpf(0.44, 1.9, _gallop)
@@ -160,15 +182,112 @@ func _pose_extra(delta: float) -> void:
 
 	if _quad > 0.002:
 		_pose_quad(smoothstep(0.0, 1.0, _quad), speed, stride)
+	if _climb_w > 0.002:
+		_pose_climb(_climb_w)
 	if _glide > 0.002:
 		_pose_glide(_glide)
 	if _spin_w > 0.002:
 		_pose_spin(spin, _spin_w)
 	_sniffing(delta, speed)
+	_pose_face(delta, speed)
 	_pose_tail(delta, speed, spin)
 	_spring_fur(delta)
 	_rotor(delta)
 	_swoosh(spin)
+
+
+## His face: lids that blink and set his look, brows and ears (the user: "his eyes need to be animated and he
+## needs a few expressions"). Each expression is [lid (how far rolled down: -1.5 wide open .. 1.5 shut), lid tilt
+## (inner corners down), brow raise (m), brow tilt (inner ends down), ears (forward up, back down), ear droop].
+const FACES := {
+	&"neutral": [-1.3, 0.0, 0.0, 0.0, 0.0, 0.0],
+	&"happy": [-0.25, -0.45, 0.022, -0.3, 0.3, 0.0],
+	&"determined": [-0.35, 0.6, -0.018, 0.6, -0.45, 0.0],
+	&"surprised": [-1.65, 0.0, 0.04, -0.2, 0.45, 0.0],
+	&"hurt": [1.35, -0.2, 0.004, -0.4, -0.7, 0.2],
+	&"sleepy": [-0.15, 0.0, -0.004, 0.0, -0.2, 0.45],
+	&"sniff": [-0.6, 0.0, 0.006, 0.0, 0.4, 0.0],
+}
+
+
+## Sets an expression for a while (over whatever he would show otherwise).
+func express(face: StringName, seconds := 1.2) -> void:
+	_face_now = face
+	_face_left = seconds
+
+
+func _build_face() -> void:
+	for suffix: String in ["_l", "_r"]:
+		var side := 1 if suffix == "_l" else -1
+		if _has("lid" + suffix):
+			_lids.append(_joint(_head, "lid" + suffix, _rest("lid" + suffix)))
+		if _has("brow" + suffix):
+			var brow := _joint(_head, "brow" + suffix, _rest("brow" + suffix))
+			_brows.append(brow)
+			_brow_rest.append(brow.position)
+		if _has("ear" + suffix):
+			_ears.append(_joint(_head, "ear" + suffix, _rest("ear" + suffix)))
+	_face = (FACES[&"neutral"] as Array).duplicate()
+	# (hurt when he loses a heart, pleased with a Bottlecap)
+	var game := get_tree().get_first_node_in_group(&"game") if is_inside_tree() else null
+	if game and game.has_signal(&"hearts_changed"):
+		game.hearts_changed.connect(func(count: int) -> void:
+			if count < _hearts_were:
+				express(&"hurt", 0.9)
+			_hearts_were = count)
+		game.caps_changed.connect(func(count: int, _total: int) -> void:
+			if count > _caps_were:
+				express(&"happy", 2.5)
+			_caps_were = count)
+
+
+func _pose_face(delta: float, speed: float) -> void:
+	if _lids.is_empty() and _brows.is_empty() and _ears.is_empty():
+		return
+	_face_left -= delta
+	var wanted: StringName = &"neutral"
+	if _face_left > 0.0:
+		wanted = _face_now
+	elif _spin_w > 0.3 or (_gallop > 0.6 and speed > 3.0):
+		wanted = &"determined"
+	elif _player.velocity.y < -7.0 and _air > 0.9:
+		wanted = &"surprised"
+	elif _sit_at > 0.3:
+		wanted = &"sleepy"
+	elif _sniff > 0.3:
+		wanted = &"sniff"
+	var target: Array = FACES[wanted]
+	for k in _face.size():
+		_face[k] = _approach(_face[k], target[k], 9.0, delta)
+	# Blinking: every few seconds, now and then twice; shut tight asleep
+	_blink_wait -= delta
+	if _blink_wait <= 0.0:
+		_blink_at = 0.0
+		_blink_wait = randf_range(1.8, 5.5) if randf() > 0.2 else 0.25
+	_blink_at = minf(_blink_at + delta / 0.16, 1.0)
+	var blink := sin(PI * _blink_at) if _blink_at < 1.0 else 0.0
+	var lid: float = lerpf(_face[0], 1.5, maxf(blink, smoothstep(0.3, 0.8, _lie_at)))
+	for i in _lids.size():
+		var side := 1.0 if i == 0 else -1.0
+		_lids[i].basis = Basis(Vector3.BACK, -side * _face[1]) * Basis(Vector3.RIGHT, lid)
+	for i in _brows.size():
+		var side := 1.0 if i == 0 else -1.0
+		_brows[i].position = _brow_rest[i] + Vector3.UP * _face[2]
+		_brows[i].basis = Basis(Vector3.BACK, side * _face[3])
+	for i in _ears.size():
+		var side := 1.0 if i == 0 else -1.0
+		# (a flick now and then)
+		var flick := sin(_time * 23.0) * 0.25 if fmod(_time + i * 1.7, 6.3) < 0.18 else 0.0
+		_ears[i].basis = Basis(Vector3.BACK, -side * (_face[5] + flick)) * Basis(Vector3.RIGHT, _face[4])
+
+
+## Climbing (Scurry): his all-fours pose turned up onto the surface ahead of him, belly to it, head up, paws
+## gripping it: the whole of him turned about his hips, which the Scurry keeps at a hand's reach from it.
+func _pose_climb(w: float) -> void:
+	var pivot := Vector3(0.0, _hips.position.y, 0.0)
+	var turn := Basis(Vector3.RIGHT, -PI * 0.5 * w)
+	_hips.position = pivot + turn * (_hips.position - pivot)
+	_hips.basis = turn * _hips.basis
 
 
 ## Now and then, standing about, he lifts his nose and sniffs the air: quick little lifts of the snout, the

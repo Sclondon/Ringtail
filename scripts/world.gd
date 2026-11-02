@@ -108,6 +108,10 @@ func _controls() -> void:
 	var duck := InputEventJoypadButton.new()
 	duck.button_index = JOY_BUTTON_X
 	InputMap.action_add_event(&"duck", duck)
+	# (and on Y: the user, 2026-11-01, "y remains duck"; scurry is the left trigger, scripts/scurry.gd)
+	var duck_y := InputEventJoypadButton.new()
+	duck_y.button_index = JOY_BUTTON_Y
+	InputMap.action_add_event(&"duck", duck_y)
 	var tail := InputEventJoypadButton.new()
 	tail.button_index = JOY_BUTTON_B
 	InputMap.action_add_event(&"tail", tail)
@@ -163,6 +167,9 @@ func _dress(level: Node) -> void:
 				material.set_shader_parameter(&"emission", 0.9 if key == "window" else 0.0)
 				made[key] = material
 			mesh.set_surface_override_material(k, made[key])
+		# (anything named `climb_` he can scurry up: Scurry)
+		if String(mesh.name).begins_with("climb_"):
+			mesh.add_to_group(&"climbable")
 		if not String(mesh.name).begins_with("nocol_"):
 			mesh.create_trimesh_collision()
 			# (solid from both sides: an open sheet such as the lawn has no outside to be sure of)

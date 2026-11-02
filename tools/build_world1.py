@@ -374,11 +374,14 @@ def alley_things():
         side = 1 if x > 0 else -1
         piece.box((x - side * 0.2, 0.25, z + 1.9), (1.2, 0.5, 1.2), "wood")
     # Power poles along the east kerb, with a crossbar and steps up them, and the phone line strung along them
+    # (the poles themselves an object of their own, `climb_`: he can scurry up them)
+    poles = Piece("climb_poles")
     for x, z in POLES:
-        piece.cylinder((x, 0.0, z), 0.18, POLE_TOP + 0.4, "pole", 8)
+        poles.cylinder((x, 0.0, z), 0.18, POLE_TOP + 0.4, "pole", 8)
         piece.box((x, POLE_TOP, z), (1.6, 0.14, 0.14), "darkwood")
         for k in range(9):
             piece.box((x, 0.9 + k * 0.6, z + 0.25 * (1 if k % 2 else -1)), (0.06, 0.06, 0.3), "metal")
+    poles.done()
     for (xa, za), (xb, zb) in zip(POLES, POLES[1:]):
         wire((xa, POLE_TOP + 0.08, za), (xb, POLE_TOP + 0.08, zb), 6)
     # The billboard on the north wall, its catwalk only to be reached by gliding from the roofs by it

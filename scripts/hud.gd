@@ -68,6 +68,7 @@ func _ready() -> void:
 	_buttons.add_theme_constant_override(&"separation", 12)
 	root.add_child(_buttons)
 	_button(Icon.Kind.DUCK, "C", &"duck")
+	_button(Icon.Kind.SCURRY, "Shift", &"scurry")
 	_button(Icon.Kind.TAIL, "E", &"tail")
 	_button(Icon.Kind.JUMP, "Space", &"jump")
 
@@ -150,6 +151,11 @@ func _button(what: Icon.Kind, key: String, action: StringName) -> void:
 
 
 func _press(action: StringName, down: bool) -> void:
+	if action == &"scurry":
+		var scurry := world.player.get_node_or_null(^"Scurry") as Scurry
+		if scurry:
+			scurry.button = down
+		return
 	if action == &"tail":
 		if down:
 			_tail()

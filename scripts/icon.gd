@@ -3,7 +3,7 @@ extends Control
 ## A small symbol drawn in code (no font has them all, and none on the web):
 ## for the HUD's counts and the buttons.
 
-enum Kind { HEART, HEART_EMPTY, CRUMB, CAP, JUMP, DUCK, SPRINT, TAIL, CLOCK }
+enum Kind { HEART, HEART_EMPTY, CRUMB, CAP, JUMP, DUCK, SPRINT, TAIL, CLOCK, SCURRY }
 
 var kind := Kind.HEART
 var colour := Color.WHITE
@@ -70,6 +70,12 @@ func _draw() -> void:
 				var t := k / 39.0
 				spiral.append(c + Vector2.from_angle(t * TAU * 1.6) * s * (0.08 + 0.34 * t))
 			draw_polyline(spiral, colour, w, true)
+		Kind.SCURRY:
+			# A paw print: the pad and four toes
+			draw_circle(c + Vector2(0, s * 0.12), s * 0.2, colour)
+			for k in 4:
+				var a := lerpf(-2.35, -0.8, k / 3.0)
+				draw_circle(c + Vector2(0, s * 0.12) + Vector2.from_angle(a) * s * 0.33, s * 0.085, colour)
 		Kind.CLOCK:
 			draw_circle(c, s * 0.42, colour)
 			draw_circle(c, s * 0.34, ink)

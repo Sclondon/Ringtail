@@ -55,13 +55,14 @@ func _run() -> void:
 		bound = maxf(bound, rig._gallop)
 	_check(most > 0.9 and bound > 0.5, "running on all fours (quad %.2f)" % most)
 
-	# Duck-walking too
+	# Scurrying, he goes on all fours at a walk too
 	await _put(Vector3(0.0, 0.05, 8.0))
-	Input.action_press(&"duck")
+	(player.get_node(^"Scurry") as Scurry).button = true
 	await _frames(10)
-	Input.action_press(&"move_up", 0.7)
+	Input.action_press(&"move_up", 0.35)
 	await _frames(50)
-	_check(rig._quad > 0.9 and rig._gallop < 0.2, "duck-walk on all fours (quad %.2f)" % rig._quad)
+	_check(rig._quad > 0.9 and rig._gallop < 0.2, "scurrying on all fours at a walk (quad %.2f)" % rig._quad)
+	(player.get_node(^"Scurry") as Scurry).button = false
 
 	# Jump held on the way down: the twirl, falling slowly
 	await _put(Vector3(0.0, 0.05, 8.0))
@@ -202,6 +203,25 @@ func _run() -> void:
 			highest = maxf(highest, player.global_position.y)
 		Input.action_release(&"jump")
 		_check(swimming and highest - pond.surface_y() > 1.7, "a leap out of the water (%.2f m over it)" % (highest - pond.surface_y()))
+
+	# Scurrying into a power pole, he climbs it
+	var scurry := player.get_node(^"Scurry") as Scurry
+	await _put(Vector3(3.0, 0.05, -31.2))
+	world.camera.set_process(false)
+	world.camera.set_physics_process(false)
+	world.camera.global_transform = Transform3D(Basis(Vector3.UP, PI), Vector3(3.0, 2.0, -35.0))
+	scurry.button = true
+	Input.action_press(&"move_up")
+	var base := player.global_position.y
+	var was_climbing := false
+	for _i in 120:
+		await physics_frame
+		was_climbing = was_climbing or scurry.climbing
+	_check(was_climbing and player.global_position.y - base > 2.5, "scurries up a pole (%.1f m)" % (player.global_position.y - base))
+	scurry.button = false
+	_release()
+	world.camera.set_process(true)
+	world.camera.set_physics_process(true)
 
 	# A pounce hurts, and losing every heart sends him back
 	world.hurt(player.global_position + Vector3.FORWARD)
