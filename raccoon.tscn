@@ -17,6 +17,7 @@ sprint_delay = 0.12
 sprint_push = 0.985
 flip_lift = 2.2
 flip_time = 0.8
+dive_window = 0.5
 slide_min_speed = 5.0
 sleep_after = 75.0
 spin_rate = 28.0

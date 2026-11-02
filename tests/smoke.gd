@@ -77,7 +77,7 @@ func _run() -> void:
 	_check(rig._quad > 0.9 and rig._gallop < 0.2, "scurrying on all fours at a walk (quad %.2f)" % rig._quad)
 	(player.get_node(^"Scurry") as Scurry).button = false
 
-	# Jump held on the way down: the twirl, falling slowly
+	# Jump pressed again in the air and held: the twirl, falling slowly
 	await _put(Vector3(0.0, 0.15, 29.5))
 	Input.action_press(&"jump")
 	player._queue_jump()
@@ -85,6 +85,8 @@ func _run() -> void:
 	var slowest := 0.0
 	for _i in 60:
 		await physics_frame
+		if _i == 15:
+			player._queue_jump()
 		if moves.gliding:
 			glided = true
 			slowest = minf(slowest, player.velocity.y)

@@ -6,7 +6,7 @@ extends Node3D
 ## "the smoke dust needs to spawn exactly on every step not just a generic trail, and it should be a few puffs"):
 ## each paw on all fours (RaccoonRig.stepped), each foot upright; a ring on landing; a trail sliding; a ring spinning.
 
-const BLOBS := 40
+const BLOBS := 140
 const LIFE := 0.55
 
 var _player: Player

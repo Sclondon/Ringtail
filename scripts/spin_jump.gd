@@ -8,8 +8,8 @@ extends Node
 ## The Player takes no jump while spinning, so the jump is caught here, before the Player moves each step.
 
 ## How much higher than a jump, and how fast he may fall twirling down.
-@export var height := 1.6
-@export var fall := 3.2
+@export var height := 2.6
+@export var fall := 1.8
 
 var twirling := false
 var _player: Player

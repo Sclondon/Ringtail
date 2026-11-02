@@ -6,7 +6,7 @@ extends Node
 ## - Spin (the tail button; the user, 2026-11-01: "the tail attack should be a spin"):
 ##   wound up, then once round with the tail flung out, hitting everything around him. In the air it
 ##   is a second jump, once a jump.
-## - Twirl (jump held while falling): the tail whirled over his head, and he comes down slowly.
+## - Twirl (jump pressed again in the air, then held): the tail whirled over his head, and he comes down slowly.
 ##
 ## Anything in the group `tail_hittable` with a `tail_hit(from: Vector3, push: Vector3)`
 ## method is hit; a RigidBody3D in it without one is knocked away.
@@ -20,8 +20,6 @@ signal struck(what: Node)
 @export var spin_jump := 0.95
 ## How fast he may fall while twirling.
 @export var glide_fall := 1.25
-## He has to have been off the ground this long before a held jump twirls.
-@export var glide_after := 0.22
 
 ## How far through each move he is (1: not doing it).
 var spin := 1.0
@@ -32,6 +30,8 @@ var _struck := {}
 var _airborne := 0.0
 var _spun_this_jump := false
 var _pressed := false
+var _twirl_armed := false
+var _buffer_was := 0.0
 
 
 func _ready() -> void:
@@ -79,9 +79,18 @@ func _physics_process(delta: float) -> void:
 		if spin > RaccoonRig.SPIN_WIND and spin < RaccoonRig.SPIN_TURNED:
 			_strike(spin_reach, PI)
 
-	# The twirl: jump held on the way down.
+	# The twirl: jump pressed again in the air (the user, 2026-11-02: "the helicopter tail should only happen if you
+	# press A again"), then held on the way down. (A press the Player has not used is left in its jump buffer.)
+	var buffer: float = _player._jump_buffer
+	if grounded:
+		_twirl_armed = false
+	elif free and buffer > _buffer_was and _airborne > 0.1:
+		_twirl_armed = true
+		_player._jump_buffer = 0.0
+		buffer = 0.0
+	_buffer_was = buffer
 	var holding: bool = _player._is_jump_held()
-	gliding = free and not grounded and holding and _airborne > glide_after and _player.velocity.y < 0.0 and not _player.is_diving and spin >= 1.0
+	gliding = free and not grounded and _twirl_armed and holding and _player.velocity.y < 0.0 and not _player.is_diving and spin >= 1.0
 	if gliding:
 		_player.velocity.y = maxf(_player.velocity.y, -glide_fall)
 

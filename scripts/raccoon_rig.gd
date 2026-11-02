@@ -82,6 +82,7 @@ var _tail_yaw_was := 0.0
 ## The trail behind the tail as it is swung: where its end and a point back along it were, these last frames.
 var _trail_mesh: MeshInstance3D
 var _trail: Array[PackedVector3Array] = []
+var _trail_tip := Vector3.INF
 var _lids: Array[Node3D] = []
 var _brows: Array[Node3D] = []
 var _brow_rest: Array[Vector3] = []
@@ -444,6 +445,21 @@ func _swoosh(spin: float) -> void:
 		_trail_mesh.material_override = look
 		add_child(_trail_mesh)
 	var sweeping := (spin > SPIN_WIND and spin < SPIN_TURNED) or _glide > 0.5 or _tj_w > 0.5
+	# (the trail is the stepping dust's little clouds, shed from the tail's end as it goes round: the user,
+	# 2026-11-02, "the tail swipe and helicopter should use the stepping dust particle")
+	var dust := get_parent().get_node_or_null(^"CloudDust") as CloudDust
+	if dust:
+		_trail_mesh.visible = false
+		if sweeping and _points.size() > TAIL_BONES:
+			var tip := _points[TAIL_BONES]
+			var from: Vector3 = _trail_tip if _trail_tip != Vector3.INF else tip
+			for k in 2:
+				var at := from.lerp(tip, (k + 1) * 0.5)
+				dust.puff(at - Vector3.UP * 0.04, (at - _points[2]).normalized() * 0.3 + Vector3.UP * 0.1, 0.075)
+			_trail_tip = tip
+		else:
+			_trail_tip = Vector3.INF
+		return
 	if sweeping and _points.size() > TAIL_BONES:
 		_trail.push_front(PackedVector3Array([_points[2], _points[TAIL_BONES]]))
 	elif not _trail.is_empty():
