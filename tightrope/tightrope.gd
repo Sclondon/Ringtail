@@ -24,6 +24,9 @@ const BALANCE := 7.0
 const WAKE := 4.0
 const BODIES_NEAR := 36.0
 const BODIES_GONE := 48.0
+## Its bounce: a spring this stiff, this damped (a bounce about every half second, dying away in about a second).
+const BEND_STIFF := 170.0
+const BEND_DAMP := 2.6
 
 @export var from := Vector3.ZERO
 @export var to := Vector3(6, 0, 0)
@@ -39,6 +42,12 @@ const BODIES_GONE := 48.0
 
 var _points := PackedVector3Array()
 var _before := PackedVector3Array()
+## As it is drawn and stood on: the chain, bent down further by its bounce (`_bend` metres at most, at `_bend_t` of the
+## way along, springing back at `_bend_speed`).
+var _shown := PackedVector3Array()
+var _bend := 0.0
+var _bend_speed := 0.0
+var _bend_t := 0.5
 var _piece := 0.0
 var _bodies: Array[AnimatableBody3D] = []
 var _look_in := 0.0
@@ -58,6 +67,7 @@ func _ready() -> void:
 		var t := float(i) / (POINTS - 1)
 		_points.append(from.lerp(to, t) + Vector3.DOWN * 4.0 * t * (1.0 - t) * sag)
 	_before = _points.duplicate()
+	_shown = _points.duplicate()
 	_strands = _many(_cable(), POINTS - 1)
 	if style == Style.VINE:
 		_grow_leaves()
@@ -117,24 +127,30 @@ func _physics_process(delta: float) -> void:
 	var middle := POINTS / 2
 	var anyone := _anyone_within(WAKE)
 	# (hanging still with nobody by it, it rests)
-	if (_points[middle] - _before[middle]).length_squared() < 0.000001 and not anyone:
+	if (_points[middle] - _before[middle]).length_squared() < 0.000001 and not anyone and absf(_bend) < 0.001 and absf(_bend_speed) < 0.01:
 		return
 	var gravity := Vector3.DOWN * 9.8
 	var pull := []
 	pull.resize(POINTS)
 	pull.fill(0.0)
 	for body: Node in get_tree().get_nodes_in_group(&"tightrope_walkers"):
-		var i := _nearest((body as Node3D).global_position)
-		if i >= 0:
-			pull[i] += 1.0
+		var at := (body as Node3D).global_position
+		if _nearest(at) >= 0:
+			# (shared between the two points either side of him by how near each is, so it does not jump from one
+			# point to the next as he moves and set the line bobbing)
+			var t := clampf(distance_along(at) / maxf(span(), 0.001), 0.0, 1.0) * (POINTS - 1)
+			var i := mini(int(t), POINTS - 2)
+			pull[i] += 1.0 - (t - i)
+			pull[i + 1] += t - i
 	# A step of the chain: each point carries on as it was going, falls, and is drawn down by anyone on it near it
 	for i in range(1, POINTS - 1):
 		var p := _points[i]
-		var moving := (p - _before[i]) * 0.985
+		# (stood on, it settles sooner: it does not go on bobbing under him)
+		var moving := (p - _before[i]) * (0.985 - 0.1 * minf(float(pull[i]) * 2.0, 1.0))
 		_before[i] = p
 		_points[i] = p + moving + (gravity * (1.0 + float(pull[i]) * weight)) * delta * delta
 	# Then held to its length, again and again, but not quite: it gives a little, most where the weight is
-	for k in 6:
+	for k in 16:
 		_points[0] = from
 		_points[POINTS - 1] = to
 		for i in POINTS - 1:
@@ -149,6 +165,11 @@ func _physics_process(delta: float) -> void:
 				_points[i] = a + fix
 			if i + 1 < POINTS - 1:
 				_points[i + 1] = b - fix
+	# Its bounce, a spring of its own laid over the chain: pressed down where it was struck, as a string is
+	_bend_speed += (-_bend * BEND_STIFF - _bend_speed * BEND_DAMP) * delta
+	_bend += _bend_speed * delta
+	for i in POINTS:
+		_shown[i] = _points[i] + Vector3.DOWN * _bend * _bend_shape(float(i) / (POINTS - 1))
 	_lay()
 	# Whoever stands on it is drawn back over it, unless he is stepping off, and balances on it
 	for body: Node in get_tree().get_nodes_in_group(&"tightrope_walkers"):
@@ -180,7 +201,7 @@ func _nearest(at: Vector3) -> int:
 	var best := -1
 	var best_distance := 0.9
 	for i in range(1, POINTS - 1):
-		var p := _points[i]
+		var p := _shown[i]
 		var level := Vector2(at.x - p.x, at.z - p.z).length()
 		if level < FOOTING * 2.0 and at.y > p.y - 0.3 and at.y < p.y + 0.8 and level < best_distance + FOOTING:
 			best = i
@@ -191,8 +212,8 @@ func _nearest(at: Vector3) -> int:
 func _lay() -> void:
 	var side := line().cross(Vector3.UP)
 	for i in POINTS - 1:
-		var a := _points[i]
-		var b := _points[i + 1]
+		var a := _shown[i]
+		var b := _shown[i + 1]
 		if not _bodies.is_empty():
 			_bodies[i].global_transform = _piece_at(i, side)
 		var along := b - a
@@ -202,8 +223,8 @@ func _lay() -> void:
 	if _leaves:
 		for i in _leaf_places.size():
 			var place: Array = _leaf_places[i]
-			var a := _points[place[0]]
-			var b := _points[place[0] + 1]
+			var a := _shown[place[0]]
+			var b := _shown[place[0] + 1]
 			var along := (b - a).normalized()
 			var out := side.rotated(along, place[2])
 			var face := along.cross(out)
@@ -216,8 +237,8 @@ func _lay() -> void:
 
 ## Where piece `i` lies (`side` the way across it), for its body to stand on.
 func _piece_at(i: int, side: Vector3) -> Transform3D:
-	var a := _points[i]
-	var b := _points[i + 1]
+	var a := _shown[i]
+	var b := _shown[i + 1]
 	var along := (b - a).normalized()
 	var up := side.cross(along).normalized() * -1.0
 	if up.y < 0.0:
@@ -289,7 +310,7 @@ func point_at_distance(distance: float) -> Vector3:
 	var t := clampf(distance / span_now, 0.0, 1.0) * (POINTS - 1)
 	var i := mini(int(t), POINTS - 2)
 	var level := from + line() * distance
-	var y := lerpf(_points[i].y, _points[i + 1].y, t - i)
+	var y := lerpf(_shown[i].y, _shown[i + 1].y, t - i)
 	return Vector3(level.x, y, level.z)
 
 
@@ -304,15 +325,41 @@ func distance_to(point: Vector3) -> float:
 
 
 func _closest(point: Vector3) -> Vector3:
-	var best := _points[0]
+	var best := _shown[0]
 	for i in POINTS - 1:
-		var a := _points[i]
-		var ab := _points[i + 1] - a
+		var a := _shown[i]
+		var ab := _shown[i + 1] - a
 		var t := clampf((point - a).dot(ab) / maxf(ab.length_squared(), 0.0001), 0.0, 1.0)
 		var p := a + ab * t
 		if p.distance_squared_to(point) < best.distance_squared_to(point):
 			best = p
 	return best
+
+
+## Something coming down on it at `feet` at `speed` (m/s): the line is struck down there, bent as a string is,
+## and springs back up and bounces a while (for jumps timed to its bounce: `spring_at`; Ringtail, 2026-11-02, "you
+## should be able to bounce on the wires and time your jumps to jump higher and higher").
+func kick(feet: Vector3, speed: float) -> void:
+	var t := clampf(distance_along(feet) / maxf(span(), 0.001), 0.05, 0.95)
+	# (struck somewhere new while still bouncing: the bend moves there, keeping how deep it is there)
+	var shape := _bend_shape(t)
+	_bend *= shape
+	_bend_speed *= shape
+	_bend_t = t
+	_bend_speed += speed
+
+
+## Under `feet`: how far its bounce has it pressed down (m), and how fast it is coming back up (m/s; less than 0
+## going down). A jump from it at the bottom of a bounce can be given more.
+func spring_at(feet: Vector3) -> Vector2:
+	var shape := _bend_shape(distance_along(feet) / maxf(span(), 0.001))
+	return Vector2(maxf(_bend * shape, 0.0), -_bend_speed * shape)
+
+
+## How far down a point `t` of the way along is bent, for a bend of 1 m where it was struck (a string pushed at one
+## point: straight to each end).
+func _bend_shape(t: float) -> float:
+	return t / _bend_t if t <= _bend_t else (1.0 - t) / (1.0 - _bend_t)
 
 
 ## Whether someone whose feet are at `feet` is stood on it: over its line, on it, not under it or well over it.
