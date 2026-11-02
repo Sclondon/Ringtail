@@ -1,7 +1,7 @@
 """The hazards' models (the user, 2026-11-01: "there should be birds and other predators to avoid, and people as
 well and cars"; enemies "in the same style as the hero"). Looks and sizes are Claude's (placeholders):
 
-    crow   a scruffy black crow, bushy zigzag spikes of feather like the raccoon's fur, big cartoon eyes
+    (the crow was here too: it is tools/build_birds.py's now, models/crow.glb, with the owl)
     hawk   a brown hawk with a cream chest ruff, hooked yellow beak, fierce brow, banded tail, broad zigzag wings
     car    a rounded cartoon car (its body paint is tinted in the game), four wheels to turn
 
@@ -336,7 +336,6 @@ def look(folder, name, objects):
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 models = {
-    "crow": bird("crow", 1.0, "crow", "crowdeep", "crowdeep", "beak", False, False),
     "hawk": bird("hawk", 1.7, "hawk", "hawkdark", "cream", "yellow", True, True),
     "car": car(),
 }

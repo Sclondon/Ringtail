@@ -118,3 +118,33 @@ Read README.md first. Started 2026-11-01.
 - "the kits should not teleport to you, and if they die they should just rag doll and stop moving": villagers too
   (Villager.die: a car, a fall over SquadRaccoon.DEADLY_FALL, off the world).
 - Claude's placeholders: every villager's name and line (hello-level chatter), their tints and sizes.
+
+## 2026-11-02: the crow and the owl
+
+- The user: "we need to work on a nice owl and crow model as well", then "the bird wings need joints not just simple
+  flaps, make an accurate bird wing flap with reference to the species — like look up images".
+- tools/build_birds.py (Blender) writes models/crow.glb (a large-billed crow: big arched bill, steep brow, shaggy
+  throat, wedge tail, fingered primaries) and models/owl.glb (an eagle-owl: ear tufts, pale facial disc rimmed dark,
+  orange eyes under heavy lids, streaked chest, barred wings and tail, feathered legs, black talons), in the
+  raccoon's style (smooth forms, spiky tufts). References (Wikimedia Commons, kept out of the repo): a large-billed
+  crow, a pied crow flight composite, crows and a raven in flight, Muybridge's Animal Locomotion plate 762, eagle-owl
+  and great horned owl photos, eagle-owls flying.
+- Parts are a tree of joints, each with no turn at rest, the wings built spread: body > head (> the owl's lids),
+  tail, legs; shoulder > `_fore` (elbow) > `_hand` (wrist) > `_p0.._p6` (each primary). BirdBody (scripts/bird_body.gd)
+  poses them: `fold`, `flap`, `flap_rate`, `tuck`, `flare` (landing), `look_at_point`, `peck`, `blink`.
+  - Folding is a Z: the arm rolled (trailing edge down, tilted out over the body) and swung back, the forearm hinged
+    back over it and the hand out over that, both about the wing's chord (Z), so the feathers still trail; each
+    primary laid back along the body. Folding in the wing's own plane (about Y) turned the forearm's feathers up
+    over the back.
+  - The beat (CROW_STROKE, OWL_STROKE): downstroke straight and bowed down, leading edge down; upstroke elbow and
+    wrist flexed, hand swept back, primaries fanned and twisted apart. Crow: rowing, ~2.7 beats a second. Owl: deep
+    slow strokes up into a high V, broad wing barely flexed, long flat glides. The body leans level in flight.
+- The crows (HazardCrows / HazardBird kind CROW) are on BirdBody: folded on the ground, eyeing him, pecking, a
+  flick of the wings on each hop; beating in flight, gliding in to land, half folded diving. The hawk is still
+  build_hazards.py's plain model.
+- HazardOwl (Claude's picks, placeholders: its role, its numbers): sits on a pole top (or `owl_<n>` markers), head
+  following him; near him on the ground outside the grove it stares (no blinking), swoops silently, talons forward,
+  beats back and glides in to its perch. `HazardOwl.place(world, markers, player)` goes after Hazards.place.
+- Checks: `tests/bird_shots.gd -- --out=<dir>` (each pose from four sides, close up, beat filmstrips side/front/
+  above, glide, landing), `tests/bird_clip.gd` (folded wing points no more than 4 mm into the body; each wing's
+  shoulder excepted), `tests/owl_test.gd` (owl and crows on a flat yard), `tests/bird_world_shots.gd` (in the town).
