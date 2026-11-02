@@ -44,6 +44,8 @@ func _run() -> void:
 	for what: String in SINGLES:
 		if what in only:
 			await _singles(what)
+	if "hands" in only:
+		await _hands()
 	if "eyes" in only:
 		await _eyes()
 	if only.is_empty() or "menus" in only:
@@ -244,4 +246,42 @@ func _singles(what: String) -> void:
 			await _shoot("%s_%d_%s" % [what, k, view[0]])
 		stand.queue_free()
 		await _frames(2)
+	stage.queue_free()
+
+
+## His left paw close up from the front, its side and below (the user, 2026-11-02: "his fingers are still splayed").
+func _hands() -> void:
+	var stage := Node3D.new()
+	root.add_child(stage)
+	var environment := Environment.new()
+	environment.background_mode = Environment.BG_COLOR
+	environment.background_color = Color(0.5, 0.62, 0.72)
+	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	environment.ambient_light_color = Color(0.6, 0.6, 0.65)
+	var lit := WorldEnvironment.new()
+	lit.environment = environment
+	stage.add_child(lit)
+	var sun := DirectionalLight3D.new()
+	sun.rotation_degrees = Vector3(-45.0, 30.0, 0.0)
+	stage.add_child(sun)
+	var eye := Camera3D.new()
+	eye.fov = 30.0
+	stage.add_child(eye)
+	eye.make_current()
+	var stand := FurEditor.Stand.new()
+	var rig := RaccoonRig.new()
+	rig.model = load("res://models/raccoon.glb")
+	rig.key_poses = false
+	rig.cap_hand = false
+	rig.dusty = false
+	stand.add_child(rig)
+	stage.add_child(stand)
+	await _frames(40)
+	var skeleton: Skeleton3D = rig._skeleton
+	var paw := skeleton.global_transform * skeleton.get_bone_global_pose(skeleton.find_bone("hand_l")).origin
+	for view: Array in [["front", Vector3(0.2, 0.0, 1.0)], ["side", Vector3(1.0, 0.0, 0.1)], ["below", Vector3(0.1, -1.0, 0.25)]]:
+		var aim := paw + Vector3(0.0, -0.04, 0.0)
+		eye.look_at_from_position(aim + (view[1] as Vector3).normalized() * 0.45, aim)
+		await _frames(3)
+		await _shoot("hand_%s" % view[0])
 	stage.queue_free()

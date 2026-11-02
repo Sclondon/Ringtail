@@ -153,14 +153,18 @@ def hands(b):
         palm = [(-0.045, 0.028, 0.030), (0.0, 0.024, 0.032), (0.030, 0.020, 0.040), (0.055, 0.016, 0.040)]
         rings = [(wrist + X * side * d, Y * ry, Z * rz) for d, ry, rz in palm]
         b.tube(rings + kit.dome(rings[-1], X * side, 0.010, 2), 12)
-        # Four long fingers, spread a little, and a thumb forward
+        # Four long fingers together side by side, touching, curled gently down at their tips, and the thumb tucked
+        # along the palm (the user, 2026-11-02: "his fingers are still splayed"; the rig has no finger bones on him,
+        # so they are as modelled here)
         for k in range(4):
             across = (k - 1.5) / 1.5
-            root = wrist + Vector((side * 0.050, -0.002, across * 0.026))
+            root = wrist + Vector((side * 0.050, -0.002, across * 0.03))
             # (long, as a raccoon's are: the user, 2026-11-01, "his fingers need to be longer")
-            tip = root + Vector((side * (0.085 - abs(across) * 0.016), -0.014, across * 0.026))
-            b.strand([root, root.lerp(tip, 0.55) + Vector((0.0, 0.002, 0.0)), tip], [0.011, 0.010, 0.008])
-        b.strand([wrist + Vector((side * x, y, z)) for x, y, z in ((0.012, -0.004, 0.026), (0.034, -0.009, 0.054), (0.058, -0.012, 0.072))],
+            reach = 0.082 - abs(across) * 0.014
+            middle = root + Vector((side * reach * 0.55, -0.003, -across * 0.002))
+            tip = root + Vector((side * reach, -0.024, -across * 0.004))
+            b.strand([root, middle, tip], [0.011, 0.010, 0.008])
+        b.strand([wrist + Vector((side * x, y, z)) for x, y, z in ((0.012, -0.006, 0.024), (0.030, -0.013, 0.036), (0.046, -0.019, 0.042))],
                  [0.011, 0.010, 0.008])
 
 
