@@ -556,7 +556,7 @@ def head_fur(_b):
     tags = {}
     rng = random.Random(5)
     placed = 0
-    while placed < 95:
+    while placed < 150:
         # (a point on the skull, as drawn: not on the face in front of the ears, nor under the jaw)
         a = rng.uniform(0.0, math.tau)
         b = rng.uniform(-0.35, 1.25)
@@ -565,8 +565,9 @@ def head_fur(_b):
             continue
         root = HEAD_CENTRE + Vector((n.x * HEAD_RADII.x, n.y * HEAD_RADII.y, n.z * HEAD_RADII.z)) * 0.97
         out = Vector((n.x / HEAD_RADII.x, n.y / HEAD_RADII.y, n.z / HEAD_RADII.z)).normalized()
-        # (laid back over the head, as fur is)
-        tuft(made, tags, root, (out * 0.45 - Z - Y * 0.3).normalized(), rng.uniform(0.015, 0.032), 0.022, REGION["head"], rng)
+        # (laid back over the head, as fur is, but standing up off it enough to be seen: the user, 2026-11-02,
+        # "you cant really see the fur on his head")
+        tuft(made, tags, root, (out * 0.9 - Z * 0.75 - Y * 0.15).normalized(), rng.uniform(0.03, 0.055), 0.026, REGION["head"], rng)
         placed += 1
     bmesh.ops.recalc_face_normals(made, faces=made.faces[:])
     tag_spikes(made, tags)

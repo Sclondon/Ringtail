@@ -370,7 +370,10 @@ func _spring_fur(delta: float) -> void:
 		# (thrown back by how it is hurried, streamed back by how fast it goes, and always hanging down a little,
 		# so on all fours it hangs off his back and sides and bounces with each stride: the user, 2026-11-02,
 		# "while running it seems like the fur just sticks up rather than bounce around")
-		var push := -accel.limit_length(60.0) * 1.1 - speed.limit_length(8.0) * 2.2 + Vector3.DOWN * 13.0
+		# (not the tail's cones nor the head's tufts: hung, the tail drooped and the head fur lay flat; the user,
+		# 2026-11-02, "his tail is all droopy now", "you cant really see the fur on his head")
+		var hangs := r < FUR_HEAD - TAIL_BONES
+		var push := -accel.limit_length(60.0) * 1.1 - speed.limit_length(8.0) * 2.2 + Vector3.DOWN * (13.0 if hangs else 0.0)
 		if r == FUR_HEAD:
 			push += Vector3(sin(_time * 41.0), sin(_time * 37.0), 0.0) * 18.0 * _sniff
 		_fur_lag_speed[r] += (push - _fur_lag[r] * FUR_STIFFNESS - _fur_lag_speed[r] * FUR_DAMPING) * delta
