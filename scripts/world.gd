@@ -485,6 +485,7 @@ func _grow_lawn() -> void:
 	var lawn := TownGrass.place(self, player, markers)
 	Wildlife.place(self, lawn, player)
 	GroveAnimals.place(self, markers, player)
+	GroveMushrooms.place(self, markers, lawn)
 	# (the points to stand on one hand on: pole tops, tree tips: PointStand)
 	PointPerches.find(self)
 	# One wind over the hill: Wind Waker ribbons riding it round him, the grass gusting in step (GameCommon wind; the
