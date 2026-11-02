@@ -383,6 +383,12 @@ var _bones: Array[int] = []
 ## For each joint: 0, or which arm it belongs to (1 left, -1 right; doubled for the shoulder itself).
 var _arm_sides: Array[int] = []
 
+## Posed every this many frames (1: every frame). A figure far off need not be posed each frame: a game sets it by
+## distance (Ringtail's ZoneStreaming), and the rig is given all the time since, so it keeps pace.
+var lod_every := 1
+var _lod_count := 0
+var _lod_time := 0.0
+
 var _time := 0.0
 var _phase := 0.0
 var _move := 0.0
@@ -770,7 +776,16 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if _player == null:
 		return
-	delta = minf(delta, 1.0 / 30.0)
+	# (posed only every `lod_every` frames when far, given all the time since, so it keeps pace)
+	if lod_every > 1:
+		_lod_count += 1
+		_lod_time += delta
+		if _lod_count < lod_every:
+			return
+		delta = _lod_time
+		_lod_count = 0
+		_lod_time = 0.0
+	delta = minf(delta, lod_every / 30.0)
 	if _ragdoll:
 		_follow_ragdoll()
 		_apply_pose()

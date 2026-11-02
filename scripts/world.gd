@@ -499,3 +499,5 @@ func _grow_lawn() -> void:
 	ribbons.field = wind
 	ribbons.follow_camera = true
 	add_child(ribbons)
+	# Only the zone he is in is run (the user, 2026-11-02: "only load stuff in the zone you're in")
+	ZoneStreaming.start(self)

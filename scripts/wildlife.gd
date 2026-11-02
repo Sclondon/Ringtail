@@ -54,7 +54,7 @@ static func place(world: Node3D, lawn: TownGrass, hero: Node3D) -> Wildlife:
 func _physics_process(delta: float) -> void:
 	for k in _beasts.size():
 		var beast := _beasts[k]
-		if not is_instance_valid(beast):
+		if not is_instance_valid(beast) or not beast.can_process():
 			continue
 		var kind := _kinds[k]
 		var at := beast.global_position

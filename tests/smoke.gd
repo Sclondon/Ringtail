@@ -54,6 +54,8 @@ func _run() -> void:
 			quiet.append(node.get_parent())
 	for node: Node in quiet:
 		node.process_mode = Node.PROCESS_MODE_DISABLED
+		# (and kept so when ZoneStreaming wakes its zone)
+		node.set_meta(&"stream_mode", Node.PROCESS_MODE_DISABLED)
 		if node is Node3D:
 			(node as Node3D).global_position.y = -300.0
 

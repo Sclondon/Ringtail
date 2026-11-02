@@ -141,7 +141,13 @@ func _ready() -> void:
 func _show_counts() -> void:
 	var zones := world.zones
 	var zone := zones.current if zones else -1
-	if zone >= 0:
+	if zone >= 0 and zone == zones.grove:
+		# (the grove is a zone too: its own food; and the kits, all of which come home there, counted for the hill)
+		_zone.text = "The grove"
+		_crumbs.text = "%d / %d" % [zones.food[zone], zones.food_total[zone]]
+		if world.lost_kits:
+			_kits.text = "%d / %d" % [world.lost_kits.found, world.lost_kits.total]
+	elif zone >= 0:
 		_zone.text = zones.names[zone]
 		_crumbs.text = "%d / %d" % [zones.food[zone], zones.food_total[zone]]
 		_kits.text = "%d / %d" % [zones.kits[zone], zones.kits_total[zone]]

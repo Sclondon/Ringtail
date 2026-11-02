@@ -1,6 +1,6 @@
 extends SceneTree
-## The zones (Zones) with four markers of the test's own round the grove: every Crumb out of the grove counted in one,
-## the HUD's zone following him, and a Crumb taken in a zone counted there. Headless:
+## The zones (Zones): four sides (markers of the test's own if the world has none) and the grove, five: every Crumb
+## counted in one, the HUD's zone following him, and a Crumb taken in a zone counted there. Headless:
 ##   godot --headless --path . --audio-driver Dummy --fixed-fps 60 -s res://tests/zones_test.gd
 
 var failures: Array[String] = []
@@ -31,19 +31,20 @@ func _run(world: World) -> void:
 		zones.queue_free()
 		zones = Zones.place(world)
 		world.zones = zones
-	_check(zones.names.size() == 4, "four zones (%s)" % ", ".join(zones.names))
+	_check(zones.names.size() == 5 and zones.names[zones.grove] == "Grove", "five zones (%s)" % ", ".join(zones.names))
+	_check(zones.zone_of(heart) == zones.grove and zones.zone_of(heart + Vector3(Zones.GROVE_RADIUS + 5.0, 0.0, 0.0)) != zones.grove, "the grove is the zone round its heart")
 	var outside := 0
 	for node in world.get_children():
-		if node is Pickup and (node as Pickup).kind == Pickup.Kind.CRUMB and not Hazards.safe((node as Pickup).global_position):
+		if node is Pickup and (node as Pickup).kind == Pickup.Kind.CRUMB:
 			outside += 1
 	var cans := 0
 	for node in world.get_children():
-		if node is TrashCan and not Hazards.safe((node as Node3D).global_position):
+		if node is TrashCan:
 			cans += (node as TrashCan).holds
 	var counted := 0
-	for k in 4:
+	for k in zones.names.size():
 		counted += zones.food_total[k]
-	_check(counted == outside + cans and counted > 0, "every Crumb out of the grove is in a zone (%d)" % counted)
+	_check(counted == outside + cans and counted > 0, "every Crumb is in a zone (%d)" % counted)
 	# A Crumb in a zone: he goes there, and takes it
 	var crumb: Pickup
 	for node in world.get_children():

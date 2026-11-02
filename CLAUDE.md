@@ -697,3 +697,28 @@ Read README.md first. Started 2026-11-01.
   the fishing button, as the crow, pause, the fur editor; also at --resolution 390x844).
 - Not done: on a tall phone screen the HUD's counts are drawn at desktop size (the canvas is 1280 wide), so small;
   the pause screen zooms itself, the HUD does not.
+
+## Performance: only the zone he is in runs (2026-11-02)
+
+- The user: "Let's work on performance too, make sure to only load stuff in the zone you're in (the grove and surround
+  ring is its own zone as well so 5 zones total)". Zones (scripts/zones.gd) has a fifth, "Grove": within GROVE_RADIUS
+  48 m of grove_heart (the clearing, the wood and the ring road out to its edge, 47.6 m); the HUD shows its own food
+  there and the kits for the whole hill (they come home to it).
+- `ZoneStreaming` (scripts/zone_streaming.gd, started at the end of World._grow_lawn) gives everything set out a zone
+  by where it is (a wire by its middle, a band of crows by its home): live (in his zone, home there, or within
+  LIVE_REACH 30 m of him), frozen (a still thing in a zone next to his: shown, not running), hidden (not running, not
+  shown, out of the physics). The grove is next to every side. Changes go 120 a frame, looked at every 0.3 s; a jump
+  of over 8 m (a respawn, a test) is set at once. Paused things only pause: nothing is moved. Not kept, so never
+  paused: him, the camera, his band, a villager following him. A car or walker DayNight put away stays away. Freed
+  things are let go. Far meshes of still things are not drawn past 125 m (trees) / 55 m (small things). A live
+  figure far from the camera is posed every 2nd/3rd/4th frame past 12/22/35 m (CharacterRig.lod_every, also in
+  GameCommon's character_rig.gd). A test that switches a node off for good sets its meta `stream_mode` to
+  PROCESS_MODE_DISABLED too, or a zone waking up turns it back on (smoke does).
+- Numbers (tests/perf_zones.gd, 1280x720 window, frame ms / process ms / physics ms), streaming off -> on:
+  Grove 97 / 52 / 13.1 -> 37 / 34 / 3.8; Station 71 / 43 / 11.5 -> 19 / 23 / 3.0; Estate 64 / 44 / 9.9 -> 19 / 23 / 3.3;
+  Stairs 62 / 39 / 11.6 -> 17 / 21 / 3.0; Shrine 63 / 42 / 12.1 -> 15 / 21 / 2.8. The grove is still the heaviest: 31
+  villagers, ~45 animals and ~3M primitives of dense trees in view.
+- Measure: `godot --path . --audio-driver Dummy --resolution 1280x720 -s res://tests/perf_zones.gd [-- --no-stream]`
+  (it shuts the pause screen each frame: it opens when the window loses focus and would stop everything). Any run with
+  `RINGTAIL_NO_STREAM=1` in the environment has streaming off. `tests/zone_streaming_test.gd` (headless) walks grove,
+  each side and back: live, frozen and hidden as above, the band running, the HUD's zone and counts.

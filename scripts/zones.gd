@@ -2,13 +2,19 @@ class_name Zones
 extends Node
 ## The hill's four sides, each a zone with food and kits of its own to find (the user, 2026-11-02: "it should be a 4
 ## sided hill ... breaking the map up into 4 zones. Each zone should be themed a little different and have different
-## kit and food trackers"). A zone is a `zone_<n>_<Name>` marker at its middle; anything belongs to the zone whose
-## marker is nearest (across the ground), except in the grove, which is no zone. The HUD shows the counts of the zone
-## he is in (and the whole hill's in the grove).
+## kit and food trackers"). A side is a `zone_<n>_<Name>` marker at its middle; anything belongs to the side whose
+## marker is nearest (across the ground). The grove and the woods and the ring road round it are a zone of their own,
+## the fifth (the user, 2026-11-02: "the grove and surround ring is its own zone as well so 5 zones total"): within
+## `GROVE_RADIUS` of the grove's heart. The HUD shows the counts of the zone he is in (in the grove: the grove's food,
+## and how many of all the lost raccoons are home). ZoneStreaming runs only the zone he is in.
 ##
 ##   world.zones = Zones.place(world)     # once the Crumbs, cans and lost kits are out
 
 signal changed
+
+## How far the grove's zone reaches from its heart (m): the clearing, the woods round it and the ring road
+## (build_town.py: ROAD's outer edge 47.6).
+const GROVE_RADIUS := 48.0
 
 var world: World
 ## Each zone: its name and middle, and its counts.
@@ -18,8 +24,11 @@ var food: Array[int] = []
 var food_total: Array[int] = []
 var kits: Array[int] = []
 var kits_total: Array[int] = []
-## The zone he is in now (-1: the grove, or no zones at all).
+## The zone he is in now (-1: no zones at all).
 var current := -1
+## Which zone is the grove (-1 with no zones), and its heart.
+var grove := -1
+var heart := Vector3.ZERO
 
 
 static func place(world: World) -> Zones:
@@ -34,6 +43,11 @@ static func place(world: World) -> Zones:
 	for zone: Array in found:
 		zones.names.append(String(zone[1]) if zone[1] != "" else "Zone %d" % (int(zone[0]) + 1))
 		zones.middles.append(zone[2])
+	if not zones.names.is_empty():
+		zones.heart = (world.markers["grove_heart"] as Transform3D).origin if world.markers.has("grove_heart") else Vector3.ZERO
+		zones.grove = zones.names.size()
+		zones.names.append("Grove")
+		zones.middles.append(zones.heart)
 	var count := zones.names.size()
 	for list: Array in [zones.food, zones.food_total, zones.kits, zones.kits_total]:
 		list.resize(count)
@@ -59,13 +73,15 @@ static func place(world: World) -> Zones:
 	return zones
 
 
-## The zone `at` is in: the nearest zone middle, or -1 in the grove (or with no zones).
+## The zone `at` is in: the grove near its heart, else the side whose middle is nearest; -1 with no zones.
 func zone_of(at: Vector3) -> int:
-	if middles.is_empty() or Hazards.safe(at):
+	if middles.is_empty():
 		return -1
+	if Vector2(at.x - heart.x, at.z - heart.z).length() < GROVE_RADIUS:
+		return grove
 	var best := -1
 	var nearest := INF
-	for k in middles.size():
+	for k in grove:
 		var d := Vector2(at.x - middles[k].x, at.z - middles[k].z).length()
 		if d < nearest:
 			nearest = d
