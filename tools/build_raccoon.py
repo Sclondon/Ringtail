@@ -382,6 +382,10 @@ def tag_spikes(made, tags):
 # spikes (the user, 2026-11-01: "his tail rings should be spiky cones sorta like zigzagoon"), grey and dark by turns.
 CONES = 8
 SPIKES = 9
+# (and round a ruff on his body, fewer and so broader: the user, 2026-11-02, "the fur strands are too skinny in general")
+RUFF_SPIKES = 6
+# (and each loose tuft on his body and crown this much broader than drawn)
+BLADE = 1.8
 
 
 def cones(dark):
@@ -468,13 +472,14 @@ FUR_TYPES = {
     "sleek": {"length": 0.45, "width": 1.2, "count": 0.5, "flare": 0.35},
     "wiry": {"length": 1.35, "width": 0.45, "count": 1.7, "flare": 1.1},
     "cones": {"cones": True},
+    "rings": {"rings": True},
 }
-FUR_NOW = {"length": 1.0, "width": 1.0, "count": 1.0, "flare": 1.0, "droop": 0.0, "cones": False}
+FUR_NOW = {"length": 1.0, "width": 1.0, "count": 1.0, "flare": 1.0, "droop": 0.0, "cones": False, "rings": False}
 
 
 def use_fur(kind):
     """Sets FUR_NOW for a fur type (FUR_TYPES), before building."""
-    FUR_NOW.update({"length": 1.0, "width": 1.0, "count": 1.0, "flare": 1.0, "droop": 0.0, "cones": False})
+    FUR_NOW.update({"length": 1.0, "width": 1.0, "count": 1.0, "flare": 1.0, "droop": 0.0, "cones": False, "rings": False})
     FUR_NOW.update(FUR_TYPES[kind])
 
 
@@ -588,13 +593,19 @@ def ruffs(_b):
     def ring(centre, axis, u, v, radius, lean=0.0, spiky=False, wide=1.0, region=0, base=None):
         # (`base`: the ruff's base ring (centre, radius), where each of the rim's points grows from)
         loop = []
-        count = SPIKES * 2 if spiky else SPIKES
-        twist = rng.uniform(0.0, math.tau)
+        count = RUFF_SPIKES * 2 if spiky else RUFF_SPIKES
+        even = FUR_NOW["rings"]
+        twist = 0.3 if even else rng.uniform(0.0, math.tau)
         for j in range(count):
-            a = math.tau * j / count + twist + (rng.uniform(-0.22, 0.22) * math.tau / count if spiky else 0.0)
+            a = math.tau * j / count + twist + (rng.uniform(-0.22, 0.22) * math.tau / count if spiky and not even else 0.0)
             tip = spiky and j % 2 == 0
-            r = radius * (rng.uniform(0.72, 1.4) if tip else (0.62 * rng.uniform(0.9, 1.1) if spiky else 1.0))
-            p = centre + axis * (lean * rng.uniform(0.4, 1.7) if tip else 0.0) + (u * math.cos(a) * wide + v * math.sin(a)) * r
+            if even:
+                # (the first rings: every spike alike, the user, 2026-11-02, "I kind of liked the earliest iteration")
+                r = radius * (1.0 if tip else (0.62 if spiky else 1.0))
+                p = centre + axis * (lean if tip else 0.0) + (u * math.cos(a) * wide + v * math.sin(a)) * r
+            else:
+                r = radius * (rng.uniform(0.72, 1.4) if tip else (0.62 * rng.uniform(0.9, 1.1) if spiky else 1.0))
+                p = centre + axis * (lean * rng.uniform(0.4, 1.7) if tip else 0.0) + (u * math.cos(a) * wide + v * math.sin(a)) * r
             vert = made.verts.new(kit.to_blender(reshape(p)))
             if spiky:
                 root = base[0] + (u * math.cos(a) * wide + v * math.sin(a)) * base[1]
@@ -617,19 +628,23 @@ def ruffs(_b):
                 made.faces.new((a[k0], a[k1], b[j1], b[j]))
 
     def ruff(centre, axis, radius, flare, region, lean=0.09, wide=1.0):
-        # (axis points down the limb: the spikes lean that way; each ruff tipped and nudged a little off true)
-        axis = (axis + Vector((rng.uniform(-1, 1), rng.uniform(-1, 1), rng.uniform(-1, 1))) * 0.22).normalized()
-        centre = centre + Vector((rng.uniform(-1, 1), rng.uniform(-1, 1), rng.uniform(-1, 1))) * 0.008
+        # (axis points down the limb: the spikes lean that way; each ruff tipped and nudged a little off true, but for
+        # the even rings)
+        if not FUR_NOW["rings"]:
+            axis = (axis + Vector((rng.uniform(-1, 1), rng.uniform(-1, 1), rng.uniform(-1, 1))) * 0.22).normalized()
+            centre = centre + Vector((rng.uniform(-1, 1), rng.uniform(-1, 1), rng.uniform(-1, 1))) * 0.008
         u = axis.cross(Z if abs(axis.z) < 0.9 else X).normalized()
         v = axis.cross(u).normalized()
         if SHAPE != "triangle":
             # (a ring of locks of the fur's shape, each from the ruff's root out to where a zigzag tip would be)
-            twist = rng.uniform(0.0, math.tau)
-            for j in range(SPIKES):
-                a = math.tau * j / SPIKES + twist + rng.uniform(-0.22, 0.22) * math.tau / SPIKES
+            even = FUR_NOW["rings"]
+            twist = 0.3 if even else rng.uniform(0.0, math.tau)
+            for j in range(RUFF_SPIKES):
+                a = math.tau * j / RUFF_SPIKES + twist + (0.0 if even else rng.uniform(-0.22, 0.22) * math.tau / RUFF_SPIKES)
                 out = u * math.cos(a) * wide + v * math.sin(a)
                 root = centre - axis * 0.035 + out * radius * 0.7
-                tip = centre + axis * lean * rng.uniform(0.4, 1.7) + out * radius * _flare(flare) * rng.uniform(0.72, 1.4)
+                reach = (1.0, 1.0) if even else (rng.uniform(0.4, 1.7), rng.uniform(0.72, 1.4))
+                tip = centre + axis * lean * reach[0] + out * radius * _flare(flare) * reach[1]
                 tuft(made, tags, root, (tip - root).normalized(), (tip - root).length, radius * 0.55, region, rng)
             return
         base = ring(centre - axis * 0.035, axis, u, v, radius * 0.7, wide=wide, region=region)
@@ -640,6 +655,26 @@ def ruffs(_b):
         made.faces.new(base[::-1])
         made.faces.new(back)
 
+    if FUR_NOW["rings"]:
+        # The first rings (tools/build_raccoon.py as at 593c2d7: the user, 2026-11-02, "Honestly I kind of liked the
+        # earliest iteration of the rings around his body"): even rings of spikes round his upper arms and thighs,
+        # cuffs at the elbows and knees, three layers round his body, and no loose tufts
+        for side in (1.0, -1.0):
+            out = X * side
+            suffix = "_l" if side > 0 else "_r"
+            for d, r, flare in ((0.07, 0.05, 1.9), (0.14, 0.046, 1.8), (UPPER_ARM, 0.043, 1.6)):
+                ruff(Vector((side * (SHOULDER.x + d), SHOULDER.y, 0.0)), out, r, flare,
+                     REGION[("upper_arm" if d < UPPER_ARM else "forearm") + suffix], 0.075)
+            for y, r, flare in ((HIP_Y - 0.04, 0.085, 1.7), (0.33, 0.072, 1.7), (KNEE_Y, 0.056, 1.5)):
+                ruff(Vector((side * HIP_X, y, 0.0)), -Y, r, flare, REGION[("thigh" if y > KNEE_Y else "shin") + suffix], 0.075)
+        for y, depth, wide, flare in ((0.47, 0.142, 1.15, 1.7), (0.6, 0.162, 1.16, 1.58), (0.73, 0.134, 1.2, 1.55)):
+            ruff(Vector((0.0, y, 0.006)), -Y, depth, flare, REGION["chest" if y > 0.7 else "hips"], 0.09, wide)
+        bmesh.ops.recalc_face_normals(made, faces=made.faces[:])
+        tag_spikes(made, tags)
+        mesh = bpy.data.meshes.new("ruffs")
+        made.to_mesh(mesh)
+        made.free()
+        return mesh
     for side in (1.0, -1.0):
         out = X * side
         suffix = "_l" if side > 0 else "_r"
@@ -700,6 +735,9 @@ def tuft(made, tags, root, direction, length, width, region, rng, group=BODY, si
     # (the fur type: FUR_TYPES)
     length *= FUR_NOW["length"]
     width *= FUR_NOW["width"]
+    # (broader blades on his body and crown: "the fur strands are too skinny in general"; the mane as it was set)
+    if group in (BODY, CROWN):
+        width *= BLADE
     if FUR_NOW["droop"] > 0.0:
         direction = (direction - Y * FUR_NOW["droop"]).normalized()
     # (`side`, if given, is the way its flat side lies: a mane's tufts lie flat round the ring of it)
@@ -1173,8 +1211,10 @@ if __name__ == "__main__":
     shape = shape_arg()
     folder = kit.PREVIEW_DIR
     kit.PREVIEW_DIR = None
+    # (his own fur is the even rings: models/raccoon.glb; the shaggy fur that was his is "spiky", raccoon_fur_spiky)
+    use_fur("rings")
     if shape and shape != "triangle":
-        # A fur shape of its own: models/raccoon_shape_<shape>.glb (at the plain fur type)
+        # A fur shape of its own: models/raccoon_shape_<shape>.glb (on his own rings)
         SHAPE = shape
         name = NAME + "_shape_" + shape
         kit.export(name, reshaped_bones(), PARTS, reshaped_weights, MATERIALS)
@@ -1182,7 +1222,7 @@ if __name__ == "__main__":
         if folder:
             look_at(folder, name)
         sys.exit(0)
-    if kind and kind != "spiky":
+    if kind and kind != "rings":
         # A fur type of its own: models/raccoon_fur_<type>.glb, the full model only (the editor swaps its mesh in)
         use_fur(kind)
         name = NAME + "_fur_" + kind

@@ -11,7 +11,9 @@ extends RefCounted
 
 const FILE := "user://looks.json"
 ## His fur types (models/raccoon.glb is "spiky"; the others models/raccoon_fur_<type>.glb).
-const TYPES := ["spiky", "soft", "shaggy", "sleek", "wiry", "cones"]
+## ("rings", his own since 2026-11-02, the even rings of his first fur: "Honestly I kind of liked the earliest iteration of
+## the rings around his body"; "spiky", the shaggy fur he had before, is models/raccoon_fur_spiky.glb)
+const TYPES := ["rings", "spiky", "soft", "shaggy", "sleek", "wiry", "cones"]
 ## The cats' (models/cat.glb is "spiky"; the others models/cat_<type>.glb).
 const CAT_TYPES := ["spiky", "sleek", "shaggy", "soft"]
 ## What is drawn on the fur.
@@ -25,10 +27,10 @@ const TEXTURES := ["solid", "straight", "wavy", "curly", "soft", "thick"]
 const BODY_SHAPE := [1.0, 0.0, 1.0]
 const MANE_SHAPE := [1.0, 0.0, 1.0, 1.0]
 const TAIL_SHAPE := [1.0, 1.0]
-## Each part's own [size, width, density] (the user: "I should be able to control the width and size of each fur blade,
+## Each part's own [size, width, density, angle] (the user: "I should be able to control the width and size of each fur blade,
 ## and the density on different body parts"), by the regions it covers; "crown" is the short fur on his head (the
 ## mane is MANE_SHAPE).
-const PART_SHAPE := [1.0, 1.0, 1.0]
+const PART_SHAPE := [1.0, 1.0, 1.0, 0.0]
 const PARTS := {"back": [0], "chest": [1], "arms": [2, 3, 4, 5], "legs": [6, 7, 8, 9]}
 ## The way each region's limb runs at rest (none for the head: out from its middle).
 const LIMB_AXES := [Vector3.UP, Vector3.UP, Vector3.RIGHT, Vector3.RIGHT, Vector3.LEFT, Vector3.LEFT, Vector3.DOWN,
@@ -45,7 +47,7 @@ const REGION_AXES := [Vector3.DOWN, Vector3.DOWN, Vector3.RIGHT, Vector3.RIGHT, 
 	Vector3.FORWARD, Vector3.FORWARD, Vector3.FORWARD, Vector3.FORWARD]
 ## A cat's markings (drawn from what tools/build_cat.py bakes into its vertex colours).
 const PATTERNS := ["none", "tabby", "tuxedo", "calico", "bicolour", "tabby_white"]
-const NAMES := {"spiky": "Spiky", "soft": "Soft", "shaggy": "Shaggy", "sleek": "Sleek", "wiry": "Wiry",
+const NAMES := {"rings": "Rings", "spiky": "Spiky", "soft": "Soft", "shaggy": "Shaggy", "sleek": "Sleek", "wiry": "Wiry",
 	"cones": "Tail cones", "plain": "Plain", "frosted": "Frosted tips", "dark_tips": "Dark tips",
 	"streaked": "Streaked", "stippled": "Stippled", "none": "Solid", "tabby": "Tabby", "tuxedo": "Tuxedo",
 	"calico": "Calico", "bicolour": "Patches", "tabby_white": "Tabby & white", "solid": "Solid", "straight": "Straight",
@@ -83,7 +85,7 @@ static func model_path(kind: String, fur: String, shape := "triangle") -> String
 		return "res://models/raccoon_shape_%s.glb" % shape
 	if kind == "cat":
 		return "res://models/cat.glb" if fur == "spiky" or not fur in CAT_TYPES else "res://models/cat_%s.glb" % fur
-	return "res://models/raccoon.glb" if fur == "spiky" or not fur in TYPES else "res://models/raccoon_fur_%s.glb" % fur
+	return "res://models/raccoon.glb" if fur == "rings" or not fur in TYPES else "res://models/raccoon_fur_%s.glb" % fur
 
 
 static func kind_of(rig: Node) -> String:
@@ -114,6 +116,10 @@ const _SPRUNG := """void vertex() {
 ## ...and what it puts in: the spring as before, after each spike is shaped (tools/build_raccoon.py tag_spikes: its
 ## group in UV2.x's tenths; its offset from its root in UV x, y and the colour's green; its rank, or which side of it
 ## the point is, in blue). `turns` turns a rest offset as its region's bone has turned.
+## How far Angle can tip a spike: towards the way its fur lies (1 would lay it flat into him) and away from it.
+const ANGLE_LEAST := -0.3
+const ANGLE_MOST := 0.95
+
 const _SHAPED := """varying float fur_along;
 varying float fur_across;
 varying float fur_seed;
@@ -150,6 +156,9 @@ void vertex() {
 				fur.x *= part.x;
 				fur.w *= part.y;
 				fur.z *= part.z;
+				// (each part's own Angle on top of all of it: the user, "the angle still doesn't seem to move the ones
+				// hanging on his belly", turned on Back and Chest, which had none)
+				fur.y += part.w;
 				// (above the density the whole spike, every point of it, is folded into its root, inside him: its rank is
 				// on every point; the user, 2026-11-02, "I turned down the density but there's still a bunch of little spiky
 				// fur")
@@ -164,7 +173,7 @@ void vertex() {
 						vec3 side = dir - axis * c;
 						float s = length(side);
 						if (s > 0.001) {
-							float c2 = clamp(c + fur.y, -0.3, 0.95);
+							float c2 = clamp(c + fur.y, ANGLE_LEAST, ANGLE_MOST);
 							dir = axis * c2 + side / s * sqrt(1.0 - c2 * c2);
 						}
 					}
@@ -214,6 +223,8 @@ const _STRANDED := """	if (furry && texture > 0 && fur_along >= 0.0) {
 
 
 const _UNIFORMS := """
+const float ANGLE_LEAST = -0.3;
+const float ANGLE_MOST = 0.95;
 // (FurLook: the marks and markings)
 uniform bool furry = false;
 uniform bool masked = false;
@@ -331,7 +342,7 @@ static func swap(rig: RaccoonRig) -> void:
 		part.set_meta(&"own_skin", part.skin)
 	if fur == "" and shape == "triangle":
 		return
-	var path := model_path(kind_of(rig), fur if fur != "" else "spiky", shape)
+	var path := model_path(kind_of(rig), fur if fur != "" else ("spiky" if kind_of(rig) == "cat" else "rings"), shape)
 	if not _meshes.has(path):
 		if not ResourceLoader.exists(path):
 			return
@@ -410,10 +421,10 @@ static func _shapes(rig: RaccoonRig) -> Array:
 		var made: Array = parts.get(named, PART_SHAPE)
 		custom = custom or made != PART_SHAPE
 		for region: int in PARTS[named]:
-			by_region[region] = Vector4(made[0], made[1], made[2], 0.0)
+			by_region[region] = Vector4(made[0], made[1], made[2], made[3] if made.size() > 3 else 0.0)
 	custom = custom or crown != PART_SHAPE
 	var shaped := kind_of(rig) == "raccoon" and (body != BODY_SHAPE or mane != MANE_SHAPE or custom)
-	return [body, mane, shaped, by_region, Vector4(crown[0], crown[1], crown[2], 0.0)]
+	return [body, mane, shaped, by_region, Vector4(crown[0], crown[1], crown[2], crown[3] if crown.size() > 3 else 0.0)]
 
 
 ## Each frame, while the fur is shaped: how each region's bone has turned from rest, for the shader to lay the

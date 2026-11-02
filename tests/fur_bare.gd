@@ -10,7 +10,7 @@ extends SceneTree
 func _initialize() -> void:
 	var paths := ["res://models/raccoon.glb", "res://models/raccoon_lo.glb"]
 	for kind: String in FurLook.TYPES:
-		if kind != "spiky":
+		if kind != "rings":
 			paths.append("res://models/raccoon_fur_%s.glb" % kind)
 	for shape: String in FurLook.SHAPES:
 		if shape != "triangle":

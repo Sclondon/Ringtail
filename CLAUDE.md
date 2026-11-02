@@ -193,8 +193,8 @@ Read README.md first. Started 2026-11-01.
     takes FurLook.CAT_LOOKS[its index] (Claude's picks: ginger tabby, black, grey long-hair tabby, tuxedo, calico,
     cream tabby & white, white with patches) unless the editor changed it.
   - His fur types (`tools/build_raccoon.py -- fur=<type>`, models/raccoon_fur_<type>.glb; FUR_TYPES multiply tuft
-    length, width, count, ruff flare and droop, all 1 for the plain build): spiky (raccoon.glb, still the default),
-    soft, shaggy, sleek, wiry, and cones (body, upper arms and thighs in banded tail cones). FurLook.swap puts the
+    length, width, count, ruff flare and droop, all 1 for the plain build): rings (raccoon.glb, the default: below),
+    spiky (the shaggy fur that was his default), soft, shaggy, sleek, wiry, and cones (body, upper arms and thighs in banded tail cones). FurLook.swap puts the
     type's mesh on (RaccoonRig.restyle), FurLook.patterned/paint draw the marks (plain, frosted tips, dark tips,
     streaked, stippled) and a cat's markings (solid, tabby, tuxedo, calico, patches, tabby & white) in the fur shader.
   - Pause: the HUD's pause button (top right, always shown), Esc, P or Start: Go on, or Fur & looks (FurEditor, over
@@ -326,3 +326,12 @@ Read README.md first. Started 2026-11-01.
   cedar's height, 55% of an oak's) and a hidden flare out into the crown at its top, and is in `climbable`: he
   scurries up, is eased out round the trunk and hops on top (holding the stick at the tree, as with the
   drainpipes). tests/plain_tree.gd: walking into a cedar and an oak stops him; he climbs both and stands on top.
+- 2026-11-02: "Honestly I kind of liked the earliest iteration of the rings around his body": fur type "rings" (the
+  ruffs as at 593c2d7: even rings round his upper arms and thighs, cuffs at elbows and knees, three layers round his
+  body, no loose tufts; FUR_NOW "rings"), now his own (models/raccoon.glb, FurLook.TYPES first, the editor's own);
+  the shaggy fur that was his is "spiky" (models/raccoon_fur_spiky.glb); the shapes are built on the rings. "the fur
+  strands are too skinny in general": a ruff ring has RUFF_SPIKES 6 (was 9, so each is half again as broad) and a
+  loose tuft on his body or crown is BLADE 1.8x as broad (the mane as it was). "the angle still doesn't seem to move
+  the ones hanging on his belly": Back and Chest (every part) have an Angle of their own (look "parts" [size, width,
+  density, angle]); tests/fur_angle.gd works the shader's angle step over the body ruffs' tips (rings: out 0.18 /
+  0.14 / 0.06 m at -0.9 / 0 / 0.9); `look_shots.gd ... belly` shoots the belly from the side.

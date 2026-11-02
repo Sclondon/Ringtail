@@ -319,7 +319,7 @@ func _fill() -> void:
 		_arrow(row, Icon.Kind.RIGHT, func() -> void:
 			_choose("cat", (cat_index + 1) % count)
 			_fill())
-	_choices("Fur", FurLook.CAT_TYPES if kind == "cat" else FurLook.TYPES, "fur", "spiky")
+	_choices("Fur", FurLook.CAT_TYPES if kind == "cat" else FurLook.TYPES, "fur", "spiky" if kind == "cat" else "rings")
 	if kind == "raccoon":
 		# (each spike's own shape: the user, "why is there not any fur shape options beside triangle")
 		_choices("Shape", FurLook.SHAPES, "shape", "triangle")
@@ -362,7 +362,7 @@ func _fill() -> void:
 
 
 ## The fur shape's sliders for the part picked: all of it (length, angle, density), the mane (count, length, width,
-## angle), or one part (size, width, density).
+## angle), or one part (size, width, density, angle).
 func _fill_part() -> void:
 	for child in _part_box.get_children():
 		child.queue_free()
@@ -379,6 +379,7 @@ func _fill_part() -> void:
 		_shape_slider("parts", FurLook.PART_SHAPE, 0, "Size", 0.2, 2.4, _part_box, _part)
 		_shape_slider("parts", FurLook.PART_SHAPE, 1, "Width", 0.3, 3.0, _part_box, _part)
 		_shape_slider("parts", FurLook.PART_SHAPE, 2, "Density", 0.0, 1.0, _part_box, _part)
+		_shape_slider("parts", FurLook.PART_SHAPE, 3, "Angle", -0.9, 0.9, _part_box, _part)
 
 
 ## A heading and a grid of buttons, one of them pressed: the look's `key`.
@@ -395,10 +396,10 @@ func _choices(heading: String, options: Array, key: String, own: String) -> void
 			look[key] = option
 			# (a fur shape other than the triangle is built at the plain fur type, and a fur type with triangles)
 			var other := ""
-			if key == "shape" and option != "triangle" and look.get("fur", "spiky") != "spiky":
-				look["fur"] = "spiky"
+			if key == "shape" and option != "triangle" and look.get("fur", "rings") != "rings":
+				look["fur"] = "rings"
 				other = "fur"
-			elif key == "fur" and option != "spiky" and look.get("shape", "triangle") != "triangle":
+			elif key == "fur" and option != "rings" and look.get("shape", "triangle") != "triangle":
 				look["shape"] = "triangle"
 				other = "shape"
 			_changed()
@@ -468,17 +469,23 @@ func _shape_slider(key: String, own: Array, index: int, named: String, low: floa
 	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	slider.focus_mode = Control.FOCUS_NONE
 	var parts: Dictionary = look.get("parts", {})
-	slider.value = float(((parts.get(part, own) if part != "" else look.get(key, own)) as Array)[index])
+	var held: Array = (parts.get(part, own) if part != "" else look.get(key, own)) as Array
+	# (a look kept before this number was added has fewer: the rest as own)
+	slider.value = float(held[index] if index < held.size() else own[index])
 	row.add_child(slider)
 	slider.value_changed.connect(func(value: float) -> void:
 		if part != "":
 			var all: Dictionary = (look.get("parts", {}) as Dictionary).duplicate(true)
 			var now: Array = (all.get(part, own) as Array).duplicate()
+			while now.size() < own.size():
+				now.append(own[now.size()])
 			now[index] = value
 			all[part] = now
 			look["parts"] = all
 		else:
 			var now: Array = (look.get(key, own) as Array).duplicate()
+			while now.size() < own.size():
+				now.append(own[now.size()])
 			now[index] = value
 			look[key] = now
 		_changed(true))
