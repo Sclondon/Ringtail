@@ -308,8 +308,10 @@ func _place_things() -> void:
 			# (150% and up: a great old tree, the shrine tree, grown at its own size so its limbs stay a jump apart;
 			# the user, 2026-11-02, "some much bigger and taller trees as well")
 			var great := float(parts[3]) >= 150.0
-			var tree := TreeGen.preset("Great camphor" if great else "Climbing oak" if int(parts[1]) % 3 != 1 else "Climbing maple")
-			if great:
+			# (the one at the great_oak marker is the grove's great oak, its own preset: see TreeGen "Great oak")
+			var oak := great and markers.has("great_oak") and (markers["great_oak"] as Transform3D).origin.distance_to(at) < 6.0
+			var tree := TreeGen.preset("Great oak" if oak else "Great camphor" if great else "Climbing oak" if int(parts[1]) % 3 != 1 else "Climbing maple")
+			if great and not oak:
 				# (the great oak of the grove, the raccoons' base: the great tree's build in oak bark; the user, 2026-11-02,
 				# "a great big oak tree with gnarled roots")
 				tree.bark_style = TreeGen.Bark.OAK

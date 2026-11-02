@@ -281,6 +281,16 @@ const PRESETS := {
 		leaf_density = 1.6, cards = 0.55, card_size = 1.25, leaf_reach = 0.85, fill = 0.0, leaves_inner = Color(0.06, 0.16, 0.07), leaves_outer = Color(0.16, 0.36, 0.14),
 		leaves_tips = Color(0.42, 0.6, 0.22), limbs = 11, first_limb = 1.2, limb_step = 1.2, limb_turn = 0.85, limb_length = 9.0,
 		limb_radius = 0.34, limb_rise = 0.06, walk_width = 0.6},
+	# (the great oak of Ringtail's grove, the raccoons' base: "a bigger trunk and the branches shouldn't start until higher
+	# up, and it should reach much wider", "the giant tree not big enough", "there's still low branches": the user,
+	# 2026-11-02. A trunk some 6 m across, bare for 7 m, near-level limbs reaching 18 m, a broad low dome over all)
+	"Great oak": {climbable = true, height = 24.0, trunk_radius = 3.0, trunk_base = 0.25, children = 20, lean = 0.02, bend = 0.1, root_flare = 1.4, roots = 12,
+		bark = Color(0.42, 0.38, 0.32), bark_style = Bark.OAK, bark_tile = 1.6, joined = true, levels = 3, twigs = 7, twig_angle = 45.0, angle_random = 16.0,
+		branch_angle = 70.0, length = 1.25, twig_length = 0.42, radius_ratio = 0.4, start = 0.45, end = 0.97, crown_shape = Crown.HEMISPHERICAL, apical = 0.1,
+		gravitropism = 0.1, droop = 0.1, curl = 0.3, wildness = 0.5, leaf_style = Leaves.FLUFFY, clump_size = 1.4,
+		leaf_density = 2.4, cards = 0.55, card_size = 1.7, leaf_reach = 0.9, fill = 0.0, leaves_inner = Color(0.06, 0.15, 0.06), leaves_outer = Color(0.16, 0.34, 0.12),
+		leaves_tips = Color(0.4, 0.56, 0.2), limbs = 12, first_limb = 7.0, limb_step = 1.15, limb_turn = 0.9, limb_length = 18.0,
+		limb_radius = 0.75, limb_rise = 0.02, walk_width = 0.8},
 }
 
 static var _cache := {}
