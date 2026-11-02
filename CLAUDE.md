@@ -67,8 +67,16 @@ Read README.md first. Started 2026-11-01.
 - On the arcade since 2026-11-02 (the user: "Let's do it", asked whether it was on the arcade): repo
   github.com/Sclondon/Ringtail (public, Pages from `master` /), build in build/ (`--export-release "Web"`), cart
   "Ringtail" in games.tsx (site PR #202): early access, no leaderboard, desktop only, film `tests/attract.gd`.
-  Those cart settings are Claude's picks. In the browser the page sits frozen about 80 s building the hill after
-  Godot's load bar, with no progress shown: a loading screen or lighter start is still to do.
+  Those cart settings are Claude's picks.
+- The start (the user: "a loading screen is a good idea - and also that load time seems very long"): the main scene
+  is scenes/boot.tscn (Boot): a loading screen while World 1 is built a step at a time (World.stepwise; tests still
+  build it all at once). It was about 90 s in Chrome (29 s natively), now about 20-25 s (about 4 s natively).
+  `RINGTAIL_LOAD_TIMES=1` makes World.lap print each step's time. Most of it was TownGrass: the lawn is kept in
+  **models/world1.lawn** (a grid, with a fingerprint of the meshes it came from). When the world or anything still
+  in it changes, the next editor run (any test) works it out again (about 7 s) and rewrites the file: **commit it
+  with the world**, or the web build works it out at every start. The wood's plainer outer trees share LO_SHAPES 6
+  shapes a kind (Claude's pick, for the load time). Left: the climbing trees, the great oak and the giant firs
+  (about 1.4 s natively) and reading world1.glb (about 1.2 s).
 
 ## Later on 2026-11-01 (the user's calls, in their words where quoted)
 
