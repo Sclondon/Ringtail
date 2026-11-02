@@ -923,3 +923,36 @@ Read README.md first. Started 2026-11-01.
   (scripts/pee.gd, a child of the Player: D-pad down or V; the stick aims, he stays put; puddles stay where they form,
   at most 40, soaking away in 25 s; a splash where it lands); RaccoonRig.peeing / pee_aim / _pose_pee.
   tests/pee_test.gd.
+
+## Bird wings: a real skeleton and rippling feathers (2026-11-02)
+
+- The user: "The bird wings and animations need to be higher quality, with rippling feathers and real wing skeleton
+  not just a simple flap animation". (This supersedes "The hawk is still build_hazards.py's plain model" above.)
+- tools/build_birds.py: each wing is the humerus (`_wing_l`) > ulna and radius (`_fore`) > carpometacarpus (`_hand`) >
+  the outer digit (`_digit`), the alula (`_alula`) on the wrist. Every flight feather is its own part on the bone it
+  grows from: tertials `_tert<n>` on the humerus, secondaries `_s<n>` on the forearm (from the wrist in), primaries
+  `_p<n>` on the hand and the outermost on the digit (from the wrist out). Covert rows are layers: `_c0` greater and
+  `_c1` median on the forearm, `_c2` primary coverts on the hand. Tail feathers are `_tail_t0.._t9`. References
+  (Wikimedia Commons, kept out of the repo): the wing skeleton and wing feather diagrams, red-tailed hawks perched
+  and flying.
+- The hawk is a red-tailed hawk (Claude's pick of species, for the PNW) in models/redtail.glb (BirdBody kind `hawk`,
+  BirdBody.FILES). build_hazards.py still writes its old plain hawk.glb, now unused (tests/tri_count.gd still counts
+  that one). HazardBird's hawk is on BirdBody: soaring with fingers up and tail fanned, a few beats now and then,
+  beating climbing away, half folded diving, talons thrown forward at the end.
+- BirdBody: the beat runs out along the wing as a chain (each bone takes CHAIN_GIVE of where the one before it was
+  CHAIN_LAG of the stroke ago); the upstroke flexes elbow, wrist and digit and turns the hand so the primaries part.
+  Every feather is a damped spring (bent across, twisted about its shaft): pushed by the air its tip moves through
+  across the wing's face, held up by the lift of flying (STROKE "lift": the hawk's tips curl up most), with a flutter
+  along the trailing edge and out to the tips, more gliding or in `wind`. Folded they settle; `ruffle()` kicks them.
+  The tail fans by state (closed folded, STROKE "tail" in flight, wide braking and turning) and twists into turns.
+  Folding turns through each hinge with the spread pose easing out under it (a straight slerp flipped the hand over
+  mid-fold when the beat had it bent past the half turn). Past RIPPLE_REACH 32 m from the camera nothing is sprung.
+  The spring rates, the lag and every number are Claude's picks.
+- Cost: crow 5.0k triangles (was 4.2k), owl 5.9k (5.2k), hawk 5.2k (rounded feathers in three steps, coverts as
+  cheap scales); about 0.13 ms a bird a frame when sprung.
+- Checks: `tests/bird_ripple.gd` (headless: every bone and feather found, no part turning over 0.5 rad between frames,
+  feathers rippling in flight and settled folded, the tail fanning), `tests/bird_clip.gd` (now with the hawk; every
+  feather part), `tests/bird_shots.gd -- --out=<dir>` (now the hawk too, and a live beat `<kind>_live<n>`).
+- tests/owl_test.gd fails on its own yard since Hazards.HAVEN_RADIUS became 55 m: its poles (40 m) and his spots are
+  inside the haven now, so no owls are placed. Moved out to 80 m the owls perch and the crows fold; the swoop and dive
+  checks still need his spots moved out too.
