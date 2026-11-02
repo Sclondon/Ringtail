@@ -48,7 +48,8 @@ static func active(world: Node) -> BirdPlayer:
 	return world.get_node_or_null(^"BirdPlayer") as BirdPlayer if world else null
 
 
-## Plays as `who` (&"raccoon", &"crow", &"owl") in `world`, from where whoever is played now is.
+## Plays as `who` (&"raccoon", &"crow", &"owl", or any of AnimalPlayer.ANIMALS) in `world`, from where whoever is
+## played now is.
 static func play_as(world: World, who: StringName) -> void:
 	var bird := active(world)
 	if who == &"raccoon":
@@ -66,7 +67,8 @@ static func play_as(world: World, who: StringName) -> void:
 		bird.queue_free()
 	else:
 		_put_away(world)
-	var made := BirdPlayer.new()
+	# (any other animal: AnimalPlayer, on foot)
+	var made: BirdPlayer = BirdPlayer.new() if KINDS.has(who) else AnimalPlayer.new()
 	made.name = "BirdPlayer"
 	made.kind = who
 	made.world = world
@@ -85,6 +87,9 @@ static func _put_away(world: World) -> void:
 	him.velocity = Vector3.ZERO
 	him.visible = false
 	him.process_mode = Node.PROCESS_MODE_DISABLED
+	# (his scurry bars would stay frozen on screen if he was put away scurrying)
+	for bars in him.find_children("*", "ScurryBars", true, false):
+		bars.visible = false
 	world.camera.process_mode = Node.PROCESS_MODE_DISABLED
 
 
@@ -99,6 +104,8 @@ static func _bring_back(world: World, at: Vector3) -> void:
 	him.collision_mask = layers.y
 	him.visible = true
 	him.process_mode = Node.PROCESS_MODE_INHERIT
+	for bars in him.find_children("*", "ScurryBars", true, false):
+		bars.visible = true
 	world.camera.process_mode = Node.PROCESS_MODE_INHERIT
 	world.camera.make_current()
 	world.camera.snap()

@@ -5,6 +5,8 @@ extends Camera3D
 
 var bird: BirdPlayer
 var distance := 3.0
+## How high over its feet it looks at (AnimalPlayer sets it by the animal's size).
+var lift := 0.35
 var _yaw := 0.0
 var _pitch := 0.35
 var _since_look := 10.0
@@ -47,7 +49,8 @@ func _process(delta: float) -> void:
 	_since_look += delta
 	# (flying and left alone: round behind it, looking a little down on it)
 	var flat := Vector3(bird.velocity.x, 0.0, bird.velocity.z)
-	if bird.flying and _since_look > 1.2 and flat.length() > 1.0:
+	# (an animal on foot too: AnimalPlayer)
+	if (bird.flying or bird is AnimalPlayer) and _since_look > 1.2 and flat.length() > 1.0:
 		_yaw = lerp_angle(_yaw, atan2(-flat.x, -flat.z), 1.0 - exp(-2.2 * delta))
 		_pitch = lerpf(_pitch, 0.3, 1.0 - exp(-1.5 * delta))
 	_place()
@@ -57,7 +60,7 @@ func _place() -> void:
 	if not is_instance_valid(bird) or not is_inside_tree():
 		return
 	var away := Vector3(sin(_yaw) * cos(_pitch), sin(_pitch), cos(_yaw) * cos(_pitch))
-	var pivot := bird.global_position + Vector3.UP * 0.35
+	var pivot := bird.global_position + Vector3.UP * lift
 	var reach := distance
 	var hit := get_world_3d().direct_space_state.intersect_ray(PhysicsRayQueryParameters3D.create(pivot, pivot + away * (reach + 0.2), 1))
 	if not hit.is_empty():

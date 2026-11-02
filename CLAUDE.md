@@ -779,3 +779,23 @@ Read README.md first. Started 2026-11-01.
   roof, climb a pole and walk the wire to him, give up and go home; `-- --out=<dir>` in a window shoots the stalk,
   the climb, the wire and a cat washing). The playground needs `Hazards.haven` moved off: its default sits under the
   playground's middle and makes the whole yard the grove (cat_shots.gd does the same now).
+
+## Playing as every animal (2026-11-02)
+
+- The user: "do most of the animals share a rig? there should be an option to play as all the animals", then "or at
+  least just to run around the grove as them". (Yes: the critters, grove animals and cats are CritterRig < CatRig <
+  RaccoonRig on his skeleton; the dogs are GameCommon's DogRig; the snake bends in a shader.)
+- `AnimalPlayer` (scripts/animal_player.gd) is a BirdPlayer, so `BirdPlayer.play_as(world, &"fox")` plays any of
+  `AnimalPlayer.ANIMALS` (19 critters, three of the town's cats by their looks, the five dog breeds, the snake) and
+  everything that follows the bird (zones, streaming, HUD buttons, Crumbs, the put-away raccoon) follows it. Mammals
+  and cats: a CritterRig reading this body as a Critter's; dogs: a YardDog carried along; the snake: a GroveSnake.
+  Walk at a light push, run at a full one, jump, paddle at the top of deep water; rabbits and frogs hop along. Camera:
+  BirdCamera (`lift`), closer for small ones, swinging round behind as it runs.
+- Claude's picks: every animal's speeds and jump (AnimalPlayer.FEEL, else from its size); the tail button's thing (skunk
+  spray, porcupine quills, opossum plays dead till the stick or jump, frog croaks, dogs bark, the snake rears and
+  coils); Crumbs count as his, cages are his alone; the hunters leave a played animal be (as a bird). Not done: climbing
+  for the squirrels and the like, swimming poses.
+- The pause screen's Play as row has an Animals button: a page of their pictures (ui/faces/<animal>.png, made by
+  `godot --path . --audio-driver Dummy -s res://tools/make_animal_faces.gd`), seven across, four on a tall screen.
+- Checks: `tests/play_as_test.gd` (headless: each walks, runs, jumps, its tail button, back to the raccoon),
+  `tests/play_as_shots.gd -- --out=<dir> [animals]` (the page, and some in the grove standing, running, tail button).

@@ -286,7 +286,7 @@ func _process(delta: float) -> void:
 		_seen[label] = label.text
 	_zone.get_parent().visible = _zone.visible
 	# (the raccoon's scurry and tail are a bird's settle and peck: BirdPlayer)
-	var as_bird := BirdPlayer.active(world) != null
+	var as_bird := BirdPlayer.active(world) != null and not BirdPlayer.active(world) is AnimalPlayer
 	for pair: Array in [[&"scurry", Icon.Kind.SCURRY, Icon.Kind.PERCH], [&"tail", Icon.Kind.TAIL, Icon.Kind.PECK]]:
 		var icon: Icon = _icons.get(pair[0])
 		var wanted: Icon.Kind = pair[2] if as_bird else pair[1]
