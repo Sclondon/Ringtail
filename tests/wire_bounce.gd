@@ -20,12 +20,14 @@ func _frames(count: int) -> void:
 func _run() -> void:
 	await _frames(10)
 	var player := world.player
-	var wire: Tightrope
-	for node in get_nodes_in_group(&"tightropes"):
-		var w := node as Tightrope
-		if w.span() > 6.0:
-			wire = w
-			break
+	# (a wire of its own over the grove's open lawn: the town's power lines run past roofs and poles he can land on)
+	var heart: Vector3 = world.markers["grove_heart"].origin if world.markers.has("grove_heart") else player.global_position
+	var wire := Tightrope.new()
+	wire.from = heart + Vector3(-5.0, 3.0, 4.0)
+	wire.to = heart + Vector3(5.0, 3.0, 4.0)
+	wire.most_sag = 0.3
+	world.add_child(wire)
+	await _frames(5)
 	if wire == null:
 		print("FAILED: no wire")
 		quit()
@@ -71,7 +73,7 @@ func _run() -> void:
 				break
 		Input.action_release(&"jump")
 		heights.append(top - base)
-		print("jump %d: %.2f m (on the wire %s)" % [jump, top - base, wire.carries(player.global_position)])
-	var ok := shake < 0.08 and heights.max() > heights[0] + 1.5 and heights.max() < 7.0
+		print("jump %d: %.2f m (on the wire %s, at %s, floor %s, wire near %s)" % [jump, top - base, wire.carries(player.global_position), player.global_position, player.is_on_floor(), wire.distance_to(player.global_position)])
+	var ok: bool = shake < 0.08 and heights.max() > heights[0] + 1.5 and heights.max() < 7.0
 	print("PASSED" if ok else "FAILED")
 	quit()
