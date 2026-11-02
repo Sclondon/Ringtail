@@ -13,7 +13,7 @@ extends Node
 
 signal struck(what: Node)
 
-@export var spin_time := 0.5
+@export var spin_time := 0.4
 @export var spin_reach := 1.35
 @export var spin_lift := 2.2
 ## How fast he may fall while twirling.
@@ -73,7 +73,8 @@ func _physics_process(delta: float) -> void:
 
 	if spin < 1.0:
 		spin = minf(spin + delta / spin_time, 1.0)
-		if spin > 0.05 and spin < 0.9:
+		# (it hits as he whips round, not while he winds up)
+		if spin > 0.22 and spin < 0.8:
 			_strike(spin_reach, PI)
 
 	# The twirl: jump held on the way down.

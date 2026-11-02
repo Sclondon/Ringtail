@@ -379,11 +379,13 @@ def swing_set():
 
 def clothesline():
     piece = Piece("nocol_clothesline")
+    # Low enough to jump up onto: its line is a Wire (wire_0) to walk along and bounce on
     for x in (-15.0, -7.0):
-        piece.box((x, 1.1, -3.0), (0.12, 2.2, 0.12), "metal")
-        piece.box((x, 2.2, -3.0), (0.12, 0.12, 1.0), "metal")
+        piece.box((x, 0.6, -3.0), (0.12, 1.2, 0.12), "metal")
+        piece.box((x, 1.2, -3.0), (0.12, 0.12, 1.0), "metal")
     for k, colour in enumerate(("trim", "red", "yellow", "siding")):
-        piece.box((-13.6 + k * 1.8, 1.75, -3.0), (0.9, 0.8, 0.03), colour)
+        piece.box((-13.6 + k * 1.8, 0.85, -3.0), (0.9, 0.5, 0.03), colour)
+    wire(0, (-14.94, 1.18, -3.0), (-7.06, 1.18, -3.0))
     return piece.done()
 
 
@@ -425,6 +427,9 @@ def alley_props():
         piece.cylinder((21.2, 0.0, z), 0.42, 1.0, "bin", 12, top="metal")
     # The power pole, with its crossarm a high walk along the alley
     piece.cylinder((25.6, 0.0, 14.5), 0.2, 8.0, "pole", 8)
+    # (a crossbar at its top, where the phone line from the house comes in)
+    piece.box((25.6, 6.25, 14.5), (1.4, 0.14, 0.14), "darkwood")
+    piece.cylinder((25.2, 6.32, 14.5), 0.06, 0.14, "trim", 6)
     piece.box((25.6, 3.92, 12.6), (0.6, 0.16, 4.2), "darkwood")
     piece.box((25.6, 5.8, 14.9), (0.7, 1.0, 0.6), "metal")
     # The billboard's catwalk, 6 m along the alley from the crossarm: too far for a jump even at a sprint (about 5 m), easy gliding
@@ -439,6 +444,28 @@ def alley_props():
 
 
 # --- Where the game's things go ---
+
+WIRE_SAG = 0.03  # of its length: the game uses the same (World, Wire.sag)
+
+
+def wire(index, a, b):
+    """Marks the ends of a wire for the game to string (scripts/wire.gd)."""
+    mark("wire_%d_a" % index, a)
+    mark("wire_%d_b" % index, b)
+
+
+def wire_point(a, b, t):
+    length = math.dist(a, b)
+    return (a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t - WIRE_SAG * length * 4.0 * t * (1.0 - t), a[2] + (b[2] - a[2]) * t)
+
+
+def crumbs_on_wire(a, b, count, start):
+    for k in range(count):
+        t = 0.15 + 0.7 * k / max(count - 1, 1)
+        p = wire_point(a, b, t)
+        mark("crumb_%03d" % (start + k), (p[0], p[1] + 0.35, p[2]))
+    return start + count
+
 
 def crumb_line(a, b, count, start):
     for k in range(count):
@@ -473,7 +500,12 @@ def markers():
     n = crumb_line((-3.8, 3.1, 12.0), (1.3, 3.1, 12.0), 5, n)          # on the swing set's bar
     n = crumb_line((22.0, 0.3, -10.0), (22.0, 0.3, 6.0), 8, n)        # down the alley
     n = crumb_line((25.6, 4.4, 11.0), (25.6, 4.4, 14.0), 4, n)        # along the crossarm
-    n = crumb_line((-16.0, 0.3, -1.0), (-8.0, 0.3, -1.0), 5, n)       # under the clothesline
+    n = crumbs_on_wire((-14.94, 1.18, -3.0), (-7.06, 1.18, -3.0), 4, n)   # along the clothesline
+    # The phone line from the house roof to the pole, and a line from the shed roof to the swing set
+    wire(1, (6.45, 6.6, -16.2), (25.6, 6.4, 14.5))
+    n = crumbs_on_wire((6.45, 6.6, -16.2), (25.6, 6.4, 14.5), 7, n)
+    wire(2, (11.0, 2.82, -7.35), (0.95, 2.78, 12.0))
+    n = crumbs_on_wire((11.0, 2.82, -7.35), (0.95, 2.78, 12.0), 5, n)
     n = crumb_line((-17.0, 0.3, 15.0), (-8.0, 0.3, 15.0), 4, n)
     print("CRUMBS %d" % n)
     for k, (x, z) in enumerate(((-6.0, 2.0), (8.0, -2.0), (-9.0, 14.0))):

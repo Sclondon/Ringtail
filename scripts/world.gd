@@ -54,6 +54,7 @@ func _ready() -> void:
 	player.facing_yaw = PI
 	player.set_spawn(spawn.origin)
 	player.respawned.connect(_on_respawned)
+	_controls()
 	camera = FollowCamera.new()
 	camera.target = player
 	camera.mode = FollowCamera.Mode.ORBIT
@@ -76,6 +77,25 @@ func _ready() -> void:
 	crumbs_changed.emit(crumbs, crumbs_total)
 	caps_changed.emit(caps.size(), CAP_NAMES.size())
 	hearts_changed.emit(hearts)
+
+
+## His controls, over what the Player sets up: no sprint (he runs on all fours anyway; the user, 2026-11-01:
+## "remove the sprint button"), and on a gamepad X to duck and slide, B for the tail (the user, 2026-11-01).
+func _controls() -> void:
+	if InputMap.has_action(&"sprint"):
+		InputMap.action_erase_events(&"sprint")
+	for action: StringName in [&"duck", &"tail"]:
+		if not InputMap.has_action(action):
+			InputMap.add_action(action)
+		for event in InputMap.action_get_events(action):
+			if event is InputEventJoypadButton:
+				InputMap.action_erase_event(action, event)
+	var duck := InputEventJoypadButton.new()
+	duck.button_index = JOY_BUTTON_X
+	InputMap.action_add_event(&"duck", duck)
+	var tail := InputEventJoypadButton.new()
+	tail.button_index = JOY_BUTTON_B
+	InputMap.action_add_event(&"tail", tail)
 
 
 func _environment() -> void:
@@ -148,6 +168,16 @@ func _place_things() -> void:
 			_cats_left += 1
 		elif name.begins_with("check_"):
 			_checkpoints.append(at)
+	var k_wire := 0
+	while markers.has("wire_%d_a" % k_wire):
+		var wire := Wire.new()
+		wire.from = markers["wire_%d_a" % k_wire].origin
+		wire.to = markers["wire_%d_b" % k_wire].origin
+		# (the same sag as tools/build_world1.py lays its crumbs along)
+		wire.sag = 0.03 * wire.from.distance_to(wire.to)
+		wire.rider = player
+		add_child(wire)
+		k_wire += 1
 	if markers.has("trampoline"):
 		var bed := Trampoline.new()
 		bed.position = markers["trampoline"].origin

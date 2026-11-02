@@ -13,6 +13,10 @@ extends CharacterRig
 ##   that slows his fall.
 
 const TAIL_BONES := 6
+## The spin: how far through it the wind-up ends and the turn is done, and how far round he winds up.
+const SPIN_WIND := 0.24
+const SPIN_TURNED := 0.72
+const SPIN_BACK := 0.75
 ## Where each foot is in the cycle when it comes down: [hind left, hind right, fore left, fore right].
 const WALK_FEET := [0.0, 0.5, 0.25, 0.75]
 ## Sprinting he bounds: both hind feet push off nearly together, he flies stretched out, lands on both
@@ -37,6 +41,11 @@ var _qphase := 0.0
 var _glide := 0.0
 var _twirl := 0.0
 var _spin_w := 0.0
+## Jumped from all fours he stays on them in the air (the user: "he needs an all 4s jumping animation"): whether
+## this jump is one, and how far into that pose he is.
+var _leaping := false
+var _leap_w := 0.0
+var _leap_rise := 0.0
 
 
 func _init() -> void:
@@ -61,6 +70,8 @@ func _ready() -> void:
 	_speeds.resize(TAIL_BONES + 1)
 	if _player:
 		_moves = _player.get_node_or_null(^"TailMoves")
+		if _player.has_signal(&"jumped"):
+			_player.jumped.connect(func() -> void: _leaping = _quad > 0.5 and _gallop > 0.3)
 
 
 func _pose_extra(delta: float) -> void:
@@ -69,11 +80,20 @@ func _pose_extra(delta: float) -> void:
 	var speed := flat.length()
 	var free: bool = not (&"state" in _player) or _player.state == Player.State.FREE
 	var low: bool = (&"is_ducking" in _player and _player.is_ducking) or (&"is_crawling" in _player and _player.is_crawling)
-	var fast: bool = &"is_sprinting" in _player and _player.is_sprinting and speed > _player.run_speed * 0.85
+	# (he runs on all fours, bounding: anything over a walk; the user, 2026-11-01: "remove the sprint button he
+	# should just run on all 4s")
+	var fast: bool = speed > _player.walk_speed * 1.25 and not low
 	var busy := maxf(maxf(_ball, _roll), maxf(_sprawled, _three)) + _carry + smoothstep(0.0, 0.1, _sit_at) + _slide
-	var wanted := 1.0 if free and (low or fast) and _air < 0.5 and busy < 0.2 else 0.0
+	var grounded: bool = _player.is_on_floor()
+	if grounded and _air < 0.2 and velocity.y <= 0.0:
+		_leaping = false
+	if _moves and (_moves.gliding or _moves.spin < 1.0):
+		_leaping = false
+	_leap_w = _approach(_leap_w, 1.0 if _leaping and not grounded else 0.0, 12.0, delta)
+	_leap_rise = clampf(velocity.y / 6.0, -1.0, 1.0)
+	var wanted := 1.0 if free and (((low or fast) and _air < 0.5) or _leaping) and busy < 0.2 else 0.0
 	_quad = _approach(_quad, wanted, 7.0, delta)
-	_gallop = _approach(_gallop, 1.0 if fast else 0.0, 6.0, delta)
+	_gallop = _approach(_gallop, smoothstep(_player.walk_speed, _player.run_speed * 0.8, speed) if fast else 0.0, 6.0, delta)
 	var stride := lerpf(0.44, 1.9, _gallop)
 	_qphase = fposmod(_qphase + speed / stride * delta, 1.0)
 
@@ -91,10 +111,34 @@ func _pose_extra(delta: float) -> void:
 	if _glide > 0.002:
 		_pose_glide(_glide)
 	if _spin_w > 0.002:
-		# (round once, quickest in the middle of it)
-		var turn := TAU * smoothstep(0.0, 1.0, spin) if spin < 1.0 else 0.0
-		_hips.basis = Basis(Vector3.UP, turn * _spin_w) * _hips.basis
+		_pose_spin(spin, _spin_w)
 	_pose_tail(delta, speed, spin)
+
+
+## The spin (the tail button): he crouches and winds up turned to his right, then whips round once to the left, fast
+## at first and settling, arms flung out, the tail lashing after him; and comes up out of it (the user: "the spin
+## needs to be snappier and he shouldnt just rotate he needs to crouch and animate in to the spin and whip his tail").
+func _pose_spin(at: float, w: float) -> void:
+	var crouch := smoothstep(0.0, SPIN_WIND, at) * (1.0 - smoothstep(SPIN_TURNED, 1.0, at))
+	var yaw := 0.0
+	if at < SPIN_WIND:
+		yaw = -SPIN_BACK * smoothstep(0.0, SPIN_WIND, at)
+	elif at < SPIN_TURNED:
+		var s := (at - SPIN_WIND) / (SPIN_TURNED - SPIN_WIND)
+		yaw = -SPIN_BACK + (TAU + SPIN_BACK) * (1.0 - pow(1.0 - s, 3.0))
+	_hips.position.y -= 0.09 * crouch * w
+	_hips.basis = Basis(Vector3.UP, yaw * w) * _hips.basis
+	_spine.basis = _slerp(_spine.basis, Basis(Vector3.RIGHT, 0.35) * _spine.basis, crouch * w)
+	_head.basis = _slerp(_head.basis, Basis(Vector3.RIGHT, -0.3) * _head.basis, crouch * w)
+	# Arms in to the chest winding up, flung wide as he goes round
+	var fling := smoothstep(SPIN_WIND, SPIN_WIND + 0.1, at) * (1.0 - smoothstep(SPIN_TURNED, 1.0, at))
+	var turned := Basis(Vector3.UP, yaw * w)
+	for i in 2:
+		var side := 1.0 if i == 0 else -1.0
+		var tucked := Vector3(side * 0.12, 0.5, 0.16)
+		var wide := Vector3(side * 0.5, 0.56, -0.04)
+		var hand := turned * tucked.lerp(wide, fling) + Vector3.DOWN * 0.09 * crouch
+		_solve_arm(i, side, to_global(hand), _forearm, w * maxf(crouch, fling))
 
 
 ## On all fours, by `w`.
@@ -108,6 +152,11 @@ func _pose_quad(w: float, speed: float, stride: float) -> void:
 	# (rump up, shoulders down, as a raccoon goes: his arms are short)
 	# (bounding, his back stretches out flat in the air and rounds as his hind feet come up under him)
 	var lean := lerpf(1.82, 1.75, _gallop) + cos(TAU * (_qphase - 0.9)) * 0.22 * bounding
+	# Leaping: stretched out flat going up, rump dropping and front reaching down coming down
+	var up := clampf(_leap_rise, 0.0, 1.0)
+	var down := clampf(-_leap_rise, 0.0, 1.0)
+	hips_y = lerpf(hips_y, _hip_height * (0.8 - 0.06 * down), _leap_w)
+	lean = lerpf(lean, 1.5 - 0.1 * up + 0.25 * down, _leap_w)
 
 	# Where the boy's pose had his feet, in the rig's space, before the hips move.
 	var base_feet: Array[Transform3D] = []
@@ -135,6 +184,8 @@ func _pose_quad(w: float, speed: float, stride: float) -> void:
 		# (flung out behind him as he leaves the ground)
 		step.x -= _bump(at, duty - 0.02, 0.62) * 0.16 * bounding
 		var point := Vector3(side * 0.095, ANKLE + step.y, -0.07 + step.x)
+		# (in a leap: flung out behind going up, drawn up under him coming down)
+		point = point.lerp(Vector3(side * 0.1, ANKLE + 0.14 + 0.08 * up - 0.04 * down, -0.36 * up + 0.04 * down - 0.08), _leap_w)
 		var pitch := step.y / maxf(lift, 0.001) * 0.6 if at >= duty else 0.0
 		var wanted := Transform3D(Basis(Vector3.RIGHT, pitch), point)
 		var blended := base_feet[i].interpolate_with(wanted, w)
@@ -149,6 +200,8 @@ func _pose_quad(w: float, speed: float, stride: float) -> void:
 		var shoulder := to_local(_shoulders[i].global_position)
 		var fingers := (global_basis * Vector3(-side * 0.12, 0.0, 1.0)).normalized()
 		var point := Vector3(side * 0.13, 0.03 + step.y, shoulder.z + 0.05 + step.x)
+		# (in a leap: reaching out ahead, and down for the ground coming down)
+		point = point.lerp(Vector3(side * 0.12, 0.16 - 0.12 * down, shoulder.z + 0.28 - 0.06 * down), _leap_w)
 		var pole := (global_basis * Vector3(side * 0.3, 0.0, -1.0)).normalized()
 		_solve_arm(i, side, to_global(point) - fingers * 0.03, _forearm, w, pole)
 		_lay_hand(i, side, Vector3.UP, fingers, w * (1.0 - 0.6 * clampf(step.y / maxf(lift, 0.001), 0.0, 1.0)))
@@ -198,9 +251,12 @@ func _tail_shape(speed: float, spin: float) -> Array[Vector3]:
 			var out := 0.25 + 0.06 * k
 			dirs[k] = dirs[k].slerp((axis * cos(out) + (u * cos(angle) + v * sin(angle)) * sin(out)).normalized(), _glide)
 	if _spin_w > 0.001 and spin < 1.0:
-		# Flung straight out behind as he spins
+		# Wound round to his left side as he crouches; then flung out straight behind as he whips round, the springs
+		# letting it lag and then lash out after him.
+		var wound := smoothstep(0.0, SPIN_WIND, spin) * (1.0 - smoothstep(SPIN_WIND, SPIN_WIND + 0.12, spin))
 		for k in TAIL_BONES:
-			dirs[k] = dirs[k].slerp(Vector3(0.0, 0.08, -1.0).normalized(), _spin_w)
+			var angle := PI - (1.7 + 0.12 * k) * wound
+			dirs[k] = dirs[k].slerp(Vector3(sin(angle), 0.1 + 0.05 * wound, cos(angle)).normalized(), _spin_w)
 	return dirs
 
 
@@ -213,7 +269,8 @@ func _pose_tail(delta: float, speed: float, spin: float) -> void:
 	for k in TAIL_BONES:
 		targets.append(targets[k] + (hips.basis.orthonormalized() * dirs[k]) * _tail_len[k] * size)
 	var fresh := _points[0].distance_to(root) > 2.0 or _points[TAIL_BONES] == Vector3.ZERO
-	var snap := maxf(_spin_w, _glide)
+	# (not stiffened for the spin: its lag is the whip)
+	var snap := _glide
 	var steps := 2
 	var dt := delta / steps
 	for _s in steps:

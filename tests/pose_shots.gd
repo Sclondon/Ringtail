@@ -5,7 +5,7 @@ extends SceneTree
 ## Needs a window (pictures cannot be taken headless); it is kept off the screen.
 
 const SIZE := Vector2i(360, 400)
-const MOVES := ["stand", "walk", "run", "sprint", "duckwalk", "duck", "jump", "glide", "spin", "air_spin", "bound"]
+const MOVES := ["stand", "walk", "run", "sprint", "duckwalk", "duck", "jump", "glide", "spin", "air_spin", "bound", "leap"]
 
 var out := "user://pose_shots"
 var only: Array[String] = []
@@ -91,6 +91,15 @@ func _do(move: String) -> void:
 		"spin":
 			Input.action_press(&"tail")
 			await _frames(9)
+		"leap":
+			Input.action_press(&"move_up", 1.0)
+			await _frames(50)
+			Input.action_press(&"jump")
+			player._queue_jump()
+			await _frames(3)
+			await _filmstrip(move, 5)
+			_release()
+			return
 		"bound":
 			Input.action_press(&"move_up", 1.0)
 			Input.action_press(&"sprint")
@@ -110,19 +119,19 @@ func _do(move: String) -> void:
 
 
 ## Eight pictures through about one bound, from his left side, the camera keeping pace.
-func _filmstrip(move: String) -> void:
+func _filmstrip(move: String, gap := 2) -> void:
 	var sheet := Image.create(SIZE.x * 4, SIZE.y * 2, false, Image.FORMAT_RGBA8)
 	for k in 8:
 		var at := player.visual_position + Vector3.UP * 0.4
 		var a := player.facing_yaw + PI * 0.5
-		eye.global_position = at + Vector3(sin(a) * 2.6, 0.3, cos(a) * 2.6)
+		eye.global_position = at + Vector3(sin(a) * 4.2, 0.4, cos(a) * 4.2)
 		eye.look_at(at, Vector3.UP)
 		await process_frame
 		await process_frame
 		var image := view.get_texture().get_image()
 		image.convert(Image.FORMAT_RGBA8)
 		sheet.blit_rect(image, Rect2i(Vector2i.ZERO, SIZE), Vector2i(SIZE.x * (k % 4), SIZE.y * (k / 4)))
-		await _frames(2)
+		await _frames(gap)
 	sheet.save_png(out.path_join(move + ".png"))
 	print("SHOT ", move)
 

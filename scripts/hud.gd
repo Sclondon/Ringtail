@@ -68,7 +68,6 @@ func _ready() -> void:
 	_buttons.add_theme_constant_override(&"separation", 12)
 	root.add_child(_buttons)
 	_button(Icon.Kind.DUCK, "C", &"duck")
-	_button(Icon.Kind.SPRINT, "Shift", &"sprint")
 	_button(Icon.Kind.TAIL, "E", &"tail")
 	_button(Icon.Kind.JUMP, "Space", &"jump")
 

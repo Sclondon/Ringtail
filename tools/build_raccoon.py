@@ -61,15 +61,19 @@ TAIL_BONES = 6
 
 # --- Colours (sRGB) ---
 
-FUR, LIGHT, DARK, PAW, WHITE, BLACK, EAR = range(7)
+# (after the user's photos, 2026-11-01: warm grey-brown fur, sleek darker forearms and shins, black hands and
+# feet, white-rimmed ears, tan and black rings on the tail)
+FUR, LIGHT, DARK, PAW, WHITE, BLACK, EAR, LIMB, TAN = range(9)
 MATERIALS = [
-    ("fur", (0.50, 0.48, 0.47)),
+    ("fur", (0.52, 0.47, 0.43)),
     ("light", (0.90, 0.88, 0.83)),
     ("dark", (0.13, 0.12, 0.13)),
-    ("paw", (0.21, 0.19, 0.19)),
+    ("paw", (0.10, 0.09, 0.09)),
     ("eye", (0.97, 0.97, 0.95)),
     ("pupil", (0.03, 0.03, 0.04)),
-    ("ear", (0.27, 0.22, 0.22)),
+    ("ear", (0.30, 0.26, 0.24)),
+    ("limb", (0.28, 0.25, 0.23)),
+    ("tan", (0.64, 0.52, 0.40)),
 ]
 
 
@@ -103,10 +107,19 @@ def body(b):
     b.tube([kit.upright(0.0, y, z, rx, rz) for y, rx, rz, z in profile], 20)
     for side in (1.0, -1.0):
         # Arms straight out (a T-pose): (distance from the shoulder, radius)
-        arm = [(-0.05, 0.058), (0.0, 0.052), (0.06, 0.038), (UPPER_ARM, 0.03), (0.28, 0.029), (0.345, 0.026), (0.375, 0.024)]
+        arm = [(-0.05, 0.058), (0.0, 0.058), (0.09, 0.05), (UPPER_ARM + 0.02, 0.043)]
         b.tube([(Vector((side * (SHOULDER.x + d), SHOULDER.y, 0.0)), Y * r, Z * r) for d, r in arm], 12)
-        leg = [(HIP_Y + 0.04, 0.08), (HIP_Y - 0.02, 0.08), (0.36, 0.058), (0.31, 0.044), (KNEE_Y, 0.037), (0.17, 0.033), (0.10, 0.03), (0.07, 0.029)]
+        leg = [(HIP_Y + 0.04, 0.084), (HIP_Y - 0.02, 0.094), (0.35, 0.078), (0.30, 0.066), (KNEE_Y - 0.02, 0.055)]
         b.tube([kit.upright(side * HIP_X, y, 0.0, r, r * 1.08) for y, r in leg], 16)
+
+
+def lower_limbs(b):
+    # Forearms and shins: sleeker and darker than the furry upper arms and thighs, from under the fur cuffs
+    for side in (1.0, -1.0):
+        fore = [(UPPER_ARM - 0.03, 0.04), (UPPER_ARM + 0.02, 0.037), (0.28, 0.034), (0.345, 0.031), (0.375, 0.028)]
+        b.tube([(Vector((side * (SHOULDER.x + d), SHOULDER.y, 0.0)), Y * r, Z * r) for d, r in fore], 12)
+        shin = [(KNEE_Y + 0.03, 0.05), (KNEE_Y - 0.02, 0.047), (0.17, 0.043), (0.10, 0.037), (0.07, 0.034)]
+        b.tube([kit.upright(side * HIP_X, y, 0.0, r, r * 1.08) for y, r in shin], 14)
 
 
 def feet(b):
@@ -122,7 +135,7 @@ def feet(b):
             across = (k - 2) / 2.0
             b.ellipsoid(ankle + Vector((across * 0.040, -0.036, 0.142 - abs(across) * 0.018)), Vector((0.013, 0.012, 0.020)), None, 8, 4)
         # ...and the ankle, up into the leg
-        b.tube([kit.upright(ankle.x, y, z, r, r * 1.08) for y, r, z in ((0.02, 0.033, 0.0), (0.06, 0.031, 0.0), (0.10, 0.031, 0.0))], 12)
+        b.tube([kit.upright(ankle.x, y, z, r, r * 1.08) for y, r, z in ((0.02, 0.037, 0.0), (0.06, 0.038, 0.0), (0.10, 0.04, 0.0))], 12)
 
 
 def hands(b):
@@ -335,6 +348,62 @@ def tail_dark(_b):
     return cones(True)
 
 
+def ruffs(_b):
+    """Bushy fur: zigzag ruffs of spikes like the tail's, flaring out and pointing down, on his upper arms and thighs,
+    as cuffs at the elbows and knees, and as shaggy layers round his body (the user: "bushy", not thin; and their
+    photos: a fluffy body, sleek forearms and shins). A finished mesh in Blender's axes."""
+    made = bmesh.new()
+
+    def ring(centre, axis, u, v, radius, lean=0.0, spiky=False, wide=1.0):
+        loop = []
+        count = SPIKES * 2 if spiky else SPIKES
+        for j in range(count):
+            a = math.tau * j / count + 0.3
+            r = radius * (1.0 if not spiky or j % 2 == 0 else 0.62)
+            p = centre + axis * (lean if spiky and j % 2 == 0 else 0.0) + (u * math.cos(a) * wide + v * math.sin(a)) * r
+            loop.append(made.verts.new(kit.to_blender(reshape(p))))
+        return loop
+
+    def join(a, b):
+        for j in range(len(b)):
+            k0 = j * len(a) // len(b)
+            k1 = ((j + 1) * len(a) // len(b)) % len(a)
+            j1 = (j + 1) % len(b)
+            if k0 == k1:
+                made.faces.new((a[k0], b[j], b[j1]))
+            else:
+                made.faces.new((a[k0], a[k1], b[j1], b[j]))
+
+    def ruff(centre, axis, radius, flare, lean=0.075, wide=1.0):
+        # (axis points down the limb: the spikes lean that way)
+        u = axis.cross(Z if abs(axis.z) < 0.9 else X).normalized()
+        v = axis.cross(u).normalized()
+        base = ring(centre - axis * 0.035, axis, u, v, radius * 0.7, wide=wide)
+        rim = ring(centre, axis, u, v, radius * flare, lean, True, wide)
+        back = ring(centre + axis * 0.01, axis, u, v, radius * 0.7, wide=wide)
+        join(base, rim)
+        join(back, rim)
+        made.faces.new(base[::-1])
+        made.faces.new(back)
+
+    for side in (1.0, -1.0):
+        out = X * side
+        # Arms: along X from the shoulder (as drawn)
+        for d, r, flare in ((0.07, 0.05, 1.9), (0.14, 0.046, 1.8), (UPPER_ARM, 0.043, 1.6)):
+            ruff(Vector((side * (SHOULDER.x + d), SHOULDER.y, 0.0)), out, r, flare)
+        # Legs: down from the hip
+        for y, r, flare in ((HIP_Y - 0.04, 0.085, 1.7), (0.33, 0.072, 1.7), (KNEE_Y, 0.056, 1.5)):
+            ruff(Vector((side * HIP_X, y, 0.0)), -Y, r, flare)
+    # Shaggy layers round his body, widest at the belly
+    for y, depth, wide, flare in ((0.47, 0.142, 1.15, 1.7), (0.6, 0.162, 1.16, 1.58), (0.73, 0.134, 1.2, 1.55)):
+        ruff(Vector((0.0, y, 0.006)), -Y, depth, flare, 0.09, wide)
+    bmesh.ops.recalc_face_normals(made, faces=made.faces[:])
+    mesh = bpy.data.meshes.new("ruffs")
+    made.to_mesh(mesh)
+    made.free()
+    return mesh
+
+
 # --- Skin weights ---
 
 def tail_weights(p):
@@ -369,9 +438,10 @@ def weights(part, p):
         toe = blend(TOE.z - 0.022, TOE.z + 0.022, p.z) * (1.0 - shin)
         return {"shin" + suffix: shin, "foot" + suffix: 1.0 - shin - toe, "toe" + suffix: toe}
 
-    # The body and belly: every share a smooth step across a joint.
+    # The body and the ruffs: every share a smooth step across a joint. (A ruff's spikes reach further from the
+    # arm than the arm does, and go with it all the same.)
     reach = abs(p.x)
-    arm = blend(SHOULDER.x - 0.035, SHOULDER.x + 0.035, reach) if p.y > CHEST.y + 0.02 else 0.0
+    arm = blend(SHOULDER.x - 0.035, SHOULDER.x + 0.035, reach) if p.y > CHEST.y + 0.02 or (part == "ruffs" and abs(p.y - SHOULDER.y) < 0.13) else 0.0
     fore = blend(ELBOW_X - 0.035, ELBOW_X + 0.035, reach)
     leg = blend(HIP_Y + 0.03, HIP_Y - 0.045, p.y) if reach > 0.025 or p.y < HIP_Y - 0.02 else 0.0
     left = blend(-0.012, 0.012, p.x)
@@ -429,11 +499,13 @@ PARTS = [
     ("eyes", WHITE, eyes, None),
     ("pupils", BLACK, pupils, None),
     ("ears", FUR, ears, None),
-    ("ear_insides", EAR, ear_insides, None),
+    ("ear_insides", LIGHT, ear_insides, None),
     ("tail", FUR, tail, (0.006, 3, 3000)),
-    ("tail_grey", FUR, tail_grey, None),
+    ("tail_grey", TAN, tail_grey, None),
     ("tail_dark", DARK, tail_dark, None),
     ("whiskers", LIGHT, whiskers, None),
+    ("lower_limbs", LIMB, lower_limbs, (0.004, 3, 2400)),
+    ("ruffs", FUR, ruffs, None),
 ]
 
 

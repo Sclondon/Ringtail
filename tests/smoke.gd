@@ -44,15 +44,14 @@ func _run() -> void:
 	_check(world.crumbs_total >= 90, "world has its Crumbs (%d)" % world.crumbs_total)
 	_check(get_nodes_in_group(&"cats").size() == 3, "three cats in the yard")
 
-	# Sprinting goes onto all fours
+	# Running goes onto all fours, bounding
 	await _put(Vector3(0.0, 0.05, 8.0))
 	Input.action_press(&"move_up")
-	Input.action_press(&"sprint")
 	var most := 0.0
 	for _i in 70:
 		await physics_frame
 		most = maxf(most, rig._quad)
-	_check(most > 0.9 and rig._gallop > 0.5, "sprint on all fours (quad %.2f)" % most)
+	_check(most > 0.9 and rig._gallop > 0.5, "running on all fours (quad %.2f)" % most)
 
 	# Duck-walking too
 	await _put(Vector3(0.0, 0.05, 8.0))
@@ -130,6 +129,45 @@ func _run() -> void:
 			(node as Pickup).take()
 	await _frames(5)
 	_check(world.caps.has("roof"), "a Bottlecap taken")
+
+	# Dropped onto a wire he lands on it, rides it, and bounces off it higher than a jump
+	var wire: Wire
+	for node in world.get_children():
+		if node is Wire:
+			wire = node
+			break
+	_check(wire != null, "the world has wires")
+	if wire:
+		await _put(wire.point(0.5) + Vector3.UP * 1.2)
+		await _frames(40)
+		_check(wire.riding and absf(player.global_position.y - wire.point(wire.t).y) < 0.15, "lands on a wire and stays on it")
+		var on := player.global_position.y
+		Input.action_press(&"jump")
+		player._queue_jump()
+		var top := on
+		for _i in 60:
+			await physics_frame
+			top = maxf(top, player.global_position.y)
+		Input.action_release(&"jump")
+		_check(top - on > player.jump_height + 0.2, "a jump off a wire goes higher (%.2f m)" % (top - on))
+
+	# Swimming, a jump is a big leap out of the water
+	var pond: Pool = null
+	for node in world.get_children():
+		if node is Pool:
+			pond = node
+	if pond:
+		await _put(pond.global_position + Vector3.DOWN * 0.6)
+		await _frames(60)
+		var swimming := player.state == Player.State.SWIM
+		Input.action_press(&"jump")
+		player._queue_jump()
+		var highest := -INF
+		for _i in 50:
+			await physics_frame
+			highest = maxf(highest, player.global_position.y)
+		Input.action_release(&"jump")
+		_check(swimming and highest - pond.surface_y() > 1.7, "a leap out of the water (%.2f m over it)" % (highest - pond.surface_y()))
 
 	# A pounce hurts, and losing every heart sends him back
 	world.hurt(player.global_position + Vector3.FORWARD)
