@@ -160,7 +160,7 @@ func _place_things() -> void:
 		elif name.begins_with("cap_") and name != "cap_cats" and name != "cap_race":
 			_add_cap(name.substr(4), at)
 		elif name.begins_with("cat_"):
-			var cat := YardCat.new()
+			var cat := YardCat.make()
 			cat.position = at
 			cat.target = player
 			cat.beaten.connect(_on_cat_beaten)

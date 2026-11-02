@@ -25,6 +25,11 @@ var _hurt_done := false
 var _gravity := 20.0
 
 
+## A cat ready to be placed (set `position` and `target`) and added.
+static func make() -> YardCat:
+	return YardCat.new()
+
+
 func _ready() -> void:
 	add_to_group(&"tail_hittable")
 	add_to_group(&"cats")

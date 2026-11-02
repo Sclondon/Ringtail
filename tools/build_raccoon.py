@@ -606,7 +606,9 @@ def _reshaping(self):
     self.place = reshape
 
 
-kit.Builder.__init__ = _reshaping
+def reshaping():
+    """Every Builder made from now on puts its points through `reshape`."""
+    kit.Builder.__init__ = _reshaping
 
 
 def reshaped_bones():
@@ -617,10 +619,13 @@ def reshaped_weights(part, p):
     return weights(part, as_drawn(p))
 
 
-folder = kit.PREVIEW_DIR
-kit.PREVIEW_DIR = None
-kit.export(NAME, reshaped_bones(), PARTS, reshaped_weights, MATERIALS)
-if folder:
-    look_at(folder, NAME)
-kit.LOW = True
-kit.export(NAME + "_lo", reshaped_bones(), [(part, material, shapes, None) for part, material, shapes, _fuse in PARTS], reshaped_weights, MATERIALS)
+# (run as a script it builds the raccoon; imported, as tools/build_cat.py does, it only lends its shapes)
+if __name__ == "__main__":
+    reshaping()
+    folder = kit.PREVIEW_DIR
+    kit.PREVIEW_DIR = None
+    kit.export(NAME, reshaped_bones(), PARTS, reshaped_weights, MATERIALS)
+    if folder:
+        look_at(folder, NAME)
+    kit.LOW = True
+    kit.export(NAME + "_lo", reshaped_bones(), [(part, material, shapes, None) for part, material, shapes, _fuse in PARTS], reshaped_weights, MATERIALS)
