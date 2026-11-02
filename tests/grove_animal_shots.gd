@@ -6,7 +6,7 @@ extends SceneTree
 ## Needs a window (kept off the screen).
 
 const KINDS := ["skunk", "rabbit", "beaver", "otter", "rat", "mouse", "weasel", "marten", "gopher", "prairie_dog",
-		"opossum", "squirrel", "porcupine", "chipmunk"]
+		"opossum", "squirrel", "porcupine", "chipmunk", "ringtail", "frog", "turtle"]
 
 var out := "user://grove_animal_shots"
 var parts: Array[String] = []
@@ -74,6 +74,16 @@ func _lineup() -> void:
 		level.add_child(beast)
 		row.append(beast)
 		x += size * 0.45
+	# (two garter snakes in front of the row: one slithering, one coiled)
+	var slithering := GroveSnake.new()
+	level.add_child(slithering)
+	slithering.global_position = at + Vector3(x * 0.3, 0.0, 0.8)
+	slithering.rotation.y = PI * 0.5
+	slithering.speed = 0.25
+	var coiled := GroveSnake.new()
+	level.add_child(coiled)
+	coiled.global_position = at + Vector3(x * 0.6, 0.0, 0.8)
+	coiled.coil = 1.0
 	await _frames(60)
 	var middle := at + Vector3(x * 0.5, 0.3, 0.0)
 	# (front: every one faces +Z)
@@ -81,6 +91,12 @@ func _lineup() -> void:
 	eye.global_position = middle + Vector3(0.0, 0.5, x * 1.25 + 2.0)
 	eye.look_at(middle, Vector3.UP)
 	await _shot("lineup_front")
+	for k in 2:
+		var snake: GroveSnake = [slithering, coiled][k]
+		eye.global_position = snake.global_position + Vector3(0.0, 1.4, 0.9)
+		eye.look_at(snake.global_position, Vector3.UP)
+		await _frames(30 if k == 0 else 90)
+		await _shot("snake_%d" % k)
 	for beast in row:
 		beast.rotation.y = PI * 0.5
 	await _frames(10)
@@ -118,6 +134,7 @@ func _grove() -> void:
 		var what: String = GroveAnimals.Doing.keys()[life._life[beast]["doing"]]
 		doing[what] = int(doing.get(what, 0)) + 1
 	print("GROVE doing ", doing)
+	print("GROVE snakes=%d pads=%d" % [life.snakes.size(), life._pads.size()])
 	var eye := Camera3D.new()
 	world.add_child(eye)
 	eye.current = true
@@ -128,10 +145,24 @@ func _grove() -> void:
 	var seen := {}
 	for beast in life.beasts:
 		var where: String = beast.kind
-		if seen.has(where) or not beast.kind in ["otter", "mouse", "prairie_dog", "squirrel", "skunk", "porcupine", "opossum"]:
+		if seen.has(where) or not beast.kind in ["otter", "mouse", "prairie_dog", "squirrel", "skunk", "porcupine", "opossum", "ringtail", "frog", "turtle"]:
 			continue
 		seen[where] = true
 		var at := beast.global_position + Vector3.UP * 0.3
 		eye.global_position = at + Vector3(2.2, 1.2, 2.2)
 		eye.look_at(at, Vector3.UP)
 		await _shot("grove_" + where)
+	for snake in life.snakes:
+		var at := snake.global_position + Vector3.UP * 0.1
+		eye.global_position = at + Vector3(1.0, 0.9, 1.0)
+		eye.look_at(at, Vector3.UP)
+		await _shot("grove_" + snake.name)
+	# (him coming up to a snake: it slides off)
+	if not life.snakes.is_empty():
+		var snake := life.snakes[0]
+		world.player.global_position = snake.global_position + Vector3(1.5, 0.3, 0.0)
+		await _frames(90)
+		print("GROVE snake fled: ", GroveAnimals.Doing.keys()[life._snake_life[snake]["doing"]], " speed ", snake.speed)
+		eye.global_position = snake.global_position + Vector3(0.0, 1.6, 1.2)
+		eye.look_at(snake.global_position, Vector3.UP)
+		await _shot("grove_snake_fleeing")

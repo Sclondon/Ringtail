@@ -1,13 +1,13 @@
 """The grove's other animals (the user, 2026-11-02: "there should be the other animals in the grove too for me to see -
 skunk and beavers and rats and mice and rabbits and weasels and martens and otters", "gophers, prairie dogs", then
-"opossums", "squirrels", "porcupine", "chipmunk"), built as the fox, skunk, badger and rabbit are (tools/
+"opossums", "squirrels", "porcupine", "chipmunk", "and ringtails", "and turtles and frogs"), built as the fox, skunk, badger and rabbit are (tools/
 build_critters.py): on the boy's skeleton with a six-bone tail, through the raccoon's `reshape` with each animal's
 own proportions, in the raccoon's cartoon style. Every look here (colours, proportions, ears, tails) is Claude's pick
 after reference photos. scripts/critter_rig.gd poses them; scripts/grove_animals.gd puts them in the grove.
 
 Run from the project root, one animal a run:
     blender -b --factory-startup --python tools/build_grove_animals.py -- <picture folder or -> <animal>
-animals: beaver rat mouse weasel marten otter gopher prairie_dog opossum squirrel porcupine chipmunk
+animals: beaver rat mouse weasel marten otter gopher prairie_dog opossum squirrel porcupine chipmunk ringtail frog turtle
 
 Writes models/<animal>.glb and models/<animal>_lo.glb (and editable copies in tools/). Then: godot --headless --path . --import
 """
@@ -116,18 +116,42 @@ SPECIES = {
                      bib="light", stripes=True, teeth=0.7,
                      tail=dict(style="bushy", dir=(0.0, 0.7, -0.7), length=0.42, profile=[(0.0, 0.04), (0.5, 0.07), (1.0, 0.05)],
                                pattern=["fur"] * 8)),
+    "ringtail": dict(leg=0.7, arm=0.72, head=1.0, wide=0.82, long=1.25,
+                     colours=dict(fur=(0.56, 0.47, 0.36), light=(0.95, 0.9, 0.8), dark=(0.08, 0.07, 0.07), limb=(0.42, 0.34, 0.26)),
+                     muzzle=(0.07, 0.045, 0.04, 0.032), nose=(0.017, "dark"), ears=("round", 0.07, "fur"), bib="light",
+                     eyes=(0.056, 0.016, 0.092, 0.038), eye_rings="light",
+                     tail=dict(style="bushy", dir=(0.0, 0.25, -1.0), length=0.72, profile=[(0.0, 0.06), (0.3, 0.1), (1.0, 0.085)],
+                               pattern=["light", "dark"] * 4, flare=1.35)),
+    "frog": dict(leg=1.0, arm=0.62, head=1.38, wide=1.45, long=0.7, smooth=True,
+                 colours=dict(fur=(0.36, 0.56, 0.22), light=(0.88, 0.9, 0.62), dark=(0.14, 0.24, 0.09), limb=(0.33, 0.52, 0.2),
+                              throat=(0.86, 0.86, 0.6)),
+                 muzzle=(0.012, 0.11, 0.03, 0.035), muzzle_colour="fur", no_muzzle=True, nose=(0.008, "dark"), ears=None, whiskers=False, bib="light", spots="dark",
+                 eyes=(0.075, 0.07, 0.07, 0.045), throat=True, tail=dict(style="none")),
+    "turtle": dict(leg=0.45, arm=0.5, head=0.82, wide=1.3, long=0.95, smooth=True,
+                   colours=dict(fur=(0.36, 0.38, 0.2), light=(0.9, 0.78, 0.32), dark=(0.2, 0.19, 0.1), limb=(0.32, 0.34, 0.18),
+                                shell=(0.4, 0.36, 0.16), red=(0.8, 0.2, 0.12)),
+                   muzzle=(0.035, 0.05, 0.04, 0.035), muzzle_colour="fur", nose=(0.008, "dark"), ears=None, whiskers=False, shell=True,
+                   eye_patch="red",
+                   tail=dict(style="bare", dir=(0.0, -0.1, -1.0), length=0.14, profile=[(0.0, 0.04), (1.0, 0.012)], colour="fur")),
 }
 
 # How big each is drawn beside the raccoon (the skeleton is his): scripts/critter.gd's SIZES carries the same.
 SIZES = {"beaver": 1.0, "rat": 0.5, "mouse": 0.28, "weasel": 0.6, "marten": 0.75, "otter": 1.0, "gopher": 0.5,
-         "prairie_dog": 0.58, "opossum": 0.85, "squirrel": 0.5, "porcupine": 0.9, "chipmunk": 0.38}
+         "prairie_dog": 0.58, "opossum": 0.85, "squirrel": 0.5, "porcupine": 0.9, "chipmunk": 0.38, "ringtail": 0.62,
+         "frog": 0.3, "turtle": 0.55}
 
 
 def build(name):
     spec = SPECIES[name]
     tail = spec["tail"]
-    racc.TAIL_DIR = Vector(tail["dir"]).normalized()
-    racc.TAIL_LENGTH = tail["length"]
+    racc.TAIL_DIR = Vector(tail.get("dir", (0.0, 0.0, -1.0))).normalized()
+    racc.TAIL_LENGTH = tail.get("length", 0.1)
+    if spec.get("eyes"):
+        # (its own eyes: bigger, or a frog's up on top of its head)
+        racc.EYE_X, racc.EYE_Y, racc.EYE_Z, racc.EYE_R = spec["eyes"]
+    if spec.get("throat"):
+        cr.THROAT_BONE[0] = HC + Vector((0.0, -0.075, 0.06))
+    cr.HEAD_PARTS.update({"eye_rings", "eye_patches", "throat_skin"})
     profile = tail.get("profile", [(0.0, 0.05), (1.0, 0.04)])
     racc.tail_radius = cr.tail_profile(profile)
     cr.make_reshape(leg=spec["leg"], arm=spec["arm"], head=spec["head"], wide=spec["wide"], long=spec["long"])
@@ -149,7 +173,7 @@ def build(name):
         r = spec["nose"][0]
         cr.nose_ball(b, Vector((0.0, -m_drop - 0.002, HEAD_FRONT + m_len)), Vector((r * 1.15, r * 0.9, r * 0.9)))
 
-    kind, size, _colour = spec["ears"]
+    kind, size, _colour = spec["ears"] or ("round", 0.0, "fur")
 
     def ears(b):
         for side in (1.0, -1.0):
@@ -203,6 +227,67 @@ def build(name):
             length = rng.uniform(0.14, 0.24)
             b.strand([root, root + way * length * 0.5, root + way * length], [0.009, 0.006, 0.0015], 5)
 
+    def pupils(b):
+        # (as the raccoon's, grown with its eyes; a frog's wide across)
+        grow = racc.EYE_R / 0.03
+        wide = 1.5 if spec.get("throat") else 1.0
+        for side in (1.0, -1.0):
+            centre = HC + Vector((side * (racc.EYE_X + 0.002), racc.EYE_Y + 0.002, racc.EYE_Z + racc.EYE_R * 0.74))
+            b.ellipsoid(centre, Vector((0.014 * wide, 0.018 / wide, 0.011)) * grow, None, 10, 5)
+
+    def eye_rings(b):
+        # Pale rings round big dark eyes (a ringtail's)
+        for side in (1.0, -1.0):
+            centre = HC + Vector((side * racc.EYE_X, racc.EYE_Y, racc.EYE_Z - racc.EYE_R * 0.35))
+            b.ellipsoid(centre, Vector((racc.EYE_R * 1.5, racc.EYE_R * 1.45, racc.EYE_R * 0.9)), None, 14, 7)
+
+    def eye_patches(b):
+        # A red streak behind each eye (a slider's)
+        for side in (1.0, -1.0):
+            centre = HC + Vector((side * (racc.EYE_X + 0.02), racc.EYE_Y - 0.005, racc.EYE_Z - 0.06))
+            b.ellipsoid(centre, Vector((0.022, 0.016, 0.045)), Matrix.Rotation(side * 0.5, 3, Y), 10, 5)
+
+    def throat_skin(b):
+        # The throat it puffs out croaking (on its own bone)
+        b.ellipsoid(HC + Vector((0.0, -0.085, 0.055)), Vector((0.075, 0.045, 0.06)), None, 14, 7)
+
+    def on_back(y, a, lift=0.0):
+        """A point on its back at height `y`, `a` round from one side (0) over the top (pi/2) to the other (pi)."""
+        # (as drawn: the reshape widens it after)
+        w = along(BODY_WIDTH, y)
+        d = along(BODY_DEPTH, y)
+        return Vector(((w + lift) * math.cos(a), y, -(d + lift) * math.sin(a)))
+
+    def spots(b):
+        # Dark spots over its back
+        rng = random.Random(5)
+        for _k in range(14):
+            p = on_back(rng.uniform(0.46, 0.82), rng.uniform(0.35, math.pi - 0.35), -0.004)
+            r = rng.uniform(0.022, 0.04)
+            b.ellipsoid(p, Vector((r, r * 1.2, r * 0.45)), None, 10, 5)
+
+    SHELL_C = Vector((0.0, 0.63, -0.035))
+    SHELL_R = Vector((0.23, 0.3, 0.2))
+
+    def shell(b):
+        # A domed shell over its back, a rim round its edge
+        b.ellipsoid(SHELL_C, SHELL_R, None, 22, 12)
+        b.ellipsoid(SHELL_C + Vector((0.0, 0.0, 0.03)), Vector((SHELL_R.x * 1.06, SHELL_R.y * 1.04, 0.07)), None, 22, 6)
+
+    def plastron(b):
+        b.ellipsoid(SHELL_C + Vector((0.0, 0.0, 0.1)), Vector((SHELL_R.x * 0.92, SHELL_R.y * 0.95, 0.115)), None, 18, 8)
+
+    def scutes(b):
+        # Pale-edged plates on the dome: a row down the middle and one either side
+        for col, (a, ys) in enumerate(((math.pi / 2, (0.48, 0.58, 0.68, 0.78)), (0.75, (0.52, 0.63, 0.74)), (math.pi - 0.75, (0.52, 0.63, 0.74)))):
+            for y in ys:
+                t = (y - SHELL_C.y) / SHELL_R.y
+                ring = math.sqrt(max(0.0, 1.0 - t * t))
+                p = SHELL_C + Vector((SHELL_R.x * ring * math.cos(a), y - SHELL_C.y, -SHELL_R.z * ring * math.sin(a)))
+                out = Vector((p.x / SHELL_R.x ** 2, (p.y - SHELL_C.y) / SHELL_R.y ** 2, (p.z - SHELL_C.z) / SHELL_R.z ** 2)).normalized()
+                turn = out.to_track_quat("Z", "Y").to_matrix()
+                b.ellipsoid(p - out * 0.008, Vector((0.05, 0.045, 0.012)), turn, 12, 4)
+
     tail_parts = []
     style = tail["style"]
     if style == "bushy":
@@ -220,6 +305,8 @@ def build(name):
         racc.tail_radius = cr.tail_profile([(0.0, 0.08), (1.0, 0.05)])
         tail_parts.append(("tail", index[tail["colour"]], racc.tail, (0.006, 3, 1500)))
         tail_parts.append(("tail_paddle", index[tail["colour"]], paddle, None))
+    elif style == "none":
+        pass
     else:
         # (bare: the core itself, at the profile's full width: the core is drawn at 0.55 of the radius it is given)
         doubled = [(t, r / 0.55) for t, r in profile]
@@ -232,11 +319,11 @@ def build(name):
         ("feet", LIMB, racc.feet, (0.004, 3, 2400)),
         ("hands", LIMB, racc.hands, (0.003, 2, 1800)),
         ("head", head_colour, racc.head, (0.005, 4, 3200)),
-        ("muzzle", head_colour if spec.get("head_colour") else index["light"], muzzle, None),
+        ("muzzle", index[spec["muzzle_colour"]] if spec.get("muzzle_colour") else head_colour if spec.get("head_colour") else index["light"], muzzle, None),
         ("nose", index[spec["nose"][1]], nose, None),
         ("eyes", index["eye"], cr.eye_whites, None),
-        ("pupils", index["pupil"], cr.eye_pupils, None),
-        ("ears", index[spec["ears"][2]], ears, None),
+        ("pupils", index["pupil"], pupils if spec.get("eyes") else cr.eye_pupils, None),
+        ("ears", index[(spec["ears"] or (0, 0, "fur"))[2]], ears, None),
         ("whiskers", index["light"] if name not in ("opossum", "mouse") else index["dark"], cr.whiskers_at(HEAD_FRONT + m_len * 0.7, 0.12), None),
         ("lower_limbs", LIMB, racc.lower_limbs, (0.004, 3, 2400)),
     ] + tail_parts
@@ -253,6 +340,25 @@ def build(name):
         parts.append(("quills", index["quill"], quills, None))
     if spec.get("ruffs"):
         parts.append(("ruffs", FUR, racc.ruffs, None))
+    if spec.get("no_muzzle"):
+        # (a frog's face is flat: no snout)
+        parts = [p for p in parts if p[0] != "muzzle"]
+    if not spec["ears"]:
+        parts = [p for p in parts if p[0] != "ears"]
+    if spec.get("whiskers") is False:
+        parts = [p for p in parts if p[0] != "whiskers"]
+    if spec.get("eye_rings"):
+        parts.append(("eye_rings", index[spec["eye_rings"]], eye_rings, None))
+    if spec.get("eye_patch"):
+        parts.append(("eye_patches", index[spec["eye_patch"]], eye_patches, None))
+    if spec.get("throat"):
+        parts.append(("throat", index["throat"], throat_skin, None))
+    if spec.get("spots"):
+        parts.append(("spots", index[spec["spots"]], spots, None))
+    if spec.get("shell"):
+        parts.append(("shell", index["shell"], shell, None))
+        parts.append(("plastron", index["light"], plastron, None))
+        parts.append(("scutes", index["dark"], scutes, None))
     return materials, parts
 
 

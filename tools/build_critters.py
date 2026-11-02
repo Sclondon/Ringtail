@@ -196,6 +196,8 @@ def weights(part, p):
         return {"nose": 1.0}
     if part == "quills" and QUILL_BONE[0]:
         return {"quills": 1.0}
+    if part == "throat" and THROAT_BONE[0]:
+        return {"throat": 1.0}
     if part in HEAD_PARTS:
         return {"head": 1.0}
     if part == "spine_stripe":
@@ -207,6 +209,8 @@ def weights(part, p):
 NOSE_BONE = [None]
 ## A porcupine's quills: a bone of their own on its back, to raise them (CritterRig scales it up when alarmed).
 QUILL_BONE = [None]
+## A frog's throat: a bone of its own under the chin, to puff it out croaking (CritterRig.puff).
+THROAT_BONE = [None]
 
 
 def bones():
@@ -215,6 +219,8 @@ def bones():
         listed.append(("nose", NOSE_BONE[0], "head"))
     if QUILL_BONE[0] is not None:
         listed.append(("quills", QUILL_BONE[0], "spine"))
+    if THROAT_BONE[0] is not None:
+        listed.append(("throat", THROAT_BONE[0], "head"))
     return listed
 
 

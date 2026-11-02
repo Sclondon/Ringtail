@@ -7,7 +7,7 @@ extends CatRig
 ## twitches. Their part in the game is not decided yet (2026-11-01).
 
 const KINDS := ["fox", "skunk", "badger", "rabbit", "beaver", "rat", "mouse", "weasel", "marten", "otter", "gopher",
-		"prairie_dog", "opossum", "squirrel", "porcupine", "chipmunk"]
+		"prairie_dog", "opossum", "squirrel", "porcupine", "chipmunk", "ringtail", "frog", "turtle"]
 
 ## Tails, as each segment's angle below straight back in the hips' space: standing, running, and on all fours
 ## (where the hips are pitched well forward, so the same carriage takes larger numbers).
@@ -38,6 +38,12 @@ const TAILS := {
 	"squirrel": [[-1.2, -1.4, -1.3, -0.9, -0.3, 0.3], [-0.6, -0.8, -0.7, -0.4, 0.0, 0.3], [-0.4, -0.6, -0.5, -0.2, 0.3, 0.8]],
 	"chipmunk": [[-0.9, -1.0, -1.0, -0.9, -0.8, -0.7], [-0.3, -0.3, -0.3, -0.3, -0.3, -0.3], [0.0, -0.1, -0.1, -0.1, -0.1, -0.1]],
 	"porcupine": [[0.6, 0.6, 0.6, 0.6, 0.6, 0.6], [0.4, 0.4, 0.4, 0.4, 0.4, 0.4], [1.0, 1.0, 1.0, 1.0, 1.0, 1.0]],
+	# (out behind and a little up, the long ringed brush curving down at the tip)
+	"ringtail": [[0.3, 0.1, -0.05, -0.1, 0.0, 0.15], [0.1, 0.0, -0.1, -0.1, -0.05, 0.0], [0.6, 0.45, 0.35, 0.35, 0.45, 0.6]],
+	# (none to speak of)
+	"frog": [[0.0, 0.0, 0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]],
+	# (a stub under the shell)
+	"turtle": [[1.0, 1.0, 1.0, 1.0, 1.0, 1.0], [0.8, 0.8, 0.8, 0.8, 0.8, 0.8], [1.3, 1.3, 1.3, 1.3, 1.3, 1.3]],
 }
 
 var kind := "fox"
@@ -46,6 +52,10 @@ var bristle := 0.0
 var _quill_bone := -1
 var _quill_rest := Transform3D.IDENTITY
 var _bristled := 0.0
+## A frog's throat puffed out croaking (0 .. 1): set from outside (GroveAnimals).
+var puff := 0.0
+var _throat_bone := -1
+var _throat_rest := Transform3D.IDENTITY
 var _nose: Node3D
 var _nose_rest := Vector3.ZERO
 var _twitch := 0.0
@@ -74,6 +84,9 @@ func _ready() -> void:
 	if _has(&"quills"):
 		_quill_bone = _skeleton.find_bone(&"quills")
 		_quill_rest = _skeleton.get_bone_rest(_quill_bone)
+	if _has(&"throat"):
+		_throat_bone = _skeleton.find_bone(&"throat")
+		_throat_rest = _skeleton.get_bone_rest(_throat_bone)
 
 
 func _pose_extra(delta: float) -> void:
@@ -83,6 +96,10 @@ func _pose_extra(delta: float) -> void:
 		_bristled = move_toward(_bristled, bristle, delta * 3.0)
 		var grow := 1.0 + 0.45 * smoothstep(0.0, 1.0, _bristled)
 		_skeleton.set_bone_rest(_quill_bone, Transform3D(_quill_rest.basis.scaled_local(Vector3(grow, grow, grow)), _quill_rest.origin))
+	if _throat_bone >= 0:
+		# (the throat blown out round, as the quills are raised)
+		var blown := 1.0 + 1.1 * clampf(puff, 0.0, 1.0)
+		_skeleton.set_bone_rest(_throat_bone, Transform3D(_throat_rest.basis.scaled_local(Vector3(blown, blown, blown)), _throat_rest.origin))
 	if _nose:
 		# Twitching in little bursts, now and then
 		_twitch_wait -= delta

@@ -452,8 +452,22 @@ Read README.md first. Started 2026-11-01.
   and gophers sit up and stare; the porcupine turns its back, quills up; the opossum may flop (ragdoll) and lie still
   till he goes. Past 38 m they stand still, their rigs off. Counts, places and every look are Claude's picks.
   Not done: the opossum hanging by its tail, a chirp sound for the prairie dog.
-- Checks: `tests/grove_animal_shots.gd -- --out=<dir> [lineup] [grove]` (every kind beside him front and side; the
-  grove from above and close by; prints counts, what each is doing, and any that fell through).
+- Then "and ringtails", "and turtles and frogs", "and snakes" (the user, 2026-11-02; not Frogulizer's frog). Ringtail,
+  frog and turtle are build_grove_animals.py kinds too: the ringtail with big eyes in pale rings, round ears and a
+  black-and-white ringed brush ending black (2, up the trees); the frog squat and wide, eyes on top, no snout or tail,
+  dark spots, a throat on a `throat` bone it puffs croaking (CritterRig.puff); the turtle a slider: domed shell with
+  plates, yellow plastron, a red streak behind each eye. Frogs (4) sit at the pond's edge and on lily pads
+  (GroveAnimals makes five pads), croak, hop (Critter.hop), and leap in when he comes; turtles (2) bask on the bank and
+  walk in slowly, swimming low. Nothing is put within 2.2 m of the fishing spot (`fishing_spot`, else PondFishing's
+  west bank).
+- Snakes: `tools/build_snake.py` writes models/snake.glb (a straight striped garter snake, no bones, its tongue every
+  point past z 0.9) and snake_rock.glb. `GroveSnake` (scripts/grove_snake.gd) bends it in a vertex shader (Toon's
+  with a vertex stage): a travelling S-wave whose phase follows the distance gone, so the body follows its head's
+  track; or a flat coil, head on top in the middle; the tongue flicks. Two sun coiled on rocks on the rim, slither
+  about and home, and when he comes near slide off into the grass, or into the pond and across it.
+- Checks: `tests/grove_animal_shots.gd -- --out=<dir> [lineup] [grove]` (every kind beside him front and side, a
+  slithering and a coiled snake; the grove from above and close by; prints counts, what each is doing, any that fell
+  through, and a snake fleeing him).
 
 ## 2026-11-02: four faces, four zones (the user's calls; this supersedes the one-street layout above)
 

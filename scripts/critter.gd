@@ -11,7 +11,7 @@ signal respawned
 ## Its size beside the raccoon (the skeleton is his).
 const SIZES := {"fox": 0.95, "skunk": 0.78, "badger": 0.88, "rabbit": 0.72, "beaver": 1.0, "rat": 0.5, "mouse": 0.28,
 		"weasel": 0.6, "marten": 0.75, "otter": 1.0, "gopher": 0.5, "prairie_dog": 0.58, "opossum": 0.85, "squirrel": 0.5,
-		"porcupine": 0.9, "chipmunk": 0.38}
+		"porcupine": 0.9, "chipmunk": 0.38, "ringtail": 0.62, "frog": 0.3, "turtle": 0.55}
 
 var walk_speed := 1.0
 var run_speed := 4.0
@@ -24,6 +24,8 @@ var kind := ""
 ## How long it has been off the ground (the rig reads it; GroveAnimals holds it at 0 while it carries one up a tree or
 ## through the water, so it climbs and paddles instead of falling).
 var air_time := 0.0
+## A hop to take the next time it is on the ground (m/s up; a frog's: GroveAnimals).
+var hop := 0.0
 
 
 static func make(what: String, low := false) -> Critter:
@@ -54,6 +56,9 @@ func _ready() -> void:
 
 func _physics_process(delta: float) -> void:
 	var fall := velocity.y - 20.0 * delta if not is_on_floor() else -0.1
+	if hop > 0.0 and is_on_floor():
+		fall = hop
+		hop = 0.0
 	velocity = Vector3(drive.x, fall, drive.z)
 	if Vector2(drive.x, drive.z).length() > 0.1:
 		rotation.y = lerp_angle(rotation.y, atan2(drive.x, drive.z), 1.0 - exp(-8.0 * delta))
