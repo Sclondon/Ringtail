@@ -729,3 +729,24 @@ Read README.md first. Started 2026-11-01.
   (it shuts the pause screen each frame: it opens when the window loses focus and would stop everything). Any run with
   `RINGTAIL_NO_STREAM=1` in the environment has streaming off. `tests/zone_streaming_test.gd` (headless) walks grove,
   each side and back: live, frozen and hidden as above, the band running, the HUD's zone and counts.
+
+## Buildings as mini levels (2026-11-02)
+
+- The user: "the houses need more complex shapes that lend themselves to platforming over just boxes spin up an agent
+  to make a house generator that can function as a mini level generator essentially", then "same for the apartment
+  complexes and factories etc". The setting is the Pacific Northwest ("it takes place in the PNW not japan").
+- `tools/buildings.py` (a Blender library; build_town.py imports it): `buildings.make(kind, name, x, y, z, turn, seed)`
+  builds one seeded building with a measured route from the ground to its top, and returns the route, the `top` (a
+  spot for a reward), the Crumbs it put along the way, its `bounds` and any `problems` (check_route against his moves:
+  RISE_JUMP 1.0, RISE_LEDGE 1.45, GAP 2.2, HEADROOM 1.3). Kinds: craftsman, box, farmhouse, aframe, walkup,
+  commercial, construction, factory, warehouse, substation, culvert. `ZONES` maps the user's four zone themes to kinds.
+  The kinds, their parts, the routes and every size are Claude's picks.
+- Rules the routes taught (each found by tests/building_routes.gd): approach eaves from outside their line (his
+  collider is 1.3 m tall, so nothing he stands on may be under an overhang); a climbable must end flush with or
+  lean out past what is over it (the A-frame's flat ridge top, the crane's column clear of its deck, the drainpipes'
+  lean); a route never crosses an open gap between stair flights (walk along the landing first); vents are not on a
+  ridge he walks along.
+- Check: `blender -b --factory-startup --python tools/build_building_preview.py -- <dir|-> [kinds|all] [seeds] [turn]`
+  (models/buildings_preview.glb, pictures from four sides and above), then `tests/building_routes.gd [-- <name prefix>]`
+  (headless: he is put at each link's start and walks, jumps, catches, scurries or climbs to its end). All 11 kinds
+  passed for seeds 1 to 5, and turned 1 rad.
