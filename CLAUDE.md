@@ -575,3 +575,29 @@ Read README.md first. Started 2026-11-01.
 - Check: `tests/fishing_test.gd` (walks up, button, rod, cast into the pond, a forced bite, reels, lands, the best
   kept, puts it away; measures the rod's gap to his head in each move); with `-- --out=<dir>` in a window it shoots
   the cast, fight and catch, and him with the rod from four sides, above and close.
+
+## Day and night (2026-11-02)
+
+- The user: "there needs to be a day and night cycle", then "day is more dangerous — more cars, and hawks can easily
+  see you, and more people".
+- `DayNight` (scripts/day_night.gd, `DayNight.place(world)` after the clouds) runs the hour round: 14 real minutes a
+  day (DAY_SECONDS), starting at 10:00. GameCommon's weather (installed under `weather/`) gives the sun's and moon's
+  paths (Daylight.at: sunrise 6:00, sunset 18:00) and the sky shader (stars and moon at night); DayNight's own KEYS
+  give the colours: dawn, the summer midday the town was built in, golden evening, a blue moonlit night. It sets the
+  world's sun (the moon by night), ambient, fog, the far hills' `sky_` materials, the puff clouds' light, and lights
+  the windows: the far town's "window" material, and the houses' "glass" in about two houses in three (a lit copy,
+  warm by night). Lamps on the poles at night (one emissive head per pole, under its lowest wire; 4 real OmniLights
+  moved to the ones nearest him), fireflies over the grove. The HUD dial (top right, under the pause button): the sun
+  or a crescent moon over a day/night disc turning with the hour. No shrine lanterns exist to light (removed earlier).
+- Danger is one value, `DayNight.current.danger` (1 by day, 0 at night, between at dawn and dusk; `night` is the
+  opposite, for lights). Hunters read `DayNight.by_day(day_value, night_value)` (1.0 with no DayNight, so the yard
+  tests keep the old behaviour), `is_night()`, `is_day()`. By day the hawk sees him from 1.8x further and comes down
+  sooner; at night it cannot see him (it still circles). The owl hunts only at night; hostile crows dive only by day.
+  People notice him from 1.5x by day, 0.6x at night. Cars: Hazards.CARS_PER_LOOP 4 by day, 1 a road at night; people:
+  every second one at night. What is parked is put away only out of his sight (40 m), with meta `put_away_by_night`
+  (hidden, not processing, its collision layer kept in meta `night_layer`). HazardCar's headlights read
+  `DayNight.current.night`. Tall grass and the grove still hide him at any hour.
+- Claude's picks: the 14 minutes, the 10:00 start, every colour, the numbers above, which houses are lit.
+- Checks: `tests/day_night_test.gd` (headless: the clock runs; noon, midnight, dawn and dusk values; windows, lamps,
+  fireflies), `tests/day_night_shots.gd -- --out=<dir>` (dawn, noon, evening, night from the grove, the ring road and
+  facing a house).

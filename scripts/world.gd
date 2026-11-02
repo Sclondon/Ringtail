@@ -105,6 +105,8 @@ func _ready() -> void:
 	# Daughter Of The Wind's clouds round the sky (GameCommon puff-clouds; the user: "the clouds should be like
 	# daughter of the wind")
 	PuffClouds.add_to(self, _sun)
+	# The day going round: dawn, day, evening, night (DayNight; the user, 2026-11-02, "there needs to be a day and night cycle")
+	DayNight.place(self)
 	Squad.place(self, player)
 	Villagers.place(self, markers, player)
 	# The kits lost about the hill, to find and send home to the grove

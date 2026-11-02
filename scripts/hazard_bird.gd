@@ -112,7 +112,10 @@ func _him() -> Vector3:
 
 
 func _hawk(delta: float) -> void:
-	var under := player != null and Vector2(player.global_position.x - home.x, player.global_position.z - home.z).length() < notice and not Hazards.unseen(player)
+	# (by day it sees him from much further and comes down quicker; at night it roosts and does not hunt: DayNight; the
+	# user, 2026-11-02, "day is more dangerous ... hawks can easily see you")
+	var sees := notice * DayNight.by_day(1.8, 0.0)
+	var under := player != null and Vector2(player.global_position.x - home.x, player.global_position.z - home.z).length() < sees and not Hazards.unseen(player)
 	match state:
 		State.FLY:
 			_angle += delta * 0.45
@@ -127,7 +130,7 @@ func _hawk(delta: float) -> void:
 			_steer(over, 10.0, delta)
 			if not under:
 				_go(State.CLIMB)
-			elif _state_t > warning:
+			elif _state_t > warning * DayNight.by_day(0.7, 1.0):
 				_target = _him() + Vector3(player.velocity.x, 0.0, player.velocity.z) * 0.35
 				_hit_done = false
 				_go(State.DIVE)

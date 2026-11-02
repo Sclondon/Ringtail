@@ -16,7 +16,7 @@ class_name Hazards
 ##                         "you should spawn in the center of the grove and there shouldnt be enemies there")
 
 ## How many of each, per marker (Claude's picks).
-const CARS_PER_LOOP := 3
+const CARS_PER_LOOP := 4  # (all out by day; at night fewer: DayNight parks the rest)
 const PEOPLE_PER_WALK := 2
 const CROWS_PER_BAND := 4
 ## How far left of a road's centre line its vehicles keep (they drive on the left, as in Japan).

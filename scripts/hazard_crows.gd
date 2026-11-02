@@ -84,7 +84,8 @@ func _physics_process(delta: float) -> void:
 	if player == null or not hostile:
 		return
 	_wait -= delta
-	if _wait > 0.0 or player.global_position.distance_to(home) > notice or Hazards.unseen(player):
+	# (a hostile band dives at him by day only; at night they roost: DayNight)
+	if _wait > 0.0 or player.global_position.distance_to(home) > notice or Hazards.unseen(player) or not DayNight.is_day():
 		return
 	_wait = randf_range(every.x, every.y)
 	crows.shuffle()
