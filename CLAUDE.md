@@ -601,3 +601,17 @@ Read README.md first. Started 2026-11-01.
 - Checks: `tests/day_night_test.gd` (headless: the clock runs; noon, midnight, dawn and dusk values; windows, lamps,
   fireflies), `tests/day_night_shots.gd -- --out=<dir>` (dawn, noon, evening, night from the grove, the ring road and
   facing a house).
+
+## The town's people brought low (2026-11-02)
+
+- The user: "you should also make a lower poly version of the people like I did for gloaming". HazardPerson wears
+  models/boy_tp.glb (GameCommon character-controller `tools/build_boy_tp.py`, Gloaming's build_man_tp.py way): every
+  mesh of boy.glb collapsed, mirrored, held at the head, hands and open edges (hems), budgets body 1300, the arms and
+  hands 900, heads 650, boots 300, skirts 500, over pieces 400, other pieces 20% within 120-400 (faces and the knee
+  patch kept); then every worn piece pushed as clear of the low body as it was of the high (at least 5-12 mm) and the
+  whole shaded smooth by angle. Every slot and option keeps its name, so CharacterLook and the HeadShape mask heads
+  (made from its 650-triangle `boy_head__base`) work as on the boy. Its bone rests match boy.glb's exactly (imported
+  with the glTF's own bone axes). The numbers are Claude's picks.
+- A dressed person: about 3.8-4.8k triangles (the boy's 15-20k). models/boy_lo.glb is another thing (build_boy.py's
+  LOW, a 200-triangle head). Check: `tests/people_lo_shots.gd -- --out=<dir>` (four people high beside low from four
+  sides, their heads close, a crowd of 30; prints the triangles and the rests' difference).
