@@ -105,7 +105,9 @@ func _run() -> void:
 		if (node as HazardBird).kind == HazardBird.Kind.CROW:
 			crows.append(node)
 	_check(crows.size() >= 3 and (crows[0] as HazardBird)._bird != null, "crows on the new crow model (%d)" % crows.size())
-	_check(crows.all(func(c: HazardBird) -> bool: return c._bird.fold > 0.5), "crows folded on the ground")
+	# (those sitting, on the ground or up on a perch, are folded; they fly between perches now and then)
+	var sitting := crows.filter(func(c: HazardBird) -> bool: return c.state == HazardBird.State.GROUND or c.state == HazardBird.State.PERCH)
+	_check(not sitting.is_empty() and sitting.all(func(c: HazardBird) -> bool: return c._bird.fold > 0.5), "crows sitting folded (%d of %d)" % [sitting.size(), crows.size()])
 	var hurts_before := game.hurts
 	player.global_position = Vector3(1.5, 0.05, -38.0)
 	var dove := false

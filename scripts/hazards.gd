@@ -31,7 +31,8 @@ const PAINTS := [Color(0.85, 0.22, 0.18), Color(0.2, 0.45, 0.8), Color(0.95, 0.7
 
 
 static func place(world: Node3D, markers: Dictionary, player: Player) -> void:
-	haven = (markers["grove_heart"] as Transform3D).origin if markers.has("grove_heart") else Vector3(0.0, -1000.0, 0.0)
+	# (no grove: nowhere is safe; `safe` measures across the ground only, so far off across it, not below)
+	haven = (markers["grove_heart"] as Transform3D).origin if markers.has("grove_heart") else Vector3(1.0e6, 0.0, 1.0e6)
 	for loop: PackedVector3Array in _lines(markers, "road"):
 		var lane := _lane(loop)
 		for k in CARS_PER_LOOP:
@@ -63,6 +64,8 @@ static func place(world: Node3D, markers: Dictionary, player: Player) -> void:
 			var band := HazardCrows.new()
 			band.home = at
 			band.count = CROWS_PER_BAND
+			# (most bands leave him be; every third dives at him: Claude's pick)
+			band.hostile = name.get_slice("_", 1).to_int() % 3 == 0
 			band.player = player
 			world.add_child(band)
 		elif name.begins_with("den_"):

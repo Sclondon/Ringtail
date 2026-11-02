@@ -69,7 +69,9 @@ const HELI_TURN_TIME := 0.4
 const TRAIL_FRAMES := 10
 ## The fur's springs (see _spring_fur), and which region his head is.
 const FUR_STIFFNESS := 115.0
-const FUR_DAMPING := 5.0
+## (damped nearly to stillness: it sways and settles, it does not bounce; the user, 2026-11-02, "the fur is too much
+## like springs and less like fur", "too bouncy")
+const FUR_DAMPING := 17.0
 const FUR_HEAD := 16
 ## The fur shader's vertex stage, added to Toon's: a point tagged as a spike is moved by its region's lag, flex
 ## squared. Tagged in Blender as UV2 (region, -flex - 0.001), it arrives flipped as glTF has it, (region, 1.001 + flex);
@@ -445,7 +447,7 @@ func _spring_fur(delta: float) -> void:
 		# (not the tail's cones nor the head's tufts: hung, the tail drooped and the head fur lay flat; the user,
 		# 2026-11-02, "his tail is all droopy now", "you cant really see the fur on his head")
 		var hangs := r < FUR_HEAD - TAIL_BONES
-		var push := -accel.limit_length(60.0) * 1.1 - speed.limit_length(8.0) * 2.2 + Vector3.DOWN * (13.0 if hangs else 0.0)
+		var push := -accel.limit_length(40.0) * 0.55 - speed.limit_length(8.0) * 1.6 + Vector3.DOWN * (13.0 if hangs else 0.0)
 		if r == FUR_HEAD:
 			push += Vector3(sin(_time * 41.0), sin(_time * 37.0), 0.0) * 18.0 * _sniff
 		_fur_lag_speed[r] += (push - _fur_lag[r] * FUR_STIFFNESS - _fur_lag_speed[r] * FUR_DAMPING) * delta

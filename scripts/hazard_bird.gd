@@ -13,7 +13,7 @@ extends Node3D
 signal knocked
 
 enum Kind { CROW, HAWK }
-enum State { GROUND, FLY, STALK, DIVE, CLIMB, KNOCKED, AWAY }
+enum State { GROUND, FLY, STALK, DIVE, CLIMB, KNOCKED, AWAY, PERCH }
 
 const MODELS := {Kind.CROW: "res://models/crow.glb", Kind.HAWK: "res://models/hawk.glb"}
 
@@ -29,6 +29,10 @@ var notice := 16.0
 var warning := 2.2
 var dive_speed := 15.0
 var rest := 6.0
+
+## A crow's band (HazardCrows), which tells it where to sit next; and how long it stays where it is.
+var band: HazardCrows
+var _stay := randf_range(5.0, 12.0)
 
 var velocity := Vector3.ZERO
 var _model: Node3D
@@ -155,6 +159,9 @@ func _crow(delta: float) -> void:
 	match state:
 		State.GROUND:
 			# Hopping about its spot, now and then
+			if band and (_state_t > _stay or _startled()):
+				fly_to(band.next_spot(self, true))
+				return
 			velocity.x = move_toward(velocity.x, 0.0, 6.0 * delta)
 			velocity.z = move_toward(velocity.z, 0.0, 6.0 * delta)
 			var floor_y := _ground_below(global_position)
@@ -187,7 +194,15 @@ func _crow(delta: float) -> void:
 			if global_position.distance_to(_target) < 0.5 or _state_t > 4.0:
 				global_position = _target
 				velocity = Vector3.ZERO
-				_go(State.GROUND)
+				# (up on a wire or a roof it sits; down on the ground it hops about)
+				_go(State.PERCH if _target.y > home.y + 1.5 else State.GROUND)
+				_stay = randf_range(6.0, 15.0) if state == State.PERCH else randf_range(4.0, 9.0)
+		State.PERCH:
+			# Sitting up on a wire or a roof: still, looking about, now and then off somewhere else
+			velocity = Vector3.ZERO
+			global_position = _target
+			if band and (_state_t > _stay or _startled()):
+				fly_to(band.next_spot(self, _startled()))
 		State.KNOCKED:
 			_tumble(delta)
 			if _state_t > 0.9:
@@ -200,9 +215,26 @@ func _crow(delta: float) -> void:
 				_go(State.FLY)
 
 
+## Off to sit at `spot` (a perch up high, or the ground).
+func fly_to(spot: Vector3) -> void:
+	_target = spot
+	velocity = Vector3(0.0, 2.5, 0.0)
+	_go(State.FLY)
+
+
+## Where it is going, or sitting.
+func target_spot() -> Vector3:
+	return _target if state == State.FLY or state == State.PERCH else global_position
+
+
+## Whether he has come up too close (it takes off; a hostile band's crows only dive when sent).
+func _startled() -> bool:
+	return player != null and not (band and band.hostile) and player.global_position.distance_to(global_position) < 2.5
+
+
 ## For HazardCrows: dive at him now (a crow on the ground).
 func dive() -> bool:
-	if state != State.GROUND or player == null:
+	if (state != State.GROUND and state != State.PERCH) or player == null:
 		return false
 	_target = _him() + Vector3(player.velocity.x, 0.0, player.velocity.z) * 0.3
 	_hit_done = false
@@ -250,7 +282,7 @@ func tail_hit(_from: Vector3, push: Vector3) -> void:
 func _pose(delta: float) -> void:
 	# Facing the way it flies (level), banking into turns; wings beating, gliding, folded or tucked for a dive
 	var flat := Vector3(velocity.x, 0.0, velocity.z)
-	if state != State.GROUND and state != State.KNOCKED and flat.length() > 0.3:
+	if state != State.GROUND and state != State.PERCH and state != State.KNOCKED and flat.length() > 0.3:
 		var yaw := atan2(flat.x, flat.z)
 		var turn := angle_difference(rotation.y, yaw)
 		rotation.y = lerp_angle(rotation.y, yaw, 1.0 - exp(-6.0 * delta))
@@ -268,6 +300,8 @@ func _pose(delta: float) -> void:
 	var beat := 0.0
 	var fold := 0.0
 	match state:
+		State.PERCH:
+			fold = 1.0
 		State.GROUND:
 			fold = 1.0
 			beat = 0.0 if velocity.y <= 0.0 else 0.8
@@ -293,7 +327,7 @@ func _pose(delta: float) -> void:
 ## The crow (BirdBody): on the ground folded, eyeing him, pecking now and then, a flick of the wings as it hops;
 ## flying, beating hard, gliding in to land; diving at him half folded; knocked, flailing.
 func _pose_bird() -> void:
-	var flying := state != State.GROUND
+	var flying := state != State.GROUND and state != State.PERCH
 	_bird.tuck = 1.0 if flying and state != State.KNOCKED else 0.0
 	_bird.flare = 0.0
 	match state:
@@ -302,6 +336,11 @@ func _pose_bird() -> void:
 			_bird.fold = 0.55 if hopping else 1.0
 			_bird.flap = 1.0 if hopping else 0.0
 			if not hopping and randf() < get_physics_process_delta_time() * 0.5:
+				_bird.peck()
+		State.PERCH:
+			_bird.fold = 1.0
+			_bird.flap = 0.0
+			if randf() < get_physics_process_delta_time() * 0.15:
 				_bird.peck()
 		State.DIVE:
 			_bird.fold = 0.45

@@ -184,7 +184,8 @@ func _run() -> void:
 	crow.global_position = Vector3(0.0, 0.0, -30.0)
 	await _put(Vector3(0.0, 0.05, -31.0))
 	crow.process_mode = Node.PROCESS_MODE_INHERIT
-	crow.state = HazardBird.State.GROUND
+	# (put down, its time there starting now: else it is up and off to a perch at once)
+	crow._go(HazardBird.State.GROUND)
 	(player.get_node(^"TailMoves") as TailMoves).press()
 	var knocked := false
 	for _i in 40:
