@@ -145,6 +145,13 @@ var _climb_w := 0.0
 var _leg_swing := 0.0
 var _leg_swing_speed := 0.0
 var _spin_jump: Node
+## On one hand on a point (PointStand), and how far into that pose.
+var _point_stand: Node
+var _hs_w := 0.0
+## How far his head is turned on the handstand, to look out.
+const HS_HEAD := 0.3
+## How much longer the arm he stands on is drawn.
+const HS_ARM := 1.6
 var _tj_w := 0.0
 var _tj_turn := 0.0
 var _tj_speed := 0.0
@@ -212,6 +219,7 @@ func _ready() -> void:
 		_moves = _player.get_node_or_null(^"TailMoves")
 		_scurry = _player.get_node_or_null(^"Scurry")
 		_spin_jump = _player.get_node_or_null(^"SpinJump")
+		_point_stand = _player.get_node_or_null(^"PointStand")
 		if _player.has_signal(&"jumped"):
 			_player.jumped.connect(func() -> void: _leaping = _quad > 0.5 and (_gallop > 0.3 or always_on_fours))
 	_make_fur()
@@ -321,6 +329,11 @@ func _pose_extra(delta: float) -> void:
 		for i in 2:
 			var side := 1.0 if i == 0 else -1.0
 			_solve_arm(i, side, to_global(Basis(Vector3.UP, _tj_turn) * Vector3(side * 0.48, 0.62, 0.0)), _forearm, _tj_w)
+	# On one hand on top of a pole or a tree (PointStand)
+	var perched: bool = _point_stand != null and _point_stand.on
+	_hs_w = _approach(_hs_w, 1.0 if perched else 0.0, 12.0, delta)
+	if _hs_w > 0.002:
+		_pose_handstand(smoothstep(0.0, 1.0, _hs_w))
 	_sniffing(delta, speed)
 	_pose_face(delta, speed)
 	_pose_tail(delta, speed, spin)
@@ -1047,6 +1060,42 @@ func _pose_glide(w: float) -> void:
 	_head.basis = _slerp(_head.basis, Basis(Vector3.RIGHT, -0.9), w)
 
 
+## Upside-down on one paw on a point (PointStand; the user, 2026-11-02: "you need to be able to handstand on one hand
+## on the top of pointy things like trees and telephone poles"): turned over end to end, his left shoulder straight
+## over the paw on the tip (the rig's origin), the other arm out for balance, legs together pointing up, wobbling
+## a little; the tail curled over (_tail_shape).
+func _pose_handstand(w: float) -> void:
+	# (the arm he stands on drawn out long, cartoon-fashion: his arms are short, and with the shoulder no higher his
+	# head came down onto the tip)
+	var stretch := lerpf(1.0, HS_ARM, w)
+	var arm := (_upper_arm + _forearm) * 0.99 * stretch
+	var shoulder := to_local(_shoulders[0].global_position)
+	var wobble := sin(_time * 2.3) * 0.05 + sin(_time * 3.7) * 0.03
+	var over := Basis(Vector3.BACK, (PI + wobble) * w) * Basis(Vector3.RIGHT, sin(_time * 1.9) * 0.05 * w)
+	# (turned over about the rig's origin, then moved so the shoulder comes over the paw, an arm's length up)
+	var move := (Vector3(0.0, arm, 0.0) - over * shoulder) * w
+	_hips.transform = Transform3D(over, move) * _hips.transform
+	var upper := _upper_arm
+	_upper_arm *= stretch
+	_solve_arm(0, 1.0, global_position, _forearm * stretch, w)
+	_upper_arm = upper
+	# (each bone drawn out along itself, -Y; the next one down takes the stretch off again)
+	_shoulders[0].basis = _shoulders[0].basis * _along(Vector3.UP, stretch)
+	_elbows[0].basis = _along(Vector3.UP, 1.0 / stretch) * _elbows[0].basis * _along(Vector3.UP, stretch)
+	_hands[0].basis = _along(Vector3.UP, 1.0 / stretch) * _hands[0].basis
+	var near := to_local(_shoulders[0].global_position)
+	var far := to_local(_shoulders[1].global_position)
+	var out := Vector3(far.x - near.x, 0.0, far.z - near.z).normalized()
+	_solve_arm(1, -1.0, to_global(far + out * arm * 0.9 + Vector3.UP * 0.08), _forearm, w)
+	# (legs together, straight up: in the hips' own space that is down along them)
+	for i in 2:
+		var side := 1.0 if i == 0 else -1.0
+		var foot := Vector3(side * 0.02, _hip_drop - (_thigh + _shin) * 0.94, 0.03 + sin(_time * 2.9 + side) * 0.02)
+		_set_leg(i, side, foot, Basis(Vector3.RIGHT, -0.5), w)
+	# (his head turned a little to look out)
+	_head.basis = _slerp(_head.basis, Basis(Vector3.RIGHT, HS_HEAD), w)
+
+
 ## The tail's shape for now, in the hips' space, as a direction for each segment.
 func _tail_shape(speed: float, spin: float) -> Array[Vector3]:
 	var run := clampf(speed / 3.0, 0.0, 1.0)
@@ -1085,6 +1134,11 @@ func _tail_shape(speed: float, spin: float) -> Array[Vector3]:
 			# "the tail shouldnt be perfectly straight for the attack")
 			var angle := PI - (1.7 + 0.12 * k) * wound + 0.16 * k * (1.0 - wound)
 			dirs[k] = dirs[k].slerp(Vector3(sin(angle), 0.12 - 0.035 * k + 0.05 * wound, cos(angle)).normalized(), _spin_w)
+	if _hs_w > 0.001:
+		# (on one hand: curled over for balance, up from his rump and over towards his head)
+		for k in TAIL_BONES:
+			var curl := 0.3 + 0.42 * k
+			dirs[k] = dirs[k].slerp(Vector3(0.0, -cos(curl), -sin(curl)).normalized(), _hs_w)
 	# (asleep on his back: the tail out along the ground beside him, curling round towards his feet)
 	if _sleep_w > 0.001:
 		for k in TAIL_BONES:

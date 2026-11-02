@@ -1,4 +1,4 @@
-[gd_scene load_steps=12 format=3]
+[gd_scene load_steps=13 format=3]
 
 [ext_resource type="PackedScene" path="res://player.tscn" id="1"]
 [ext_resource type="Script" path="res://scripts/raccoon_rig.gd" id="2"]
@@ -10,6 +10,7 @@
 [ext_resource type="Script" path="res://scripts/scurry.gd" id="8"]
 [ext_resource type="Script" path="res://scripts/spin_jump.gd" id="9"]
 [ext_resource type="Script" path="res://scripts/wire_bounce.gd" id="10"]
+[ext_resource type="Script" path="res://scripts/point_stand.gd" id="11"]
 
 [node name="Raccoon" instance=ExtResource("1")]
 walk_speed = 1.0
@@ -57,3 +58,6 @@ script = ExtResource("9")
 
 [node name="WireBounce" type="Node" parent="." index="8"]
 script = ExtResource("10")
+
+[node name="PointStand" type="Node" parent="." index="9"]
+script = ExtResource("11")

@@ -451,6 +451,8 @@ func _grow_lawn() -> void:
 	await get_tree().physics_frame
 	var lawn := TownGrass.place(self, player, markers)
 	Wildlife.place(self, lawn, player)
+	# (the points to stand on one hand on: pole tops, tree tips: PointStand)
+	PointPerches.find(self)
 	# One wind over the hill: Wind Waker ribbons riding it round him, the grass gusting in step (GameCommon wind; the
 	# user, 2026-11-02, "there should be Wind Waker like wind trails (we have the assets for that, look at other games)")
 	wind = WindField.new()

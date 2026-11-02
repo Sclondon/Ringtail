@@ -396,3 +396,20 @@ Read README.md first. Started 2026-11-01.
   it if the town's roads widen). The road widths are the TOWN fork's.
 - Checks: `tests/vehicle_test.gd` (all up to speed, none runs into another, one pulls up behind a stopped one),
   `tests/vehicle_shots.gd` (each beside him from four sides). `models/car.glb` (tools/build_hazards.py) is unused now.
+
+## The one-hand handstand on points (2026-11-02)
+
+- The user: "you need to be able to handstand on one hand on the top of pointy things like trees and telephone poles".
+- PointPerches.find (from World._grow_lawn, once the physics has the world) collects the points: the tops of the
+  climb_ meshes named for poles or a chimney (each top's middle, from the mesh's highest ring of points) and every tree
+  body's tip (over its trunk, at the top of its drawn bounds).
+- PointStand (a child of the Player, priority -5): coming down within 0.6 m of a point, from above it, he catches it;
+  scurrying up a pole to within 1.8 m of its top (under the crossarm) he springs up onto it. On it the Player takes no
+  input of its own (`takes_input` off): the stick turns him, jump throws him up (`lift` 1.3), duck or scurry drops him
+  off. Hazards.unseen counts him out of reach there (PointStand.perched).
+- The pose (RaccoonRig._pose_handstand): turned over end to end, his left shoulder over the paw on the tip. That arm is
+  drawn out 1.6x along itself (HS_ARM), cartoon-fashion: his arms are short (0.26 m), and at their own length his head
+  came down onto the tip. The other arm is out, the legs together pointing up, a wobble, and the tail curled over.
+- Checks: tests/point_stand_test.gd (drop onto a pole top, out of reach, the pose, jump off, scurry up a pole to the
+  top), tests/handstand_shots.gd (four sides and above).
+- Not checked in play: a tree tip (in its leaves), the chimney, turning on the point with the stick.

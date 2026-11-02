@@ -103,7 +103,7 @@ static func safe(at: Vector3) -> bool:
 ## Whether what hunts can neither see nor get at `target`: in the grove (`safe`), or hidden (`hidden`). Every hunter
 ## asks this: the dogs, cats, fox, hawk, crows, owl and people.
 static func unseen(target: Node3D) -> bool:
-	return target == null or safe(target.global_position) or hidden(target)
+	return target == null or safe(target.global_position) or hidden(target) or PointStand.perched(target)
 
 
 ## Whether `target` is hidden down in tall grass (TownGrass.hidden; the user, 2026-11-02, "tall grass to hide in in
