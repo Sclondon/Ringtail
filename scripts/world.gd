@@ -111,6 +111,11 @@ func _ready() -> void:
 	lost_kits = LostKits.place(self, markers, get_node(^"Villagers") as Villagers, player)
 	# The hill's four sides, each with its own food and kits to find
 	zones = Zones.place(self)
+	# The band's hoard of food in the grove, growing with each bit found
+	if markers.has("grove_heart"):
+		var heap_at: Vector3 = (markers["grove_heart"] as Transform3D).origin + Vector3(2.8, 0.0, -1.2)
+		var ground := get_world_3d().direct_space_state.intersect_ray(PhysicsRayQueryParameters3D.create(heap_at + Vector3.UP * 5.0, heap_at + Vector3.DOWN * 5.0, 1))
+		FoodPile.place(self, ground.position if not ground.is_empty() else heap_at)
 	_grow_lawn()
 	add_child(N64Filter.new())
 	hud = Hud.new()
