@@ -16,6 +16,7 @@ tail_0..tail_5, a chain under hips) is posed by scripts/raccoon_rig.gd.
 
 import math
 import os
+import random
 import sys
 
 import bmesh
@@ -49,6 +50,8 @@ FOREARM = 0.18
 ELBOW_X = SHOULDER.x + UPPER_ARM
 WRIST_X = ELBOW_X + FOREARM
 TOE = Vector((0.0, -0.035, 0.085))
+# The hock: where his shin meets his long paw, raised behind the ankle as an animal's is (Fantastic Mr. Fox)
+HOCK = Vector((0.0, 0.135, -0.07))
 HEAD_CENTRE = Vector((0.0, 0.985, 0.01))
 HEAD_RADII = Vector((0.13, 0.115, 0.12))
 EYE_X, EYE_Y, EYE_Z, EYE_R = 0.052, 0.012, 0.094, 0.03
@@ -56,14 +59,14 @@ EYE_X, EYE_Y, EYE_Z, EYE_R = 0.052, 0.012, 0.094, 0.03
 # The tail: from its root low on his back, straight back and a little up when he is made.
 TAIL_ROOT = Vector((0.0, 0.50, -0.13))
 TAIL_DIR = Vector((0.0, 0.25, -1.0)).normalized()
-TAIL_LENGTH = 0.64
+TAIL_LENGTH = 0.74  # (a little longer: the user, 2026-11-01)
 TAIL_BONES = 6
 
 # --- Colours (sRGB) ---
 
 # (after the user's photos, 2026-11-01: warm grey-brown fur, sleek darker forearms and shins, black hands and
 # feet, white-rimmed ears, tan and black rings on the tail)
-FUR, LIGHT, DARK, PAW, WHITE, BLACK, EAR, LIMB, TAN = range(9)
+FUR, LIGHT, DARK, PAW, WHITE, BLACK, EAR, LIMB, TAN, RING = range(10)
 MATERIALS = [
     ("fur", (0.52, 0.47, 0.43)),
     ("light", (0.90, 0.88, 0.83)),
@@ -73,7 +76,9 @@ MATERIALS = [
     ("pupil", (0.03, 0.03, 0.04)),
     ("ear", (0.30, 0.26, 0.24)),
     ("limb", (0.28, 0.25, 0.23)),
-    ("tan", (0.64, 0.52, 0.40)),
+    # (the tail nearer his own colour: the user, "his tail shouldnt be as different a shade")
+    ("tan", (0.56, 0.50, 0.45)),
+    ("ring", (0.22, 0.19, 0.18)),
 ]
 
 
@@ -83,7 +88,8 @@ def tail_point(t):
 
 def tail_radius(t):
     # (along it, 0 to 1 -> radius): thin at the root, bushy, then to a blunt tip
-    profile = [(0.0, 0.045), (0.08, 0.068), (0.3, 0.092), (0.55, 0.094), (0.8, 0.078), (0.95, 0.052), (1.0, 0.035)]
+    # (thicker than it was: the user, 2026-11-01, "His tail should be a thicker and a little longer")
+    profile = [(0.0, 0.055), (0.08, 0.088), (0.3, 0.12), (0.55, 0.122), (0.8, 0.102), (0.95, 0.068), (1.0, 0.045)]
     for (a, ra), (b, rb) in zip(profile, profile[1:]):
         if t <= b:
             return ra + (rb - ra) * (t - a) / (b - a)
@@ -118,24 +124,26 @@ def lower_limbs(b):
     for side in (1.0, -1.0):
         fore = [(UPPER_ARM - 0.03, 0.04), (UPPER_ARM + 0.02, 0.037), (0.28, 0.034), (0.345, 0.031), (0.375, 0.028)]
         b.tube([(Vector((side * (SHOULDER.x + d), SHOULDER.y, 0.0)), Y * r, Z * r) for d, r in fore], 12)
-        shin = [(KNEE_Y + 0.03, 0.05), (KNEE_Y - 0.02, 0.047), (0.17, 0.043), (0.10, 0.037), (0.07, 0.034)]
-        b.tube([kit.upright(side * HIP_X, y, 0.0, r, r * 1.08) for y, r in shin], 14)
+        # (an animal's leg, after Fantastic Mr. Fox: the shin runs down and back to a hock raised behind the ankle,
+        # and the long paw angles forward from it to the toes; the user, 2026-11-01)
+        shin = [(KNEE_Y + 0.03, 0.05, 0.0), (KNEE_Y - 0.02, 0.047, -0.008), (0.19, 0.042, -0.032), (0.155, 0.037, -0.055),
+                (HOCK.y, 0.034, HOCK.z)]
+        b.tube([kit.upright(side * HIP_X, y, z, r, r * 1.08) for y, r, z in shin], 14)
 
 
 def feet(b):
     for side in (1.0, -1.0):
-        ankle = Vector((side * HIP_X, ANKLE_Y, 0.0))
-        # Long and flat, heel down: (how far forward, centre height above the ankle, half width, half height)
-        foot = [(-0.060, -0.022, 0.034, 0.030), (-0.030, -0.012, 0.042, 0.042), (0.020, -0.018, 0.048, 0.036),
-                (0.070, -0.028, 0.054, 0.024), (0.110, -0.032, 0.056, 0.020), (0.135, -0.034, 0.050, 0.016)]
-        rings = [(ankle + Vector((0.0, y, z)), X * rx, Y * ry) for z, y, rx, ry in foot]
-        b.tube(kit.dome(rings[0], -Z, 0.016, 3)[::-1] + rings + kit.dome(rings[-1], Z, 0.012, 3), 16, 0.0)
-        # Five toes along the front
-        for k in range(5):
-            across = (k - 2) / 2.0
-            b.ellipsoid(ankle + Vector((across * 0.040, -0.036, 0.142 - abs(across) * 0.018)), Vector((0.013, 0.012, 0.020)), None, 8, 4)
-        # ...and the ankle, up into the leg
-        b.tube([kit.upright(ankle.x, y, z, r, r * 1.08) for y, r, z in ((0.02, 0.037, 0.0), (0.06, 0.038, 0.0), (0.10, 0.04, 0.0))], 12)
+        x = side * HIP_X
+        # The long paw: from the hock, raised behind the ankle, down and forward to the ball of the foot
+        b.strand([Vector((x, HOCK.y + 0.01, HOCK.z - 0.004)), Vector((x, 0.095, -0.03)), Vector((x, 0.055, 0.025)),
+                  Vector((x, 0.036, 0.07))], [0.034, 0.031, 0.029, 0.031], 12)
+        # The heel pad at the back of the hock
+        b.ellipsoid(Vector((x, HOCK.y - 0.005, HOCK.z - 0.022)), Vector((0.026, 0.03, 0.02)), None, 8, 5)
+        # The ball of the foot, flat on the ground, and four toes ahead of it
+        b.ellipsoid(Vector((x, 0.026, 0.085)), Vector((0.042, 0.026, 0.045)), None, 12, 6)
+        for k in range(4):
+            across = (k - 1.5) / 1.5
+            b.ellipsoid(Vector((x + across * 0.028, 0.017, 0.128 - abs(across) * 0.012)), Vector((0.013, 0.017, 0.02)), None, 8, 4)
 
 
 def hands(b):
@@ -405,19 +413,25 @@ def tail_dark(_b):
 def ruffs(_b):
     """Bushy fur: zigzag ruffs of spikes like the tail's, flaring out and pointing down, on his upper arms and thighs,
     as cuffs at the elbows and knees, and as shaggy layers round his body (the user: "bushy", not thin; and their
-    photos: a fluffy body, sleek forearms and shins). A finished mesh in Blender's axes."""
+    photos: a fluffy body, sleek forearms and shins); and loose tufts scattered between them. No two spikes the same
+    length, the ruffs tilted and set a little off true, so the fur reads as shaggy and not as rings (the user: "The
+    fur shouldnt all be the same length and not in perfect rings on his body either"). A finished mesh in Blender's
+    axes."""
     made = bmesh.new()
     tags = {}
+    rng = random.Random(11)
 
     def ring(centre, axis, u, v, radius, lean=0.0, spiky=False, wide=1.0, region=0):
         loop = []
         count = SPIKES * 2 if spiky else SPIKES
+        twist = rng.uniform(0.0, math.tau)
         for j in range(count):
-            a = math.tau * j / count + 0.3
-            r = radius * (1.0 if not spiky or j % 2 == 0 else 0.62)
-            p = centre + axis * (lean if spiky and j % 2 == 0 else 0.0) + (u * math.cos(a) * wide + v * math.sin(a)) * r
+            a = math.tau * j / count + twist + (rng.uniform(-0.22, 0.22) * math.tau / count if spiky else 0.0)
+            tip = spiky and j % 2 == 0
+            r = radius * (rng.uniform(0.72, 1.4) if tip else (0.62 * rng.uniform(0.9, 1.1) if spiky else 1.0))
+            p = centre + axis * (lean * rng.uniform(0.4, 1.7) if tip else 0.0) + (u * math.cos(a) * wide + v * math.sin(a)) * r
             vert = made.verts.new(kit.to_blender(reshape(p)))
-            tags[vert] = (region, (1.0 if j % 2 == 0 else 0.45) if spiky else 0.0)
+            tags[vert] = (region, (1.0 if tip else 0.45) if spiky else 0.0)
             loop.append(vert)
         return loop
 
@@ -432,7 +446,9 @@ def ruffs(_b):
                 made.faces.new((a[k0], a[k1], b[j1], b[j]))
 
     def ruff(centre, axis, radius, flare, region, lean=0.075, wide=1.0):
-        # (axis points down the limb: the spikes lean that way)
+        # (axis points down the limb: the spikes lean that way; each ruff tipped and nudged a little off true)
+        axis = (axis + Vector((rng.uniform(-1, 1), rng.uniform(-1, 1), rng.uniform(-1, 1))) * 0.22).normalized()
+        centre = centre + Vector((rng.uniform(-1, 1), rng.uniform(-1, 1), rng.uniform(-1, 1))) * 0.008
         u = axis.cross(Z if abs(axis.z) < 0.9 else X).normalized()
         v = axis.cross(u).normalized()
         base = ring(centre - axis * 0.035, axis, u, v, radius * 0.7, wide=wide, region=region)
@@ -453,12 +469,89 @@ def ruffs(_b):
         # Legs: down from the hip
         for y, r, flare in ((HIP_Y - 0.04, 0.085, 1.7), (0.33, 0.072, 1.7), (KNEE_Y, 0.056, 1.5)):
             ruff(Vector((side * HIP_X, y, 0.0)), -Y, r, flare, REGION[("thigh" if y > KNEE_Y else "shin") + suffix])
+        # Loose tufts between the ruffs of his upper arms and thighs
+        for k in range(9):
+            d = rng.uniform(0.02, UPPER_ARM - 0.02)
+            a = rng.uniform(0.0, math.tau)
+            normal = Vector((0.0, math.cos(a), math.sin(a)))
+            root = Vector((side * (SHOULDER.x + d), SHOULDER.y, 0.0)) + normal * 0.045
+            tuft(made, tags, root, (normal + out * 0.9).normalized(), rng.uniform(0.03, 0.07), 0.02,
+                 REGION["upper_arm" + suffix], rng)
+        for k in range(10):
+            y = rng.uniform(KNEE_Y + 0.02, HIP_Y - 0.02)
+            a = rng.uniform(0.0, math.tau)
+            normal = Vector((math.cos(a), 0.0, math.sin(a)))
+            root = Vector((side * HIP_X, y, 0.0)) + normal * 0.065
+            tuft(made, tags, root, (normal - Y * 0.9).normalized(), rng.uniform(0.03, 0.08), 0.022,
+                 REGION["thigh" + suffix], rng)
     # Shaggy layers round his body, widest at the belly
     for y, depth, wide, flare in ((0.47, 0.142, 1.15, 1.7), (0.6, 0.162, 1.16, 1.58), (0.73, 0.134, 1.2, 1.55)):
         ruff(Vector((0.0, y, 0.006)), -Y, depth, flare, REGION["chest" if y > 0.7 else "hips"], 0.09, wide)
+    # ...and loose tufts all over it between them, of every length
+    profile = [(0.44, 0.145, 0.125, -0.01), (0.50, 0.178, 0.152, 0.0), (0.58, 0.188, 0.162, 0.012),
+               (0.66, 0.178, 0.152, 0.012), (0.73, 0.158, 0.132, 0.004), (0.79, 0.142, 0.112, 0.0)]
+    for k in range(70):
+        y = rng.uniform(0.45, 0.79)
+        rx, rz, zo = profile[0][1], profile[0][2], profile[0][3]
+        for (y0, rx0, rz0, z0), (y1, rx1, rz1, z1) in zip(profile, profile[1:]):
+            if y0 <= y <= y1:
+                f = (y - y0) / (y1 - y0)
+                rx, rz, zo = rx0 + (rx1 - rx0) * f, rz0 + (rz1 - rz0) * f, z0 + (z1 - z0) * f
+                break
+        a = rng.uniform(0.0, math.tau)
+        root = Vector((math.cos(a) * rx * 0.94, y, zo + math.sin(a) * rz * 0.94))
+        normal = Vector((math.cos(a) / rx, 0.0, math.sin(a) / rz)).normalized()
+        tuft(made, tags, root, (normal - Y * 0.8).normalized(), rng.uniform(0.035, 0.1), 0.03,
+             REGION["chest" if y > 0.7 else "hips"], rng)
     bmesh.ops.recalc_face_normals(made, faces=made.faces[:])
     tag_spikes(made, tags)
     mesh = bpy.data.meshes.new("ruffs")
+    made.to_mesh(mesh)
+    made.free()
+    return mesh
+
+
+def tuft(made, tags, root, direction, length, width, region, rng):
+    """One loose spike of fur: a flat-ish four-sided point from `root` along `direction`, its tip springing."""
+    u = direction.cross(Y if abs(direction.y) < 0.9 else X).normalized()
+    v = direction.cross(u).normalized()
+    base = []
+    for j in range(4):
+        a = math.tau * j / 4 + 0.4
+        p = root - direction * 0.012 + (u * math.cos(a) * 1.4 + v * math.sin(a) * 0.6) * width * 0.5
+        vert = made.verts.new(kit.to_blender(reshape(p)))
+        tags[vert] = (region, 0.0)
+        base.append(vert)
+    bend = Vector((rng.uniform(-1, 1), rng.uniform(-1, 1), rng.uniform(-1, 1))) * 0.25
+    tip = made.verts.new(kit.to_blender(reshape(root + (direction + bend).normalized() * length)))
+    tags[tip] = (region, 1.0)
+    for j in range(4):
+        made.faces.new((base[j], base[(j + 1) % 4], tip))
+    made.faces.new(base[::-1])
+
+
+def head_fur(_b):
+    """Short fur over his head (the user: "his head should also small fur on it"): little tufts over the crown, the
+    back of the head and the sides, none on his face. A finished mesh in Blender's axes."""
+    made = bmesh.new()
+    tags = {}
+    rng = random.Random(5)
+    placed = 0
+    while placed < 46:
+        # (a point on the skull, as drawn: not on the face in front of the ears, nor under the jaw)
+        a = rng.uniform(0.0, math.tau)
+        b = rng.uniform(-0.35, 1.25)
+        n = Vector((math.cos(b) * math.cos(a), math.sin(b), math.cos(b) * math.sin(a)))
+        if n.z > 0.35 and n.y < 0.75:
+            continue
+        root = HEAD_CENTRE + Vector((n.x * HEAD_RADII.x, n.y * HEAD_RADII.y, n.z * HEAD_RADII.z)) * 0.97
+        out = Vector((n.x / HEAD_RADII.x, n.y / HEAD_RADII.y, n.z / HEAD_RADII.z)).normalized()
+        # (laid back over the head, as fur is)
+        tuft(made, tags, root, (out - Z * 0.9 - Y * 0.2).normalized(), rng.uniform(0.022, 0.05), 0.018, REGION["head"], rng)
+        placed += 1
+    bmesh.ops.recalc_face_normals(made, faces=made.faces[:])
+    tag_spikes(made, tags)
+    mesh = bpy.data.meshes.new("head_fur")
     made.to_mesh(mesh)
     made.free()
     return mesh
@@ -485,7 +578,7 @@ def weights(part, p):
         return tail_weights(p)
     if part in ("eyes", "pupils"):
         return {"eye" + suffix: 1.0}
-    if part in ("muzzle", "nose", "whiskers", "brows", "mask", "cheeks", "ears", "ear_insides"):
+    if part in ("muzzle", "nose", "whiskers", "brows", "mask", "cheeks", "ears", "ear_insides", "head_fur"):
         return {"head": 1.0}
     if part == "head":
         skull = blend(HEAD.y - 0.03, HEAD.y + 0.03, p.y)
@@ -562,10 +655,11 @@ PARTS = [
     ("ear_insides", LIGHT, ear_insides, None),
     ("tail", FUR, tail, (0.006, 3, 3000)),
     ("tail_grey", TAN, tail_grey, None),
-    ("tail_dark", DARK, tail_dark, None),
+    ("tail_dark", RING, tail_dark, None),
     ("whiskers", LIGHT, whiskers, None),
     ("lower_limbs", LIMB, lower_limbs, (0.004, 3, 2400)),
     ("ruffs", FUR, ruffs, None),
+    ("head_fur", FUR, head_fur, None),
 ]
 
 
@@ -679,13 +773,70 @@ def reshaped_weights(part, p):
     return weights(part, as_drawn(p))
 
 
+# --- Grit: gritty gradients over him, baked into the vertex colours ---
+# (the user, 2026-11-01: "there needs to be gritty gradients on his body"). Darker low down and lighter over his
+# top, mottled at two sizes, and each spike of fur darker at its root and paler at its tip. Written as a float
+# colour layer (glTF COLOR_0, linear, at most 1: so the value over GRIT_SCALE), its alpha 1 to say it is there; the
+# fur shader multiplies by it (scripts/raccoon_rig.gd). Eyes and nose are left clean.
+GRIT_SCALE = 1.3
+CLEAN = ("eye", "pupil")
+
+
+def grit_at(p, flex):
+    from mathutils import noise
+    height = min(1.0, max(0.0, (p.y - 0.05) / 1.0))
+    shade = 0.68 + 0.42 * height ** 0.7
+    shade *= 1.0 + 0.3 * noise.noise(p * 11.0) + 0.18 * noise.noise(p * 40.0 + Vector((3.1, 7.7, 1.3)))
+    if flex >= 0.0:
+        shade *= 0.84 + 0.3 * flex
+    return min(GRIT_SCALE, max(0.0, shade))
+
+
+def paint_grit(name):
+    """Paints the grit onto every mesh of the figure just exported, and writes it out again."""
+    for obj in bpy.data.objects:
+        if obj.type != "MESH":
+            continue
+        mesh = obj.data
+        layer = mesh.color_attributes.new("Grit", "FLOAT_COLOR", "CORNER")
+        tags = mesh.uv_layers.get(kit.METRES)
+        clean = {k for k, m in enumerate(mesh.materials) if m and m.name.split(".")[0] in CLEAN}
+        for poly in mesh.polygons:
+            for index in poly.loop_indices:
+                if poly.material_index in clean:
+                    layer.data[index].color = (1.0, 1.0, 1.0, 0.0)
+                    continue
+                p = kit.from_blender(mesh.vertices[mesh.loops[index].vertex_index].co)
+                v = tags.data[index].uv.y if tags else 0.0
+                flex = -v - 0.001 if v < -0.0005 else -1.0
+                g = grit_at(p, flex) / GRIT_SCALE
+                layer.data[index].color = (g, g, g, 1.0)
+        mesh.color_attributes.active_color = layer
+        mesh.color_attributes.render_color_index = mesh.color_attributes.find("Grit")
+    bpy.ops.wm.save_as_mainfile(filepath=os.path.join(kit.ROOT, "tools", name + ".blend"))
+    bpy.ops.export_scene.gltf(
+        filepath=os.path.join(kit.ROOT, "models", name + ".glb"),
+        export_format="GLB",
+        export_yup=True,
+        export_animations=False,
+        export_skins=True,
+        export_vertex_color="ACTIVE",
+        export_all_vertex_colors=False,
+        export_try_sparse_sk=True,
+        export_morph_tangent=False,
+    )
+    print("GRIT %s" % name)
+
+
 # (run as a script it builds the raccoon; imported, as tools/build_cat.py does, it only lends its shapes)
 if __name__ == "__main__":
     reshaping()
     folder = kit.PREVIEW_DIR
     kit.PREVIEW_DIR = None
     kit.export(NAME, reshaped_bones(), PARTS, reshaped_weights, MATERIALS)
+    paint_grit(NAME)
     if folder:
         look_at(folder, NAME)
     kit.LOW = True
     kit.export(NAME + "_lo", reshaped_bones(), [(part, material, shapes, None) for part, material, shapes, _fuse in PARTS], reshaped_weights, MATERIALS)
+    paint_grit(NAME + "_lo")

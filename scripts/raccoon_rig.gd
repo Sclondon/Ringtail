@@ -38,6 +38,8 @@ var always_on_fours := false
 const ROTOR_FROM := 4
 ## How much longer his tail is drawn out as he twirls it.
 const ROTOR_STRETCH := 1.9
+## How much longer it is drawn out, held stiff, as he spins.
+const SPIN_STRETCH := 1.35
 ## The fur's springs (see _spring_fur), and which region his head is.
 const FUR_STIFFNESS := 200.0
 const FUR_DAMPING := 8.0
@@ -46,6 +48,8 @@ const FUR_HEAD := 16
 ## squared. Tagged in Blender as UV2 (region, -flex - 0.001), it arrives flipped as glTF has it, (region, 1.001 + flex);
 ## every other point's arrives at most 1.
 const FUR_VERTEX := """
+// (the grit baked into his vertex colours: tools/build_raccoon.py paint_grit, written over this)
+const float GRIT_SCALE = 1.3;
 uniform vec3 lags[17];
 void vertex() {
 	if (UV2.y > 1.0005) {
@@ -68,6 +72,7 @@ var _fur_speed_was := PackedVector3Array()
 var _fur_uniform := PackedVector3Array()
 var _rotor_disc: MeshInstance3D
 var _rotor_puffs: CPUParticles3D
+var _swoosh_puffs: CPUParticles3D
 
 var _tail: Array[Node3D] = []
 var _tail_dir: Array[Vector3] = []
@@ -163,6 +168,7 @@ func _pose_extra(delta: float) -> void:
 	_pose_tail(delta, speed, spin)
 	_spring_fur(delta)
 	_rotor(delta)
+	_swoosh(spin)
 
 
 ## Now and then, standing about, he lifts his nose and sniffs the air: quick little lifts of the snout, the
@@ -229,7 +235,9 @@ func _make_fur() -> void:
 		return
 	_fur_mesh = meshes[0]
 	var shader := Shader.new()
-	shader.code = Toon.SHADER.replace("void fragment() {", FUR_VERTEX + "\nvoid fragment() {")
+	shader.code = Toon.SHADER.replace("void fragment() {", FUR_VERTEX + "\nvoid fragment() {").replace(
+			"ALBEDO = albedo * (1.0 - stripe * line);",
+			"ALBEDO = albedo * (1.0 - stripe * line) * mix(vec3(1.0), COLOR.rgb * GRIT_SCALE, COLOR.a);")
 	for part: MeshInstance3D in meshes:
 		for surface in part.mesh.get_surface_count():
 			var toon := part.get_surface_override_material(surface) as ShaderMaterial
@@ -255,6 +263,41 @@ func restyle() -> void:
 	if is_node_ready() or not _tail.is_empty():
 		_fur_materials.clear()
 		_make_fur()
+
+
+## Swept round in the spin, the tip of his tail leaves an arc of little puffs behind it, so the eye follows the tail.
+func _swoosh(spin: float) -> void:
+	if _swoosh_puffs == null:
+		_swoosh_puffs = CPUParticles3D.new()
+		_swoosh_puffs.top_level = true
+		_swoosh_puffs.amount = 40
+		_swoosh_puffs.lifetime = 0.3
+		_swoosh_puffs.local_coords = false
+		_swoosh_puffs.direction = Vector3.UP
+		_swoosh_puffs.spread = 180.0
+		_swoosh_puffs.initial_velocity_min = 0.1
+		_swoosh_puffs.initial_velocity_max = 0.4
+		_swoosh_puffs.gravity = Vector3.ZERO
+		var curve := Curve.new()
+		curve.add_point(Vector2(0.0, 1.0))
+		curve.add_point(Vector2(1.0, 0.0))
+		_swoosh_puffs.scale_amount_curve = curve
+		var puff := SphereMesh.new()
+		puff.radius = 0.05
+		puff.height = 0.1
+		puff.radial_segments = 8
+		puff.rings = 4
+		var look := StandardMaterial3D.new()
+		look.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		look.albedo_color = Color(1.0, 0.98, 0.92, 0.75)
+		look.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		puff.material = look
+		_swoosh_puffs.mesh = puff
+		add_child(_swoosh_puffs)
+	var sweeping := spin > SPIN_WIND and spin < SPIN_TURNED
+	_swoosh_puffs.emitting = sweeping
+	if _points.size() > TAIL_BONES:
+		_swoosh_puffs.global_position = _points[TAIL_BONES]
 
 
 ## The rotor's look: a pale blur of a disc where his tail whirls, and puffs of air thrown off it.
@@ -466,12 +509,13 @@ func _tail_shape(speed: float, spin: float) -> Array[Vector3]:
 				rotor = Vector3(sin(angle), 0.06, cos(angle)).normalized()
 			dirs[k] = dirs[k].slerp(rotor, _glide)
 	if _spin_w > 0.001 and spin < 1.0:
-		# Wound round to his left side as he crouches; then flung out flat behind and swung back the way he turns,
-		# the faster the further, its tip furthest: so it trails him round and then lashes out past him as he stops.
+		# Wound round to his left side as he crouches; then, the tail being the attack, held out stiff and straight
+		# behind him and swept round with him at his own rate (the user: "the tail should be the focus and it doesnt
+		# even spin at the rate he does", "it needs to become stiff when spinning").
 		var wound := smoothstep(0.0, SPIN_WIND, spin) * (1.0 - smoothstep(SPIN_WIND, SPIN_WIND + 0.12, spin))
 		for k in TAIL_BONES:
-			var angle := PI - (1.7 + 0.12 * k) * wound - _spin_trail * (0.35 + 0.13 * k)
-			dirs[k] = dirs[k].slerp(Vector3(sin(angle), 0.12 + 0.05 * wound, cos(angle)).normalized(), _spin_w)
+			var angle := PI - (1.7 + 0.12 * k) * wound
+			dirs[k] = dirs[k].slerp(Vector3(sin(angle), 0.1 + 0.05 * wound, cos(angle)).normalized(), _spin_w)
 	return dirs
 
 
@@ -479,6 +523,9 @@ func _pose_tail(delta: float, speed: float, spin: float) -> void:
 	var dirs := _tail_shape(speed, spin)
 	# (twirling, it is drawn out long, cartoon-fashion, so its end can whirl over his head)
 	var stretch := lerpf(1.0, ROTOR_STRETCH, smoothstep(0.0, 1.0, _glide))
+	# (spinning, it is drawn out a little too, and held stiff to its line: below)
+	var rigid := _spin_w * smoothstep(SPIN_WIND - 0.05, SPIN_WIND + 0.05, spin) if spin < 1.0 else 0.0
+	stretch = lerpf(stretch, SPIN_STRETCH, rigid)
 	var hips := _hips.global_transform
 	var size := global_basis.get_scale().y
 	var root := _tail[0].global_position
@@ -502,7 +549,7 @@ func _pose_tail(delta: float, speed: float, spin: float) -> void:
 			_speeds[k] += accel * dt
 			_points[k] += _speeds[k] * dt
 			# (whirled, it is held to its cone: on springs alone it is flung out wide)
-			_points[k] = _points[k].lerp(targets[k], 0.85 * _glide)
+			_points[k] = _points[k].lerp(targets[k], maxf(0.85 * _glide, 0.95 * rigid))
 		# (each segment keeps its length)
 		for k in range(1, TAIL_BONES + 1):
 			var span := _points[k] - _points[k - 1]
