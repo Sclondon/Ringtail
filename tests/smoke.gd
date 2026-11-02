@@ -276,9 +276,9 @@ func _run() -> void:
 	_check(said and (open.call() as Array).is_empty() and not Player.input_blocked, "a raccoon at the grove says its line in a bubble as he comes near, and stops as he goes")
 	# (killed, one goes limp where it is and stays: it is never put back)
 	var goner: Villager = out_about[0]
-	goner.global_position.y = -25.0
+	goner.global_position.y = World.KILL_Y - 5.0
 	await _frames(5)
-	_check(goner.dead and goner.global_position.y < -20.0, "a raccoon off the world is dead, not put back")
+	_check(goner.dead and goner.global_position.y < World.KILL_Y, "a raccoon off the world is dead, not put back")
 	print("PASSED" if failures.is_empty() else "FAILED: " + ", ".join(failures))
 	quit(0 if failures.is_empty() else 1)
 

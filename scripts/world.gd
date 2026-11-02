@@ -13,6 +13,9 @@ signal said(text: String)
 
 const WORLD_SHADER := preload("res://shaders/world.gdshader")
 const MAX_HEARTS := 3
+## Below this nothing is on the world any more (the hill's foot is at -34 m: tools/build_town.py FOOT_Y): he starts
+## again, a raccoon of the band or the town is dead.
+const KILL_Y := -55.0
 const CAP_NAMES := {
 	"roof": "Up the chimney",
 	"glide": "The billboard",
@@ -70,9 +73,11 @@ func _ready() -> void:
 
 	player = (load("res://raccoon.tscn") as PackedScene).instantiate()
 	add_child(player)
+	player.kill_height = KILL_Y
 	var spawn: Transform3D = markers.get("spawn", Transform3D.IDENTITY)
 	player.global_position = spawn.origin
-	player.facing_yaw = PI
+	# (the way the spawn marker is turned: down the hill)
+	player.facing_yaw = spawn.basis.get_euler().y
 	player.set_spawn(spawn.origin)
 	player.respawned.connect(_on_respawned)
 	_controls()
@@ -82,6 +87,8 @@ func _ready() -> void:
 	# (closer in: the user, 2026-11-02, "the camera should be zoomed in more")
 	camera.distance = 4.0
 	add_child(camera)
+	# (from behind him, looking the way he faces: down the hill from the grove)
+	camera.look_along(Vector3(sin(player.facing_yaw), 0.0, cos(player.facing_yaw)))
 
 	_place_things()
 	# The town's hazards (birds, the fox, people, cars), and his band of raccoons
@@ -176,6 +183,14 @@ func _dress(level: Node) -> void:
 		for k in mesh.mesh.get_surface_count():
 			var original := mesh.mesh.surface_get_material(k)
 			var key := original.resource_name if original else "plain"
+			if not made.has(key) and key.begins_with("sky_"):
+				# (the far hills and the volcano: their colours already hazed, so unshaded and out of the fog)
+				var far := StandardMaterial3D.new()
+				far.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+				far.albedo_color = (original as BaseMaterial3D).albedo_color if original is BaseMaterial3D else Color.WHITE
+				far.vertex_color_use_as_albedo = true
+				far.disable_fog = true
+				made[key] = far
 			if not made.has(key):
 				var material := ShaderMaterial.new()
 				material.shader = WORLD_SHADER
@@ -191,7 +206,7 @@ func _dress(level: Node) -> void:
 				made[key] = material
 			mesh.set_surface_override_material(k, made[key])
 		# (anything named `hidden_` is solid but not seen: the wall round the brink that keeps him in)
-		if String(mesh.name).begins_with("hidden_"):
+		if String(mesh.name).begins_with("hidden_") or String(mesh.name).ends_with("_hidden"):
 			mesh.visible = false
 		# (anything named `climb_` he can scurry up: Scurry)
 		if String(mesh.name).begins_with("climb_"):
@@ -221,6 +236,19 @@ func _place_things() -> void:
 			cat.add_to_group(&"interest")
 			add_child(cat)
 			_cats_left += 1
+		elif name.begins_with("treep_"):
+			# (treep_<n>_<seed>_<size%>_<kind>: a plain tree, no limbs to stand on; the user, 2026-11-02, "not all
+			# trees need a bunch of climbable branches")
+			var parts := name.split("_")
+			var tree := TreeGen.preset("Fir" if parts[4] == "cedar" else "Oak")
+			tree.seed = int(parts[2])
+			tree.bark_style = TreeGen.Bark.OAK
+			tree.joined = true
+			var body := tree.body()
+			body.position = at
+			body.rotation.y = float(parts[2]) * 0.7
+			body.scale = Vector3.ONE * float(parts[3]) / 100.0
+			add_child(body)
 		elif name.begins_with("tree_"):
 			# (tree_<n>_<seed>_<size%>: a climbable tree of the grove, GameCommon's TreeGen, its limbs to stand on)
 			var parts := name.split("_")

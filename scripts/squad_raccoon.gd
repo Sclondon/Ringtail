@@ -75,7 +75,7 @@ func _physics_process(delta: float) -> void:
 
 	# (far behind it is never put back by him: it runs after him, or is left behind; the user, 2026-11-02, "the
 	# kits should not teleport to you". Off the bottom of the world, it is dead.)
-	if global_position.y < -20.0:
+	if global_position.y < World.KILL_Y:
 		die(velocity)
 		return
 	# Hit by a car going at any speed: dead

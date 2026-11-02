@@ -267,3 +267,41 @@ Read README.md first. Started 2026-11-01.
   maple 28k, great camphor 52k. Their sprays draw on a generator of their own, so leaf settings never move the limbs;
   the maple's limbs are turned 1.0 rad apart (0.23 m thick) so all seven seeds climb. A joined tree's leaves clear a
   tunnel from the camera to the middle of the view (1.3 m round, 4.5 m deep), so up in a crown he is seen.
+
+## 2026-11-02: World 1 is one hill (the user's calls, in their words)
+
+- "the road shouldnt just be a ring it should be a winding road down a hill. The level should be this whole hill";
+  "it's the hill grove at the top and ringed area". tools/build_town.py: the grove and the ring of lots stay on top
+  (level out to HILL_EDGE 57 m); the street leaves the ring through the lot that was the bath house's (LOTS "road";
+  the bath house moved to lot 0) and switchbacks down the hill's south face (four runs LEGS across the hill, hairpins
+  of BEND 13 m, an even grade to FOOT_Y -34 m) to a station square at the foot: a turning circle, the station, a
+  platform and a train, two shops (the station is Claude's pick). The road's level shelf (BENCH) is cut into or built
+  up from the hill, block retaining walls at its edges; long stairways (STAIRS) straight down between the bends; houses
+  on block plinths between the runs (steps up their faces), two blocks of flats near the foot; poles and wires on
+  the downhill side; drain grates at the kerbs. The hill's ground is hill_grid() (2 m squares; solid down the
+  street's face, nocol_ elsewhere) joined to the hilltop's (ground(), by 2 m square: each square belongs to one).
+  hidden_bound runs round the hilltop's brink and down round the street's face (CORRIDOR 48 m, BOTTOM 193 m).
+  Cars drive road_1 down and back up round the square; people walk walk_2. World.KILL_Y -55 m (he, the band and the
+  town's raccoons were dying at -15/-20 m).
+- "please dont make new reeds check the ones we already have": no modelled reeds; `reeds_<n>` markers (scale.x the
+  patch radius) where World grows Warren's reeds. "tall grass to hide in in spots": `tallgrass_<n>` markers; dogs'
+  yards `dog_<n>` (the DOGS work places the dogs).
+- "there needs to be drains and gutter pipes to scurry up", then "the gutters dont look like gutters, and should be
+  up against the side of the buildings, and need to be easier to climb": half-round zinc gutters round every hipped
+  roof; downpipes flush on the side walls (clear of crates and roof strips; the hillside houses' by their fronts,
+  their backs being in the hill), brackets every metre, a swan neck to the gutter, a shoe over a grate. He climbs an
+  unseen column round each (`climb_pipes_<building>_hidden`: World hides meshes named `_hidden` but keeps them solid
+  and climbable) that leans out past the eaves at the top: a straight one left him stuck under the eaves.
+  tests/pipe_climb.gd climbs six buildings' pipes from three angles each (all 18 pass).
+- "the spawning area is too small and cramped full of shit" / "the grove should be surrounded by a ring of trees" /
+  "not all trees need a bunch of climbable branches": the plateau is 13 m across the radius, its middle open lawn
+  (grove_heart at the middle, the spawn 3 m south facing down the hill: World turns him by the spawn marker and the
+  camera with him); a ring of trees round its rim with gaps (path and torii, the view, hut, shrine, pond); the shrine,
+  hut and pond at the edge; no lanterns. Only the great camphor and two ring trees are climbing trees (`tree_`);
+  the rest are plain (`treep_<n>_<seed>_<size%>_<oak|cedar>`: TreeGen Oak or Fir with the oak bark, joined).
+- "rolling hills in the distance for the skybox, and a volcano like Rainier or Fuji": three rings of ridgelines and a
+  snow-capped stratovolcano to the south-south-west (framed from the grove and down the street), material `sky_`
+  (World: unshaded, out of the fog, colours already hazed).
+- Unverified: the five Bottlecap routes re-walked on the new hilltop (the billboard glide from the great camphor, now
+  north-west of the clearing); cars and people on the long route in play; the sky_ colours against the N64 filter in
+  play (shots were dimmed by the pause menu, which opens when the shot window loses focus).

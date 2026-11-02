@@ -95,7 +95,7 @@ func _physics_process(delta: float) -> void:
 		rig.visible = not far
 	# (it is never put back anywhere: off the bottom of the world, or hit by a car, it is dead; the user,
 	# 2026-11-02, "the kits should not teleport to you, and if they die they should just rag doll and stop moving")
-	if global_position.y < -20.0:
+	if global_position.y < World.KILL_Y:
 		die(velocity)
 		return
 	for car: Node in get_tree().get_nodes_in_group(&"cars"):
