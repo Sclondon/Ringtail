@@ -1286,7 +1286,13 @@ func _leaf_colour(p: Vector3, own: Vector3, shade: float, deep: float, odd: bool
 func _sway(p: Vector3) -> float:
 	var h := clampf(p.y / maxf(_top, 0.1), 0.0, 1.0)
 	var out := clampf(Vector2(p.x - _centre.x, p.z - _centre.z).length() / _rx, 0.0, 1.2)
-	return clampf(pow(h, 1.5) * 0.7 + out * h * 0.4, 0.0, 1.0)
+	return clampf(pow(h, 1.5) * 0.7 + out * h * 0.4, 0.0, 1.0) * (0.3 if _rigid() else 1.0)
+
+
+## Whether its wood stays still in the wind (only the leaves move, and less): a tree to climb, whose collision does
+## not move, and a joined tree (Ringtail, 2026-11-02: "the tree trunks jiggle like jelly").
+func _rigid() -> bool:
+	return climbable or joined
 
 
 ## A clump of fluffy cards: quads over a lumpy ball, each with the crown's normal. Given the way its twig runs
@@ -1578,7 +1584,7 @@ func _tube(buf: _Buf, pts: Array[Vector3], radii: Array[float], sides: int) -> v
 		var other := fwd.cross(side).normalized()
 		if i > 0:
 			v += pts[i].distance_to(pts[i - 1])
-		var sway := _sway(pts[i])
+		var sway := 0.0 if _rigid() else _sway(pts[i])
 		var shade := bark.darkened(0.12 * (fposmod(sin(pts[i].dot(Vector3(12.9, 78.2, 37.7))) * 43758.5, 1.0)))
 		var ring: Array[int] = []
 		for j in sides + 1:

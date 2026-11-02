@@ -202,3 +202,10 @@ Read README.md first. Started 2026-11-01.
     type, marks, markings and colour sliders; Own look; Done). Looks are kept in user://looks.json (FurLook.FILE) and
     worn from the start. Alone: `godot --path . res://scenes/fur_editor.tscn`.
   - Checks: `tests/look_shots.gd -- --out=<dir> [cats] [furs] [menus]` (window; menus at 1280x720 and 390x844).
+- Then "the tree trunks jiggle like jelly because the leaf shader I think" and "you need to work on the ledges on the
+  branches, it interrupts your climbing, you get near a branch incorrectly": a climbable or joined tree's wood has no
+  sway at all (TreeGen._rigid; its collision never moves), its leaves a third as much. Scurry: no ledge catches while
+  held in the air; his collider held to 0.62 m on all fours (Player.height_cap; it was the boy's 1.25 m, which jammed
+  him under limbs); a limb over his head he goes round (the other way if stuck, and if both are blocked he steps up
+  onto it); a trunk is not let go of while a limb pushes him out. tests/tree_scurry.gd climbs a trunk past its limbs
+  (three presets, two seeds, four sides: 23 of 24 pass; oak seed 4 from one side drops off near the trunk's top).

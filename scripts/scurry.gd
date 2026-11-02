@@ -11,6 +11,8 @@ extends Node
 ## How fast he climbs, and how far ahead of him (from his middle) a climbable surface is caught.
 @export var climb_speed := 2.4
 @export var reach := 0.5
+## How tall his collider is while he scurries (Player.height_cap).
+@export var low_height := 0.62
 
 var held := false
 var climbing := false
@@ -18,6 +20,12 @@ var climbing := false
 var surface_normal := Vector3.ZERO
 var _player: Player
 var _hop := 0.0
+## Which way round he goes past a limb over his head (1 to his right).
+var _round_way := 1.0
+## Going round one: for how long, from where, how often it has turned back.
+var _round_time := 0.0
+var _round_from := Vector3.ZERO
+var _round_flips := 0
 
 
 func _enter_tree() -> void:
@@ -48,10 +56,20 @@ func _listening() -> bool:
 func _physics_process(delta: float) -> void:
 	held = button or (_listening() and Input.is_action_pressed(&"scurry"))
 	_hop = maxf(_hop - delta, 0.0)
+	# (on all fours he is low: his collider is held to `low_height`, so a limb he climbs under does not catch him;
+	# he stands again when let go, once there is room)
+	if held or climbing:
+		_player.height_cap = low_height
+	elif _player.height_cap < INF and _player._has_headroom(_player.stand_height):
+		_player.height_cap = INF
 	var free := _player.state == Player.State.FREE and not _player.is_limp
 	if not free or not held:
 		climbing = false
 		return
+	# (scurrying, no ledge catches: on a tree he would catch the edge of every limb he climbed past and hang from it;
+	# the user, 2026-11-02, "you need to work on the ledges on the branches, it interrupts your climbing")
+	if not _player.is_on_floor():
+		_player._grab_cooldown = maxf(_player._grab_cooldown, 0.1)
 	var ahead := Vector3(sin(_player.facing_yaw), 0.0, cos(_player.facing_yaw))
 	var middle := _player.global_position + Vector3.UP * 0.45
 	var hit := _probe(middle, ahead)
@@ -62,6 +80,14 @@ func _physics_process(delta: float) -> void:
 			climbing = true
 			surface_normal = _flat(hit.normal)
 		return
+	if hit.is_empty():
+		# (pushed out from it a little, by a limb he is passing: still on it, drawn back in)
+		hit = _probe(middle, ahead, 0.7)
+	# (or his middle is inside a limb where it leaves the trunk, and the rays start in it: look from a little back,
+	# and higher and lower)
+	for lift: float in [0.0, 0.25, -0.2]:
+		if hit.is_empty():
+			hit = _probe(middle - ahead * 0.4 + Vector3.UP * lift, ahead, 0.8)
 	if hit.is_empty():
 		# Over the top: a hop up and onto it (or off the end of whatever it was)
 		climbing = false
@@ -83,6 +109,27 @@ func _physics_process(delta: float) -> void:
 	var towards := -raw.y
 	var along := raw.x
 	var up := climb_speed * clampf(towards, -1.0, 1.0)
+	# (a limb over his head: he goes round it, the way he was going round or else to his right, not butting into it)
+	if up > 0.0 and _overhead(middle):
+		if absf(along) > 0.2 and _round_flips == 0:
+			_round_way = signf(along)
+		along = _round_way
+		up = 0.0
+		# (getting nowhere round it, caught against its side: the other way; and if that is no better, he steps up
+		# onto the limb, as off a ladder's top)
+		_round_time += delta
+		if _round_time > 0.5:
+			if _player.global_position.distance_to(_round_from) < 0.15:
+				_round_flips += 1
+				_round_way = -_round_way
+				if _round_flips >= 3 and _mount(middle):
+					return
+			_round_time = 0.0
+			_round_from = _player.global_position
+	else:
+		_round_time = 0.0
+		_round_flips = 0
+		_round_from = _player.global_position
 	# (what the Player's gravity takes off this step, given back)
 	var gravity := 2.0 * _player.jump_height / (_player.time_to_apex * _player.time_to_apex)
 	if up < 0.0:
@@ -96,12 +143,12 @@ func _physics_process(delta: float) -> void:
 ## The nearest climbable thing ahead of `from` within reach: a fan of rays at his middle, so a thin pole is not
 ## lost as he goes round it. Its normal is taken as straight out from it towards him (the faces of a pole are
 ## few and flat).
-func _probe(from: Vector3, ahead: Vector3) -> Dictionary:
+func _probe(from: Vector3, ahead: Vector3, further := 0.0) -> Dictionary:
 	var best := {}
 	var nearest := INF
 	for turn: float in [0.0, -0.35, 0.35, -0.7, 0.7]:
 		var way := ahead.rotated(Vector3.UP, turn)
-		var query := PhysicsRayQueryParameters3D.create(from, from + way * (reach + 0.25), 1)
+		var query := PhysicsRayQueryParameters3D.create(from, from + way * (reach + 0.25 + further), 1)
 		query.exclude = [_player.get_rid()]
 		var hit := _player.get_world_3d().direct_space_state.intersect_ray(query)
 		if hit.is_empty():
@@ -115,6 +162,37 @@ func _probe(from: Vector3, ahead: Vector3) -> Dictionary:
 			best = hit
 			best.normal = from - (hit.position as Vector3)
 	return best
+
+
+## Whether something climbable (a limb) is just over his head as he climbs.
+func _overhead(middle: Vector3) -> bool:
+	var query := PhysicsRayQueryParameters3D.create(middle, middle + Vector3.UP * 0.5, 1)
+	query.exclude = [_player.get_rid()]
+	var hit := _player.get_world_3d().direct_space_state.intersect_ray(query)
+	if hit.is_empty():
+		return false
+	var body: Node = hit.collider
+	return body.is_in_group(&"climbable") or (body.get_parent() != null and body.get_parent().is_in_group(&"climbable"))
+
+
+## Onto the top of the limb over his head (from under it): set on it just out from where he is, off the climb.
+## Whether there was a top to stand on.
+func _mount(middle: Vector3) -> bool:
+	var space := _player.get_world_3d().direct_space_state
+	for out: float in [0.15, 0.4, 0.7]:
+		var above := middle + surface_normal * out + Vector3.UP * 1.6
+		var query := PhysicsRayQueryParameters3D.create(above, above + Vector3.DOWN * 1.5, 1)
+		query.exclude = [_player.get_rid()]
+		var hit := space.intersect_ray(query)
+		if hit.is_empty() or (hit.normal as Vector3).y < 0.7:
+			continue
+		climbing = false
+		_hop = 0.4
+		_round_flips = 0
+		_player.global_position = (hit.position as Vector3) + Vector3.UP * 0.05
+		_player.velocity = Vector3.ZERO
+		return true
+	return false
 
 
 ## The stick, as a level direction in the world (as the Player reads it).
