@@ -68,6 +68,9 @@ const SPIN_STRETCH := 1.15
 const HELI_TURN_TIME := 0.4
 ## How fast he turns round in the spin jump's twirl (rad/s), on top of the turn the jump keeps (SpinJump).
 const TJ_SPEED := 12.0
+## What he does standing about, and for how long each (s, at least .. at most).
+const IDLES: Array[StringName] = [&"rub", &"tall", &"lean", &"crack", &"stretch"]
+const IDLE_TIMES := {&"rub": Vector2(4.0, 7.0), &"tall": Vector2(3.0, 5.0), &"lean": Vector2(4.0, 6.5), &"crack": Vector2(1.6, 1.6), &"stretch": Vector2(2.4, 2.4)}
 ## How far his knees turn out to the side (radians) where a pose solves his legs: a little bow-legged, as an animal's.
 const KNEE_OUT := 0.22
 ## How many frames back the tail's trail reaches.
@@ -153,6 +156,11 @@ var _qphase := 0.0
 var _sneak := 0.0
 var _sphase := 0.0
 var _hunch := 0.0
+## What he is doing standing about (rub, tall, lean, crack, stretch), how long, and how long he has: _pose_hunch.
+var _idle := &"rub"
+var _idle_t := 0.0
+var _idle_for := 5.0
+var _idle_w := {}
 var _still := 0.0
 ## 1 going on all fours in the scurry's gallop, 0 in the sprint's bound.
 var _scurry_gait := 0.0
@@ -263,7 +271,7 @@ func _pose_extra(delta: float) -> void:
 	_hunch = _approach(_hunch, 1.0 if upright else 0.0, 6.0, delta)
 	_still = _approach(_still, 1.0 if speed < 0.2 else 0.0, 4.0, delta)
 	if _hunch > 0.002:
-		_pose_hunch(smoothstep(0.0, 1.0, _hunch) * (1.0 - _quad) * (1.0 - _sneak), _still)
+		_pose_hunch(smoothstep(0.0, 1.0, _hunch) * (1.0 - _quad) * (1.0 - _sneak), _still, delta)
 	# (his fingers together, not splayed, in most of what he does: the user, 2026-11-02, "the fingers shouldnt be
 	# splayed in the idle or most poses"; spread only where a paw is set on something: on all fours, climbing, hanging)
 	var spread := maxf(_quad, maxf(_climb_w, minf(_hang, 1.0)))
@@ -851,19 +859,71 @@ func _pose_sneak(w: float, speed: float) -> void:
 ## Upright on his feet, walking or standing, he is a little hunched (the user, 2026-11-02: "his walk should be
 ## slightly hunched as well"); standing still he rubs his paws together before his chest ("his idle should be
 ## slightly hunched and rubbing his hands together"). `still` is how still he is (1 standing).
-func _pose_hunch(w: float, still: float) -> void:
-	# (from the waist up: the hips and legs stay as they are, the feet planted)
-	_spine.basis = _slerp(_spine.basis, Basis(Vector3.RIGHT, 0.26 + 0.08 * still) * _spine.basis, w)
+func _pose_hunch(w: float, still: float, delta: float) -> void:
+	# What he does standing about, one thing after another (the user, 2026-11-02: "his idle shouldn't always be rubbing
+	# his hands, he should also straighten up sometimes with his hands at his side, and lean, crack his neck, stretch,
+	# there should be different options for him to cycle through")
+	if still > 0.9:
+		_idle_t += delta
+		if _idle_t > _idle_for:
+			var choices := IDLES.filter(func(k: StringName) -> bool: return k != _idle)
+			_idle = choices[randi() % choices.size()]
+			_idle_t = 0.0
+			_idle_for = IDLE_TIMES[_idle].x + randf() * (IDLE_TIMES[_idle].y - IDLE_TIMES[_idle].x)
+	else:
+		_idle = &"rub"
+		_idle_t = 0.0
+		_idle_for = randf_range(3.0, 6.0)
+	for kind: StringName in IDLES:
+		_idle_w[kind] = _approach(float(_idle_w.get(kind, 0.0)), 1.0 if kind == _idle else 0.0, 3.5, delta)
+	var tall := float(_idle_w[&"tall"]) * still
+	var lean := float(_idle_w[&"lean"]) * still
+	var crack := float(_idle_w[&"crack"]) * still
+	var stretch := float(_idle_w[&"stretch"]) * still
+	# (from the waist up: the hips and legs stay as they are, the feet planted; straightening, stretching, less bent)
+	var bent := 1.0 - 0.85 * maxf(tall, stretch)
+	_spine.basis = _slerp(_spine.basis, Basis(Vector3.RIGHT, (0.26 + 0.08 * still) * bent) * _spine.basis, w)
 	if _chest:
-		_chest.basis = _slerp(_chest.basis, Basis(Vector3.RIGHT, 0.1 + 0.06 * still) * _chest.basis, w)
+		_chest.basis = _slerp(_chest.basis, Basis(Vector3.RIGHT, (0.1 + 0.06 * still) * bent) * _chest.basis, w)
 	# (his head kept looking ahead, not at the ground)
 	if _neck:
-		_neck.basis = _slerp(_neck.basis, Basis(Vector3.RIGHT, -0.25 - 0.1 * still) * _neck.basis, w)
-	var rub := w * still
+		_neck.basis = _slerp(_neck.basis, Basis(Vector3.RIGHT, (-0.25 - 0.1 * still) * bent) * _neck.basis, w)
+	var forward := global_basis.z.normalized()
+	# Leaning onto one hip: his body tipped to the side, head tilted back the other way
+	if lean > 0.002:
+		_spine.basis = Basis(Vector3.BACK, 0.16 * lean) * _spine.basis
+		if _chest:
+			_chest.basis = Basis(Vector3.BACK, 0.08 * lean) * _chest.basis
+		_head.basis = Basis(Vector3.BACK, -0.2 * lean) * _head.basis
+	# Cracking his neck: a quick tilt to one side, a pause, then the other
+	if crack > 0.002:
+		var t := _idle_t
+		var tilt := 0.5 * _bump(t, 0.1, 0.65) - 0.5 * _bump(t, 0.85, 1.4)
+		if _neck:
+			_neck.basis = Basis(Vector3.BACK, tilt * crack) * _neck.basis
+		_head.basis = Basis(Vector3.BACK, tilt * 0.4 * crack) * _head.basis
+	# Stretching: up on his back, arms high over his head, then down again
+	if stretch > 0.002:
+		var reach := _bump(_idle_t, 0.0, 2.4) * stretch
+		_spine.basis = Basis(Vector3.RIGHT, -0.22 * reach) * _spine.basis
+		_head.basis = Basis(Vector3.RIGHT, -0.3 * reach) * _head.basis
+		for i in 2:
+			var side := 1.0 if i == 0 else -1.0
+			var shoulder := to_local(_shoulders[i].global_position)
+			_solve_arm(i, side, to_global(shoulder + Vector3(side * 0.07, 0.3, -0.02)), _forearm, reach)
+			_close_paw(i, side, 0.6, reach)
+	# Straight, or leaning: his arms hang at his sides
+	var hang := maxf(tall, lean) * (1.0 - stretch)
+	if hang > 0.002:
+		for i in 2:
+			var side := 1.0 if i == 0 else -1.0
+			var shoulder := to_local(_shoulders[i].global_position)
+			_solve_arm(i, side, to_global(shoulder + Vector3(side * 0.07, -0.27, 0.03)), _forearm, hang)
+			_close_paw(i, side, 0.45, hang)
+	var rub := w * still * float(_idle_w[&"rub"])
 	if rub < 0.002:
 		return
 	# (paws together before his chest, rubbing: each going round against the other, out of step)
-	var forward := global_basis.z.normalized()
 	var turn := _time * 7.5
 	for i in 2:
 		var side := 1.0 if i == 0 else -1.0

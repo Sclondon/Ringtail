@@ -5,7 +5,7 @@ extends SceneTree
 ## Needs a window (pictures cannot be taken headless); it is kept off the screen.
 
 const SIZE := Vector2i(360, 400)
-const MOVES := ["stand", "walk", "run", "sprint", "duckwalk", "duck", "jump", "glide", "spin", "air_spin", "bound", "leap", "spin_film", "heli", "long_jump", "scurry_film", "walk_film", "sneak_film", "sneak"]
+const MOVES := ["stand", "walk", "run", "sprint", "duckwalk", "duck", "jump", "glide", "spin", "air_spin", "bound", "leap", "spin_film", "heli", "long_jump", "scurry_film", "walk_film", "sneak_film", "sneak", "idle_tall", "idle_lean", "idle_crack", "idle_stretch"]
 
 var out := "user://pose_shots"
 var only: Array[String] = []
@@ -84,6 +84,13 @@ func _do(move: String) -> void:
 	match move:
 		"stand":
 			await _frames(30)
+		"idle_tall", "idle_lean", "idle_crack", "idle_stretch":
+			# (one of the things he does standing about, held: RaccoonRig IDLES)
+			var rig := player.get_node(^"Rig") as RaccoonRig
+			rig._idle = StringName(move.substr(5))
+			rig._idle_t = 0.0
+			rig._idle_for = 99.0
+			await _frames(40 if move == "idle_crack" else 70)
 		"walk":
 			_press(&"move_up", 0.35)
 			await _frames(70)
