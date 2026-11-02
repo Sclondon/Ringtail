@@ -112,6 +112,9 @@ static var input_blocked := false
 ## Whether a full push held for `sprint_delay` sprints by itself. (The Clearing: off,
 ## sprint is a button of its own. GameCommon and Outside: on.)
 @export var auto_sprint := true
+## How far the stick must be pushed (0..1) for that full push. A gamepad stick often reads over 0.95 well short of
+## its edge (Ringtail, 2026-11-02: "he still starts running on all 4s before I press all the way on the stick").
+@export_range(0.5, 1.0) var sprint_push := 0.95
 @export var push_speed := 1.15
 ## Stick deflection at which the walk starts turning into a run.
 @export_range(0.0, 1.0) var run_threshold := 0.55
@@ -978,7 +981,7 @@ func _move_horizontal(strength: float, grounded: bool, delta: float) -> void:
 	# Running flat out with nothing in his way for a moment, he sprints. (In
 	# the air he neither gets there nor loses it.)
 	var called := _is_sprint_held() and strength > run_threshold
-	var flat_out := (strength > 0.95 and auto_sprint or called) and not is_pushing and not is_ducking and landing_progress >= 1.0 and (current.length() > run_speed * 0.85 or called) and wade < 0.25 and not is_spinning and gun_raise < 0.5
+	var flat_out := (strength > sprint_push and auto_sprint or called) and not is_pushing and not is_ducking and landing_progress >= 1.0 and (current.length() > run_speed * 0.85 or called) and wade < 0.25 and not is_spinning and gun_raise < 0.5
 	if not flat_out:
 		_run_time = 0.0
 	elif grounded:
