@@ -59,6 +59,8 @@ const ROTOR_FROM := 4
 const ROTOR_STRETCH := 1.2
 ## How much longer it is drawn out, held stiff, as he spins.
 const SPIN_STRETCH := 1.15
+## How long his one turn takes as the twirl begins, seconds.
+const HELI_TURN_TIME := 0.4
 ## How many frames back the tail's trail reaches.
 const TRAIL_FRAMES := 10
 ## The fur's springs (see _spring_fur), and which region his head is.
@@ -136,6 +138,9 @@ var _still := 0.0
 ## 1 going on all fours in the scurry's gallop, 0 in the sprint's bound.
 var _scurry_gait := 0.0
 var _glide := 0.0
+var _was_gliding := false
+## How far through his one turn as the twirl begins (1: done).
+var _heli_turn := 1.0
 var _twirl := 0.0
 var _spin_w := 0.0
 ## Where the spin has him turned, and how far the tail swings back behind him for how fast he turns.
@@ -245,13 +250,22 @@ func _pose_extra(delta: float) -> void:
 		_pose_hang_swing(delta)
 	if _glide > 0.002:
 		_pose_glide(_glide)
+	# (as the twirl begins he goes once round, whole: the user, 2026-11-02, "you should spin around once when you
+	# start helicoptering")
+	if gliding and not _was_gliding:
+		_heli_turn = 0.0
+	_was_gliding = gliding
+	if _heli_turn < 1.0:
+		_heli_turn = minf(_heli_turn + delta / HELI_TURN_TIME, 1.0)
+		var round_once := TAU * (1.0 - pow(1.0 - _heli_turn, 2.0))
+		_hips.transform = Transform3D(Basis(Vector3.UP, round_once), Vector3.ZERO) * _hips.transform
 	if _spin_w > 0.002:
 		_pose_spin(spin, _spin_w)
 	# The spin jump: round and round in the air, arms out, the tail stiff (SpinJump)
 	var twirling: bool = _spin_jump != null and _spin_jump.twirling
 	_tj_w = _approach(_tj_w, 1.0 if twirling else 0.0, 14.0, delta)
 	if _tj_w > 0.002:
-		_tj_turn = fposmod(_tj_turn + delta * 22.0 * _tj_w, TAU)
+		_tj_turn = fposmod(_tj_turn + delta * 12.0 * _tj_w, TAU)
 		_hips.basis = Basis(Vector3.UP, _tj_turn * _tj_w) * _hips.basis
 		for i in 2:
 			var side := 1.0 if i == 0 else -1.0
@@ -773,6 +787,9 @@ func _pose_sneak(w: float, speed: float) -> void:
 		var paw := Vector3(side * 0.07, shoulder.y - 0.05 + 0.012 * rise, shoulder.z + 0.19)
 		_solve_arm(i, side, to_global(paw), _forearm, w)
 		_lay_hand(i, side, forward, (Vector3.DOWN + forward * 0.35).normalized(), w * 0.85)
+		# (the fingers together, loosely curled, not splayed: the user, 2026-11-02, "his fingers shouldnt be splayed while
+		# sneaking")
+		_close_paw(i, side, 0.9, w)
 
 
 ## Upright on his feet, walking or standing, he is a little hunched (the user, 2026-11-02: "his walk should be
@@ -798,7 +815,15 @@ func _pose_hunch(w: float, still: float) -> void:
 		var circling := Vector3(cos(turn + PI * i) * 0.018, sin(turn + PI * i) * 0.014, 0.0)
 		var paw := Vector3(side * 0.028, shoulder.y - 0.11, shoulder.z + 0.15) + circling
 		_solve_arm(i, side, to_global(paw), _forearm, rub)
+		_close_paw(i, side, 0.5, rub)
 		_lay_hand(i, side, forward, (forward * 0.6 + Vector3.UP * 0.5 - global_basis.x.normalized() * side * 0.6).normalized(), rub * 0.8)
+
+
+## Paw `i` with its fingers drawn together and curled `curl` (0 flat .. 1.4 a fist), by `w`, over what the rig set.
+func _close_paw(i: int, side: float, curl: float, w: float) -> void:
+	_curl[i] = lerpf(_curl[i], curl, w)
+	_splay[i] = lerpf(_splay[i], 0.05, w)
+	_pose_fingers(i, side)
 
 
 ## 0 outside a..b, rising to 1 halfway between and back down.
@@ -891,13 +916,26 @@ func _pose_tail(delta: float, speed: float, spin: float) -> void:
 	var flung := _spin_w * smoothstep(SPIN_WIND - 0.05, SPIN_WIND + 0.05, spin) if spin < 1.0 else 0.0
 	flung = maxf(flung, _tj_w)
 	stretch = lerpf(stretch, SPIN_STRETCH, flung)
-	var yaw := _hips.global_basis.get_euler().y
-	var turning := angle_difference(_tail_yaw_was, yaw) / maxf(delta, 0.001) if delta > 0.0 else 0.0
+	# (which way he faces, from his hips' forward laid level: their Euler angles jump about when they are pitched,
+	# hunched or on all fours, and left the tail stuck pointing one way as he spun: the user, 2026-11-02)
+	var ahead := _hips.global_basis.z
+	ahead.y = 0.0
+	if ahead.length_squared() < 0.09:
+		ahead = Vector3(global_basis.z.x, 0.0, global_basis.z.z)
+	var yaw := atan2(ahead.x, ahead.z)
+	var turned_by := angle_difference(_tail_yaw_was, yaw) if delta > 0.0 else 0.0
+	var turning := turned_by / maxf(delta, 0.001)
 	_tail_yaw_was = yaw
 	var axis := global_position
 	var hips := _hips.global_transform
 	var size := global_basis.get_scale().y
 	var root := _tail[0].global_position
+	# (it is carried round with him as he turns, most of the way: the springs only make up the lag behind him)
+	if absf(turned_by) > 0.0001 and absf(turned_by) < 1.5:
+		var carry := Basis(Vector3.UP, turned_by * 0.85)
+		for k in range(1, TAIL_BONES + 1):
+			_points[k] = root + carry * (_points[k] - root)
+			_speeds[k] = carry * _speeds[k]
 	var targets := PackedVector3Array([root])
 	for k in TAIL_BONES:
 		targets.append(targets[k] + (hips.basis.orthonormalized() * dirs[k]) * _tail_len[k] * size * stretch)

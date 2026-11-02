@@ -19,12 +19,15 @@ sprint_delay = 0.12
 sprint_push = 0.985
 sneak_speed = 0.55
 sneak_push = 0.4
+fall_gravity_scale = 1.3
+apex_gravity_scale = 0.35
 flip_lift = 2.2
 flip_time = 0.45
 dive_window = 0.5
 slide_min_speed = 5.0
 sleep_after = 75.0
 spin_rate = 28.0
+spin_spinup = 16.0
 landing_speeds = Vector4(15, 17, 19, 21)
 
 [node name="Rig" parent="." index="1"]

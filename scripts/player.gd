@@ -137,6 +137,11 @@ static var input_blocked := false
 @export var fall_gravity_scale := 1.7
 ## Extra gravity while rising after jump is released, giving short hops.
 @export var jump_cut_gravity_scale := 2.8
+## Near the top of a jump (going up or down slower than `apex_speed`, m/s) gravity is this much of itself, so he
+## hangs there a moment (1: no hang). Ringtail, 2026-11-02: "when you jump you should hang at the top of your jump a
+## little longer".
+@export_range(0.1, 1.0) var apex_gravity_scale := 1.0
+@export var apex_speed := 1.6
 @export var air_acceleration := 10.0
 @export var max_fall_speed := 20.0
 ## Grace period to still jump after walking off a ledge.
@@ -263,6 +268,9 @@ static var input_blocked := false
 @export_range(0.1, 1.0) var spin_deflection := 0.6
 ## How fast he turns, radians a second.
 @export var spin_rate := 15.0
+## How quickly he gets up to that speed, radians a second each second (kept whipping the stick round all the while;
+## Ringtail, 2026-11-02: "you should have to spin the stick longer to get him up to speed").
+@export var spin_spinup := 70.0
 ## How fast he gets dizzy while spinning, and gets over it, per second.
 @export var dizzy_rates := Vector2(0.3, 0.07)
 
@@ -308,6 +316,9 @@ var state := State.FREE
 var is_ducking := false
 ## Down on hands and knees.
 var is_crawling := false
+## The tallest his collider may be just now, whatever his stance (INF: no limit). Set from outside: a figure on
+## all fours climbing, as Ringtail's Scurry, is held this low so it is not caught under what it climbs past.
+var height_cap := INF
 ## Swimming, with his head under.
 var is_underwater := false
 ## How far through a swing of a bat he is, 0..1 (1: not swinging).
@@ -796,7 +807,7 @@ func _process(delta: float) -> void:
 			heading = Vector3.ZERO
 	# Spinning, he turns at his own rate whatever the stick says: it comes up
 	# quickly and dies away as he comes out of it.
-	_spin_speed = move_toward(_spin_speed, spin_way * spin_rate * lerpf(1.0, 1.25, dizzy) if is_spinning else 0.0, (70.0 if is_spinning else 38.0) * delta)
+	_spin_speed = move_toward(_spin_speed, spin_way * spin_rate * lerpf(1.0, 1.25, dizzy) if is_spinning else 0.0, (spin_spinup if is_spinning else 38.0) * delta)
 	if absf(_spin_speed) > 0.3:
 		facing_yaw = wrapf(facing_yaw + _spin_speed * delta, -PI, PI)
 	elif heading != Vector3.ZERO:
@@ -1137,6 +1148,8 @@ func _move_vertical(grounded: bool, delta: float) -> void:
 			gravity *= fall_gravity_scale
 		elif _jumping and not _is_jump_held():
 			gravity *= jump_cut_gravity_scale
+		if not is_diving and absf(velocity.y) < apex_speed:
+			gravity *= lerpf(apex_gravity_scale, 1.0, absf(velocity.y) / apex_speed)
 		velocity.y = maxf(velocity.y - gravity * delta, -max_fall_speed)
 
 
@@ -1546,6 +1559,7 @@ func _slide(grounded: bool, delta: float) -> void:
 
 
 func _set_height(height: float) -> void:
+	height = minf(height, height_cap)
 	if is_equal_approx(_capsule.height, height):
 		return
 	_capsule.height = height
