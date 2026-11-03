@@ -710,6 +710,21 @@ Read README.md first. Started 2026-11-01.
   (it shuts the pause screen each frame: it opens when the window loses focus and would stop everything). Any run with
   `RINGTAIL_NO_STREAM=1` in the environment has streaming off. `tests/zone_streaming_test.gd` (headless) walks grove,
   each side and back: live, frozen and hidden as above, the band running, the HUD's zone and counts.
+- Baked motion for the crowd (2026-11-02; the user on posing every figure in code each frame: "Surely thats not best
+  practice", then "This should be how the game Common character controller works"). A CharacterRig with `baked = true`
+  is played from clips by BakedMotion (scripts/baked_motion.gd, component code, free of Ringtail): one manager
+  advances each figure's AnimationPlayer by hand, the nearest 8 every frame, within 25 m every 2nd, further every 3rd,
+  out of sight every 12th, past 110 m not at all; head look live within 12 m; ragdolls live. Baked: every critter
+  (Critter.make), the villagers and the squad (RaccoonRig). Live: him, the yard cats, HazardFox, car riders (LOD'd
+  already), birds (BirdBody poses less often far off or out of sight). `Villager.baked_state()` names its state clip;
+  climbing stays live. Clips: `anims/<model>.res`. **Rebake when a rig's posing or a model's skeleton changes**:
+  `godot --headless --path . --audio-driver Dummy --fixed-fps 60 -s res://tools/bake_motion.gd -- res://scripts/critter.gd <kinds...>`
+  and `... -- res://tools/bake_raccoons.gd raccoon`. Live beside baked: `tests/baked_compare.gd -- --out=<dir>
+  [--maker=res://tools/bake_raccoons.gd --what=raccoon]`. `BAKED_MOTION_OFF=1` has everyone live (for A/B).
+  Numbers (perf_zones, same run, baked / live): Grove 21.6 / 40.2 ms, Rural 19.1 / 21.1, Industrial 18.3 / 19.2,
+  Construction 16.0 / 17.9, City 21.4 / 24.1. Baked fur does not spring (the live rig drives it). Next for flocks of
+  many small things: vertex-animation textures on a MultiMesh (not built). The grass's script is now the biggest
+  per-frame cost in the grove (about 7 ms for 3 Grass nodes).
 
 ## Buildings as mini levels (2026-11-02)
 
