@@ -42,6 +42,8 @@ static func place(world: Node3D, hero: Player, count := 5) -> void:
 		var rig := RaccoonRig.new()
 		rig.name = "Rig"
 		rig.always_on_fours = true
+		# (played from baked clips, tools/bake_raccoons.gd)
+		rig.baked = true
 		rig.dusty = false
 		rig.key_poses = false
 		rig.cap_hand = false

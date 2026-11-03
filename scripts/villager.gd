@@ -118,6 +118,37 @@ func _ready() -> void:
 	_go(Doing.STAND, randf_range(0.2, 1.2))
 
 
+## What it is doing, for BakedMotion: a state baked as its own clip (tools/bake_raccoons.gd), "live" while it climbs,
+## or "" to go by its speed.
+func baked_state() -> String:
+	if rig.climbing_npc:
+		return "live"
+	if sit_progress > 0.5:
+		if rig.lounge > 0.5:
+			return "lounge"
+		if _napping:
+			return "nap"
+		if rub_progress < 1.0:
+			return "groom"
+		if rig.talking > 0.5:
+			return "sit_talk"
+		if rig.listening > 0.5:
+			return "sit_listen"
+		return "sit"
+	if rig.cheer > 0.5:
+		return "cheer"
+	if rig.clap > 0.5:
+		return "clap"
+	if is_ducking:
+		return "rummage"
+	if Vector2(velocity.x, velocity.z).length() < 0.3:
+		if rig.talking > 0.5:
+			return "talk"
+		if rig.listening > 0.5:
+			return "listen"
+	return ""
+
+
 func _physics_process(delta: float) -> void:
 	var hero := villagers.player
 	if hero == null:

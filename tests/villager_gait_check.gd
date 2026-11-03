@@ -15,6 +15,8 @@ func _initialize() -> void:
 
 
 func _run(level: Node3D) -> void:
+	# (baked figures stepped every frame, however far from the camera: their feet measured frame by frame)
+	BakedMotion.full_rate = true
 	for _i in 10:
 		await physics_frame
 	var player: Player = level.player
@@ -36,9 +38,11 @@ func _run(level: Node3D) -> void:
 		who._pace = 0.35
 		for _i in 60:
 			await physics_frame
-		var parts: Array[Node3D] = []
-		parts.append_array(who.rig._feet)
-		parts.append_array(who.rig._hands)
+		# (the skeleton's own feet and hands: posed live or played from baked clips, BakedMotion)
+		var skeleton: Skeleton3D = who.rig._skeleton
+		var parts: Array[int] = []
+		for bone: String in ["foot_l", "foot_r", "hand_l", "hand_r"]:
+			parts.append(skeleton.find_bone(bone))
 		var track: Array = []
 		var speed := 0.0
 		for _i in FRAMES:
@@ -46,7 +50,7 @@ func _run(level: Node3D) -> void:
 			speed += Vector2(who.velocity.x, who.velocity.z).length() / FRAMES
 			var frame: Array[Vector3] = []
 			for part in parts:
-				frame.append(part.global_position - Vector3(0.0, who.global_position.y, 0.0))
+				frame.append(skeleton.global_transform * skeleton.get_bone_global_pose(part).origin - Vector3(0.0, who.global_position.y, 0.0))
 			track.append(frame)
 		var slip := [0.0, 0.0, 0.0, 0.0]
 		var lowest := [INF, INF, INF, INF]
@@ -62,12 +66,13 @@ func _run(level: Node3D) -> void:
 					slip[k] = maxf(slip[k], Vector2(at.x - down_at.x, at.z - down_at.z).length())
 				else:
 					down_at = null
-		var on_fours: bool = who.rig._quad > 0.5
+		var baked := who.rig.get_node_or_null(^"Baked") != null
+		var on_fours: bool = who.rig.always_on_fours if baked else who.rig._quad > 0.5
 		# (feet always; paws only when they walk on them)
 		var worst := maxf(slip[0], slip[1])
 		if on_fours:
 			worst = maxf(worst, maxf(slip[2], slip[3]))
-		print("%-13s speed %.2f m/s quad %.2f slip hind %.3f %.3f fore %.3f %.3f m (scale %.2f)" % [case[0], speed, who.rig._quad, slip[0], slip[1], slip[2], slip[3], who.rig.scale.x])
+		print("%-13s %s speed %.2f m/s quad %.2f slip hind %.3f %.3f fore %.3f %.3f m (scale %.2f)" % [case[0], "baked" if baked else "live ", speed, who.rig._quad, slip[0], slip[1], slip[2], slip[3], who.rig.scale.x])
 		# (a kit drops to all fours to go any faster than a walk, upright or not)
 		var ok: bool = (on_fours == case[2] or case[1]) and worst < 0.04 * maxf(who.rig.scale.x, 0.5) * 2.0 and speed > 0.3
 		print(("ok   " if ok else "FAIL ") + case[0])

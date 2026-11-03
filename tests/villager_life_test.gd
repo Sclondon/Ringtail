@@ -70,8 +70,8 @@ func _run(world: World) -> void:
 			speakers[a.speaking] = true
 			var talker: Villager = a if a.speaking else b
 			var hearer: Villager = b if a.speaking else a
-			gestured = gestured or talker.rig._talk_w > 0.6
-			listened = listened or hearer.rig._listen_w > 0.6
+			gestured = gestured or _doing(talker.rig, "talk", talker.rig._talk_w)
+			listened = listened or _doing(hearer.rig, "listen", hearer.rig._listen_w)
 		var open := 0
 		for who: Villager in [a, b]:
 			if band.talk._bubbles.has(who) and band.talk._bubbles[who].openness > 0.5:
@@ -172,8 +172,8 @@ func _run(world: World) -> void:
 		for member: Villager in band.members:
 			if member.doing == Villager.Doing.CELEBRATE:
 				party += 1
-				cheered = cheered or (not member.giant and member.rig._cheer_w > 0.6)
-				clapped = clapped or (member.giant and member.rig._clap_w > 0.6)
+				cheered = cheered or (not member.giant and _doing(member.rig, "cheer", member.rig._cheer_w))
+				clapped = clapped or (member.giant and _doing(member.rig, "clap", member.rig._clap_w))
 	_check(party >= 3 and cheered, "they celebrate when something is brought home (%d)" % party)
 	_check(clapped or not band.members.any(func(m: Villager) -> bool: return m.giant), "the giant claps")
 	# Back in the grove with food found since he left it: they celebrate at the pile
@@ -201,3 +201,12 @@ func _run(world: World) -> void:
 func _only(band: Villagers, these: Array) -> void:
 	for member in band.members:
 		member.process_mode = Node.PROCESS_MODE_INHERIT if member in these else Node.PROCESS_MODE_DISABLED
+
+
+## Whether a rig is doing `what`: played from baked clips (BakedMotion), its clip of that name (or sat, "sit_" it);
+## posed live, the rig's own weight for it.
+func _doing(rig: RaccoonRig, what: String, weight: float) -> bool:
+	var baked := rig.get_node_or_null(^"Baked") as AnimationPlayer
+	if baked:
+		return baked.current_animation in [what, "sit_" + what]
+	return weight > 0.6

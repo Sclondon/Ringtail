@@ -181,6 +181,8 @@ func _add(kit: bool, look: int, at: Vector3, special := {}) -> Villager:
 	rig.dusty = false
 	rig.key_poses = false
 	rig.cap_hand = false
+	# (one of the crowd: played from baked clips, tools/bake_raccoons.gd)
+	rig.baked = true
 	# (kits go about on all fours; grown-ups stand, and drop to all fours to run)
 	rig.always_on_fours = kit
 	rig.scale = Vector3.ONE * float(build.size)

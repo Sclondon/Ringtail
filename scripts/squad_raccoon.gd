@@ -63,6 +63,11 @@ func _ready() -> void:
 	_mind_t = randf_range(2.0, 6.0)
 
 
+## What it is doing, for BakedMotion: sat (a clip of its own), or "" to go by its speed.
+func baked_state() -> String:
+	return "sit" if sit_progress > 0.5 else ""
+
+
 func _physics_process(delta: float) -> void:
 	var hero := squad.player
 	if hero == null:
