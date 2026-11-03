@@ -21,8 +21,11 @@ const LIVE_REACH := 30.0
 const PER_FRAME := 120
 const LOOK_EVERY := 0.3
 ## How often a figure far from the camera is posed: every frame within the first, every second frame within the
-## next, and so on (CharacterRig.lod_every).
-const LOD_STEPS: Array[float] = [12.0, 22.0, 35.0]
+## next, and so on (CharacterRig.lod_every). For a figure his size; a smaller one (a mouse, a kit) as if as much
+## further off as it is smaller, since it looks no bigger on screen.
+const LOD_STEPS: Array[float] = [10.0, 18.0, 28.0, 40.0]
+## Out of sight, a figure is posed every this many frames (CharacterRig.watch_screen).
+const OFF_SCREEN_EVERY := 8
 ## Past these (m) trees and big still things, and small things, are not drawn.
 const FAR_TREES := 125.0
 const FAR_SMALL := 55.0
@@ -71,7 +74,11 @@ func _gather() -> void:
 		if still < 0:
 			continue
 		var at := _where(node)
-		_things.append([node, zones.zone_of(at), still == 1, State.LIVE, _rig_of(node)])
+		var rig := _rig_of(node)
+		# (out of sight, posed only now and then)
+		if rig:
+			rig.watch_screen(OFF_SCREEN_EVERY)
+		_things.append([node, zones.zone_of(at), still == 1, State.LIVE, rig])
 		_far(node, still == 1)
 
 
@@ -164,7 +171,7 @@ func _process(delta: float) -> void:
 		# (a live figure far from the camera is posed less often)
 		var rig: CharacterRig = thing[4]
 		if rig and thing[3] == State.LIVE and is_instance_valid(rig):
-			var d := eye.distance_to(rig.global_position)
+			var d := eye.distance_to(rig.global_position) / clampf(rig.global_basis.get_scale().y, 0.3, 1.0)
 			var every := 1
 			for step in LOD_STEPS:
 				if d > step:

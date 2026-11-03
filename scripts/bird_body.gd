@@ -65,6 +65,10 @@ const FLUTTER_RATE := 34.0
 const CRUISE := 9.0
 ## Past this far from the camera the feathers are not sprung (they lie as the bones put them).
 const RIPPLE_REACH := 32.0
+## Posed every frame within the first of these (m from the camera), every second frame within the next, and so on;
+## out of sight, every OFF_SCREEN_EVERY frames.
+const POSE_STEPS: Array[float] = [12.0, 22.0, 35.0]
+const OFF_SCREEN_EVERY := 8
 
 
 class Feather:
@@ -139,6 +143,9 @@ var _last_place := Vector3.INF
 var _velocity := Vector3.ZERO
 var _last_yaw := INF
 var _yaw_rate := 0.0
+var _on_screen: VisibleOnScreenNotifier3D
+var _skipped := 0
+var _skipped_time := 0.0
 
 
 static func make(kind: StringName) -> BirdBody:
@@ -260,7 +267,36 @@ func ruffle(amount := 1.0) -> void:
 		f.twist_v += randf_range(-1.0, 1.0) * 4.0 * amount * f.give
 
 
+## How many frames to a pose: by how far it is from the camera, and whether any of it is on screen.
+func _pose_every() -> int:
+	if _on_screen == null:
+		_on_screen = VisibleOnScreenNotifier3D.new()
+		_on_screen.aabb = AABB(Vector3(-1.0, -0.5, -1.0), Vector3(2.0, 1.6, 2.0))
+		add_child(_on_screen)
+		return 1
+	if not _on_screen.is_on_screen() and DisplayServer.get_name() != "headless":
+		return OFF_SCREEN_EVERY
+	var camera := get_viewport().get_camera_3d()
+	if camera == null:
+		return 1
+	var far := camera.global_position.distance_to(global_position)
+	var every := 1
+	for step in POSE_STEPS:
+		if far > step:
+			every += 1
+	return every
+
+
 func _process(delta: float) -> void:
+	# (far off or out of sight, posed only every few frames, given all the time since)
+	var every := _pose_every()
+	_skipped += 1
+	_skipped_time += delta
+	if _skipped < every:
+		return
+	delta = _skipped_time
+	_skipped = 0
+	_skipped_time = 0.0
 	_time += delta
 	_fold = move_toward(_fold, fold, delta * 3.5)
 	_flap = move_toward(_flap, flap, delta * 4.0)

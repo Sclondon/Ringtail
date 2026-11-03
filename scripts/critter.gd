@@ -35,6 +35,8 @@ static func make(what: String, low := false) -> Critter:
 	body.rig.name = "Rig"
 	body.rig.scale = Vector3.ONE * SIZES.get(what, 0.85)
 	body.rig.dusty = false
+	# (one of the crowd: played from its baked clips, tools/bake_motion.gd)
+	body.rig.baked = true
 	return body
 
 

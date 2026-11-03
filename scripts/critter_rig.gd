@@ -108,3 +108,25 @@ func _pose_extra(delta: float) -> void:
 			_twitch_wait = randf_range(0.8, 2.5)
 		_twitch = maxf(_twitch - delta, 0.0)
 		_nose.position = _nose_rest + Vector3(0.0, sin(_time * 55.0) * 0.004, sin(_time * 55.0 + 1.0) * 0.002) * smoothstep(0.0, 0.15, _twitch)
+
+
+## Played from baked clips (BakedMotion): the quills raised and the throat puffed as live, the nose twitching near.
+func _pose_baked(delta: float, near: bool) -> void:
+	if _quill_bone >= 0:
+		_bristled = move_toward(_bristled, bristle, delta * 3.0)
+		if _bristled > 0.0:
+			var grow := 1.0 + 0.45 * smoothstep(0.0, 1.0, _bristled)
+			_skeleton.set_bone_pose_scale(_quill_bone, _skeleton.get_bone_pose_scale(_quill_bone) * grow)
+	if _throat_bone >= 0 and puff > 0.0:
+		var blown := 1.0 + 1.1 * clampf(puff, 0.0, 1.0)
+		_skeleton.set_bone_pose_scale(_throat_bone, _skeleton.get_bone_pose_scale(_throat_bone) * blown)
+	var nose := _skeleton.find_bone(&"nose") if near and _nose else -1
+	if nose >= 0:
+		_time += delta
+		_twitch_wait -= delta
+		if _twitch_wait <= 0.0:
+			_twitch = 0.6
+			_twitch_wait = randf_range(0.8, 2.5)
+		_twitch = maxf(_twitch - delta, 0.0)
+		var shake := Vector3(0.0, sin(_time * 55.0) * 0.004, sin(_time * 55.0 + 1.0) * 0.002) * smoothstep(0.0, 0.15, _twitch)
+		_skeleton.set_bone_pose_position(nose, _skeleton.get_bone_pose_position(nose) + shake)

@@ -388,6 +388,16 @@ var _arm_sides: Array[int] = []
 var lod_every := 1
 var _lod_count := 0
 var _lod_time := 0.0
+## Out of sight (no part of a box round the figure on screen; never so headless, where nothing is drawn), posed only
+## every this many frames (0: as on screen).
+## Set with watch_screen(); its shadow can still show, so not never.
+var off_screen_every := 0
+var _on_screen: VisibleOnScreenNotifier3D
+## Played from baked clips (BakedMotion, made by tools/bake_motion.gd) instead of posed here every frame: for the crowd,
+## people and animals, not a hero. Set before it enters the tree. Without clips for its model it is posed live as ever.
+var baked := false
+## Its clips, if not at res://anims/<model name>.res.
+var motion: AnimationLibrary
 
 var _time := 0.0
 var _phase := 0.0
@@ -771,21 +781,37 @@ func _ready() -> void:
 	if _player and _player.has_signal(&"dived"):
 		_player.dived.connect(_on_dived)
 	_prev_yaw = rotation.y
+	if baked:
+		BakedMotion.take(self)
+
+
+## Posed less often while out of sight: every `every` frames (a box of `size` m round the figure, in its own space,
+## says whether any of it is on screen).
+func watch_screen(every := 8, size := Vector3(2.0, 2.6, 2.4)) -> void:
+	off_screen_every = every
+	if _on_screen == null:
+		_on_screen = VisibleOnScreenNotifier3D.new()
+		_on_screen.name = "OnScreen"
+		add_child(_on_screen)
+	_on_screen.aabb = AABB(Vector3(-size.x * 0.5, -0.3, -size.z * 0.5), size)
 
 
 func _process(delta: float) -> void:
 	if _player == null:
 		return
-	# (posed only every `lod_every` frames when far, given all the time since, so it keeps pace)
-	if lod_every > 1:
+	var every := lod_every
+	if off_screen_every > 0 and _on_screen and not _on_screen.is_on_screen() and DisplayServer.get_name() != "headless":
+		every = maxi(every, off_screen_every)
+	# (posed only every `every` frames when far or out of sight, given all the time since, so it keeps pace)
+	if every > 1:
 		_lod_count += 1
 		_lod_time += delta
-		if _lod_count < lod_every:
+		if _lod_count < every:
 			return
 		delta = _lod_time
 		_lod_count = 0
 		_lod_time = 0.0
-	delta = minf(delta, lod_every / 30.0)
+	delta = minf(delta, every / 30.0)
 	if _ragdoll:
 		_follow_ragdoll()
 		_apply_pose()
@@ -1182,6 +1208,12 @@ func _process(delta: float) -> void:
 	_raise_dust(flat, grounded, delta)
 	_sunk = _approach(_sunk, sink, 6.0, delta)
 	_figure.position.y = -_sunk
+
+
+## For a rig that extends this one, played from baked clips (BakedMotion): called after each clip step, so it can
+## lay something live over the clip (set bone poses on _skeleton). `near`: within BakedMotion.NEAR of the camera.
+func _pose_baked(_delta: float, _near: bool) -> void:
+	pass
 
 
 ## For a rig that extends this one (the mummy's, the brother's): called each
