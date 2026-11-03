@@ -83,7 +83,7 @@ func _filter(on: bool) -> void:
 
 
 ## A point of a face's own frame (x across it, z down it from the hill's middle) in the world (build_town.py's
-## FACES: City south, Industrial east, Construction north, Rural west).
+## FACES: Rural south, Industrial east, Construction north, City west).
 func _face(f: int, x: float, y: float, z: float) -> Vector3:
 	var turn := PI / 2.0 * f
 	return Vector3(x * cos(turn) + z * sin(turn), y, z * cos(turn) - x * sin(turn))
@@ -114,7 +114,7 @@ func _run() -> void:
 	await _view(Vector3(0.0, 120.0, 0.5), Vector3(0.0, 0.0, 0.0))
 	await _shot("grove_top_down")
 	for f in 4:
-		var name: String = ["city", "industrial", "construction", "rural"][f]
+		var name: String = ["rural", "industrial", "construction", "city"][f]
 		await _put(_face(f, 14.0, 0.0, 130.0), _face(f, -20.0, -10.0, 150.0))
 		await _shot("street_" + name)
 		# (stood on the ground at the face's foot, a person's height up, looking out)

@@ -427,7 +427,7 @@ Read README.md first. Started 2026-11-01.
 - Then "the cars need to be way faster like hard to dodge": cruise 20 (hatchback), 21 (taxi), 17 (keis), 13 (bus)
   m/s, up from 11/11.5/9.5/7.5. Each brakes at BRAKE 14 m/s² (bus 0.7x, keis 0.85x) planned over the 44 m ahead, so it
   comes into every bend at that bend's speed (`bend_at`: the turn between the 4 m chords either side, not the road's
-  segments, which aliased); it holds that speed till its rear bumper is out, then pulls away at PULL 7 m/s². It
+  segments, which aliased; looked at every metre for the first 12 m, every 2 m past: at 2 m a short sharp kink at the top of the flat Construction road fell between two looks and a taxi took it 1.4 m/s too fast); it holds that speed till its rear bumper is out, then pulls away at PULL 7 m/s². It
   follows no faster than it could brake to the one in front's speed by GAP. vehicle_test: each kind past 70% of its
   cruise, no bend entered over 1 m/s too fast (bend_speed/bend_sharp), the pull-up from its braking distance. Warning
   cues: headlights only (the vehicles have no sound).
@@ -835,13 +835,18 @@ Read README.md first. Started 2026-11-01.
   the jagged Olympics to the west. Their places and sizes are Claude's picks.
 - The zones: "one of the zones should be a neighborhood under construction, one a more rural suburb vibe, one more
   commercial and city like, and one zone needs to be sewers, substations, factories and warehouses", then "and the
-  zones need different road layouts". Claude's picks: S City, a grid on the slope (boulevard with a planted median,
+  zones need different road layouts". Claude's picks: W City, a grid on the slope (boulevard with a planted median,
   three cross streets with traffic lights, two avenues; streets `follow` the slope so crossings meet with no step);
   E Industrial, a trunk road with level gravel yard roads off it to terraced yards and an open sewer channel; N
-  Construction, three runs and hairpins; W Rural, a winding lane with three cul-de-sacs, a barn, a pasture, an orchard
-  and the hollow log. Faces are `zone_<n>_City/Industrial/Construction/Rural`.
+  Construction, three runs and hairpins; S Rural, a winding lane with three cul-de-sacs, a barn, a pasture, an orchard
+  and the hollow log. Faces are `zone_0_Rural`, `zone_1_Industrial`, `zone_2_Construction`, `zone_3_City`.
+- "the construction and suburb zone should be across from each other and should be flat not on a slope, and then the
+  city and warehouse zone shoujld be across from each other and ona slope" (the user, 2026-11-02): City and Rural
+  swapped faces (City was S, Rural W; the swap that moves least: Construction keeps the billboard glide from flats_10,
+  Industrial its bay). Construction and Rural have FOOTS 0: level with the hilltop all the way out (their roads keep
+  their layouts, the hairpins and the winding lane, on the flat). City and Industrial keep their slopes.
 - "the hill slope doesn't need to be so severe in the zones", "or not all of them at least": FOOTS (City -16,
-  Industrial -14, Construction -34, Rural -13; Claude's picks). The ridges and the valley follow `foot_at(angle)`.
+  Industrial -14; Construction and Rural 0 since the swap above). The ridges and the valley follow `foot_at(angle)`.
   graded() eases each road's grade in and out. Industrial was -24, then -17: at about 12% on a long straight the
   vehicles' wheel check failed (vehicle_test).
 - "each zone should have a different view in the distance", "so the city zone sees more city in the distance, suburbs
@@ -850,6 +855,16 @@ Read README.md first. Started 2026-11-01.
   streets, tower cranes and dirt. Rural: fields, barns and tree rows. The hills and mountains are behind.
   `far_height` keeps the valley at the foot's height out to PLAY + 30 m: it used to rise from 190 m, so past the
   bigger hill's foot the far land and its trees floated over the faces (the user's "floating ring of trees").
+- "the skybox looks much worse than before- the city is just arandom mess of garbeld shapes, its way too busy in the
+  distance for all the zones cconsidering how bare each zone is" (the user, 2026-11-02). The garbling was a bug:
+  beyond()'s block() took the wrong corners, so every far building was the floor, two walls and a wall for a lid,
+  see-through from two sides. Fixed, and the far town made calm (Claude's picks): a few big plain shapes per zone,
+  kept to a wedge straight out past its face with open land and firs between, none overlapping. City: about 11
+  towers in one downtown (taller to its middle), 10 low blocks nearer, the needle tower (110 m). Industrial: 7 long
+  sheds, 3 stacks, a group of tanks, the bay with 3 container cranes (as bars) and a ship. Construction: dirt pads,
+  3 streets of four new houses, 2 tower cranes. Rural: 16 big fields, 3 barns, 4 farmhouses, 4 rows of firs. 160 far
+  firs (was 380), the 900 random far pieces gone. The far town's colours are a third of the way to the haze
+  (`far_` in COLOURS; far_red less, for the barns).
 - The grove: "the grove needs to be bigger, and have 2 rings of trees, in between we need a couple big trees for npcs
   to be in", then "the pond needs to be much bigger, same with clearing", "the grove still needs a denser surround
   woods". PLATEAU 34 m, INNER rows 37/40 m, three `giantfir_<n>_<seed>` markers at r 44.4 m (main grows the Giant

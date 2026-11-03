@@ -184,7 +184,8 @@ func _physics_process(delta: float) -> void:
 		if absf(look) < 0.1:
 			turning = sharp
 		want = minf(want, sqrt(pow(lerpf(cruise, corner_speed, sharp), 2.0) + 2.0 * BRAKE * pull * maxf(look - 4.0, 0.0)))
-		look += 2.0
+		# (every metre near, where braking leaves no room: at 2 m a short sharp kink fell between two looks)
+		look += 1.0 if look < 12.0 else 2.0
 	# (the bend its front is in, for tests)
 	bend_sharp = bend_at(along + half_size.z)
 	bend_speed = lerpf(cruise, corner_speed, bend_sharp)

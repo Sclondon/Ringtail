@@ -102,31 +102,32 @@ w1.COLOURS.update({
     "sky_forest": (0.30, 0.42, 0.44),
     "sleeve": (0.95, 0.78, 0.18),
     "vend_blue": (0.22, 0.42, 0.78),
-    # the town below and the hills (not textured: no moire far off)
+    # the town below and the hills (not textured: no moire far off); the far town's colours a third of the way to the
+    # haze (quieter: the user, 2026-11-02, "its way too busy in the distance")
     "far_green": (0.32, 0.52, 0.30),
     "far_forest": (0.20, 0.38, 0.26),
     "far_hill": (0.36, 0.52, 0.50),
-    "far_wall": (0.80, 0.78, 0.72),
-    "far_wall2": (0.62, 0.66, 0.62),
-    "far_roof": (0.34, 0.36, 0.36),
-    "far_roof2": (0.46, 0.36, 0.30),
-    "far_roof3": (0.28, 0.32, 0.30),
+    "far_wall": (0.77, 0.80, 0.80),
+    "far_wall2": (0.65, 0.72, 0.73),
+    "far_roof": (0.47, 0.53, 0.56),
+    "far_roof2": (0.54, 0.53, 0.52),
+    "far_roof3": (0.43, 0.50, 0.52),
     "far_road": (0.55, 0.55, 0.56),
     "far_tree": (0.16, 0.32, 0.22),
     "far_tree2": (0.22, 0.38, 0.24),
-    "far_glass": (0.46, 0.56, 0.62),
-    "far_brick": (0.56, 0.36, 0.30),
-    "far_metal": (0.62, 0.64, 0.64),
-    "far_metal2": (0.44, 0.52, 0.56),
-    "far_red": (0.66, 0.26, 0.20),
-    "far_blue": (0.26, 0.38, 0.56),
-    "far_yellow": (0.88, 0.72, 0.22),
-    "far_lumber": (0.80, 0.68, 0.48),
-    "far_dirt": (0.56, 0.46, 0.34),
-    "far_field": (0.62, 0.66, 0.36),
-    "far_field2": (0.74, 0.68, 0.40),
-    "far_field3": (0.42, 0.56, 0.30),
-    "far_water": (0.36, 0.50, 0.58),
+    "far_glass": (0.54, 0.66, 0.73),
+    "far_brick": (0.61, 0.53, 0.52),
+    "far_metal": (0.65, 0.71, 0.74),
+    "far_metal2": (0.53, 0.63, 0.69),
+    "far_red": (0.64, 0.34, 0.29),
+    "far_blue": (0.41, 0.54, 0.69),
+    "far_yellow": (0.82, 0.76, 0.47),
+    "far_lumber": (0.77, 0.74, 0.64),
+    "far_dirt": (0.61, 0.59, 0.55),
+    "far_field": (0.65, 0.72, 0.56),
+    "far_field2": (0.73, 0.74, 0.59),
+    "far_field3": (0.52, 0.66, 0.52),
+    "far_water": (0.48, 0.62, 0.71),
 })
 
 HILL_TOP = 2.5          # the plateau's height: a gentle mound (the user, 2026-11-02: "the grove hill is way too steep")
@@ -158,10 +159,10 @@ LOTS = [
     ("road", 0.0),          # east: the Industrial zone's road goes down from here
     ("commercial", 0.12),
     ("craftsman", 1.6),
-    ("road", 0.0),          # south: the City's boulevard
+    ("road", 0.0),          # south: the Rural lane
     ("commercial", 0.12),
     ("craftsman", 1.8),
-    ("road", 0.0),          # west: the Rural lane
+    ("road", 0.0),          # west: the City's boulevard
     ("farmhouse", 0.6),
     ("craftsman", 1.2),
     ("road", 0.0),          # north: the Construction zone's
@@ -1383,7 +1384,7 @@ def beyond():
     # fields, farmhouses, red barns and rows of trees. Then the hills and the mountains. Only to look at, cheap boxes.
     town = w1.Piece("nocol_far_town")
     rng = random.Random(11)
-    zones = {"City": math.pi / 2, "Industrial": 0.0, "Construction": -math.pi / 2, "Rural": math.pi}
+    zones = {zone: math.pi / 2 - turn for turn, _t, zone in FACES}
 
     def zone_at(a):
         return min(zones, key=lambda z: abs((a - zones[z] + math.pi) % math.tau - math.pi))
@@ -1395,19 +1396,37 @@ def beyond():
 
         def p(u, yy, v):
             return (x + u * c - v * s, y + yy, z + u * s + v * c)
+        # (k[iu * 4 + iy * 2 + iv]: its four walls are the iu and iv sides; they were the floor, the top and two of the
+        # walls, so each far building was a pair of walls with a lid, see-through from two sides: the "garbled shapes")
         k = [p(iu * w / 2, iy * tall, iv * d / 2) for iu in (-1, 1) for iy in (0, 1) for iv in (-1, 1)]
-        for q in [(0, 4, 5, 1), (2, 3, 7, 6), (0, 2, 6, 4), (1, 5, 7, 3)]:
-            town.face([k[i] for i in q], wall, 0.95)
+        for q, shade in (((0, 1, 3, 2), 0.86), ((4, 6, 7, 5), 0.86), ((0, 2, 6, 4), 0.95), ((1, 5, 7, 3), 0.95)):
+            town.face([k[i] for i in q], wall, shade)
         if roof:
             e = [p(-w / 2 - 0.4, tall, -d / 2 - 0.4), p(w / 2 + 0.4, tall, -d / 2 - 0.4), p(w / 2 + 0.4, tall, d / 2 + 0.4), p(-w / 2 - 0.4, tall, d / 2 + 0.4)]
             r0, r1 = p(-w / 2 - 0.4, tall + rise, 0.0), p(w / 2 + 0.4, tall + rise, 0.0)
             town.face([e[0], e[1], r1, r0], roof, 1.05)
             town.face([e[2], e[3], r0, r1], roof, 0.85)
-            town.face([k[0 * 4 + 1], k[0 * 4 + 3], r0], wall, 0.9)
-            town.face([k[1 * 4 + 3], k[1 * 4 + 1], r1], wall, 0.9)
+            town.face([k[2], k[3], r0], wall, 0.86)
+            town.face([k[6], k[7], r1], wall, 0.86)
         else:
-            town.face([k[1], k[3], k[7], k[5]], top or wall, 1.08)
+            town.face([k[2], k[3], k[7], k[6]], top or wall, 1.08)
         return p
+
+    def bar(x, y, z, turn, length, high, wide, mat):
+        """A box turned `turn` about the upright, its middle at (x, y, z), `length` along the turn."""
+        c, s = math.cos(turn), math.sin(turn)
+        k = [(x + c * u - s * v, y + yy, z + s * u + c * v) for u in (-length / 2, length / 2) for yy in (-high / 2, high / 2) for v in (-wide / 2, wide / 2)]
+        for q in [(0, 1, 3, 2), (4, 6, 7, 5), (0, 2, 6, 4), (1, 5, 7, 3), (2, 6, 7, 3), (0, 1, 5, 4)]:
+            town.face([k[i] for i in q], mat, 0.95)
+
+    def fir(x, z, tall, mat):
+        """A far fir: a six-sided cone."""
+        y = _cone(x, z) - 0.2
+        wide = tall * 0.24
+        for i in range(6):
+            t0, t1 = math.tau * i / 6, math.tau * (i + 1) / 6
+            town.face([(x + math.cos(t0) * wide, y + tall * 0.12, z + math.sin(t0) * wide), (x + math.cos(t1) * wide, y + tall * 0.12, z + math.sin(t1) * wide),
+                       (x, y + tall, z)], mat, 0.85 + 0.25 * math.cos(t0 - 0.8))
 
     def mast(x, z, tall, jib, turn, mat):
         """A tower crane's silhouette: a mast, a jib across its top."""
@@ -1419,106 +1438,132 @@ def beyond():
         y0, y1 = y + tall + 0.1, y + tall + 1.1
         back, out, half = -jib * 0.25, jib * 0.75, 0.5
         k = [(x + c * u - s * v, yy, z + s * u + c * v) for u in (back, out) for yy in (y0, y1) for v in (-half, half)]
-        for q in [(0, 4, 5, 1), (2, 3, 7, 6), (0, 2, 6, 4), (1, 5, 7, 3), (2, 6, 7, 3), (0, 1, 5, 4)]:
+        for q in [(0, 1, 3, 2), (4, 6, 7, 5), (0, 2, 6, 4), (1, 5, 7, 3), (2, 6, 7, 3), (0, 1, 5, 4)]:
             town.face([k[i] for i in q], mat, 0.95)
         # (and a hook line hanging from near its end)
         town.box((x + c * jib * 0.6, y + tall - 4.0, z + s * jib * 0.6), (0.3, 8.0, 0.3), mat)
 
-    for n in range(900):
-        a = rng.uniform(0.0, math.tau)
-        zone = zone_at(a)
-        r = rng.uniform(PLAY + 10.0, PLAY + 150.0)
-        x, z = math.cos(a) * r, math.sin(a) * r
-        turn = a + rng.choice((0.0, math.pi / 2)) + rng.uniform(-0.1, 0.1)
-        if zone == "City":
-            # (the farther in, the taller: downtown towers)
-            depth = (r - PLAY) / 150.0
-            if rng.random() < 0.35 + 0.5 * depth:
-                tall = rng.uniform(12.0, 24.0) + depth * rng.uniform(10.0, 45.0)
-                block(x, z, turn, rng.uniform(14.0, 24.0), rng.uniform(14.0, 24.0), tall, rng.choice(("far_wall", "far_glass", "far_brick", "far_glass")), top="far_roof3")
+    # (calmer, the user, 2026-11-02: "the city is just arandom mess of garbeld shapes, its way too busy in the distance
+    # for all the zones cconsidering how bare each zone is": a few big plain shapes to each zone, kept to a wedge
+    # straight out past its face with open land and firs between, none overlapping, in the hazier colours above)
+    placed = []
+
+    def free(x, z, size):
+        if any(math.hypot(x - px, z - pz) < size + ps for px, pz, ps in placed):
+            return False
+        placed.append((x, z, size))
+        return True
+
+    def spot(zone, r0, r1, spread=0.5, size=10.0, tries=30):
+        """A free spot in the zone's wedge (within `spread` of straight out past its face), or None."""
+        for _i in range(tries):
+            a = zones[zone] + rng.uniform(-spread, spread)
+            r = rng.uniform(r0, r1)
+            x, z = math.cos(a) * r, math.sin(a) * r
+            if free(x, z, size):
+                return x, z, a
+        return None
+
+    # City: a modest downtown far out, its towers the taller the nearer its middle; a few low blocks nearer
+    dx, dz = math.cos(zones["City"]) * (PLAY + 135.0), math.sin(zones["City"]) * (PLAY + 135.0)
+    for n in range(11):
+        for _i in range(30):
+            d = rng.uniform(0.0, 50.0)
+            t = rng.uniform(0.0, math.tau)
+            x, z = dx + math.cos(t) * d, dz + math.sin(t) * d
+            if free(x, z, 12.0):
+                tall = 26.0 + 44.0 * (1.0 - d / 50.0) + rng.uniform(-4.0, 4.0)
+                block(x, z, zones["City"] + rng.uniform(-0.05, 0.05), rng.uniform(16.0, 22.0), rng.uniform(16.0, 22.0), tall,
+                      "far_glass" if n % 2 else "far_wall", top="far_roof3")
+                break
+    for n in range(10):
+        s = spot("City", PLAY + 40.0, PLAY + 95.0, 0.45, 14.0)
+        if s:
+            block(s[0], s[1], s[2], rng.uniform(18.0, 24.0), rng.uniform(14.0, 20.0), rng.uniform(9.0, 14.0), "far_wall2", top="far_roof3")
+    nx, nz = math.cos(zones["City"] + 0.3) * (PLAY + 150.0), math.sin(zones["City"] + 0.3) * (PLAY + 150.0)
+    ny = _cone(nx, nz)
+    town.cylinder((nx, ny, nz), 1.6, 110.0, "far_wall", 8)
+    town.cylinder((nx, ny + 100.0, nz), 10.0, 4.0, "far_wall", 16)
+    town.cylinder((nx, ny + 104.0, nz), 1.0, 18.0, "far_wall", 6)
+    # Industrial: long sheds, three stacks, a group of tanks, and past them the bay with its cranes and a ship
+    for n in range(7):
+        s = spot("Industrial", PLAY + 30.0, PLAY + 100.0, 0.5, 30.0)
+        if s:
+            block(s[0], s[1], s[2] + math.pi / 2, rng.uniform(44.0, 60.0), rng.uniform(20.0, 26.0), rng.uniform(9.0, 12.0), "far_metal2", "far_roof", 2.0)
+    for n in range(3):
+        s = spot("Industrial", PLAY + 40.0, PLAY + 100.0, 0.4, 8.0)
+        if s:
+            town.cylinder((s[0], _cone(s[0], s[1]) - 0.5, s[1]), 2.2, rng.uniform(38.0, 48.0), "far_brick", 8)
+    s = spot("Industrial", PLAY + 50.0, PLAY + 90.0, 0.4, 16.0)
+    if s:
+        for k in range(3):
+            town.cylinder((s[0] + (k - 1) * 8.0, _cone(s[0], s[1]) - 0.5, s[1]), 3.4, 12.0, "far_metal", 10)
+    ia = zones["Industrial"]
+    bay_r0, bay_r1 = PLAY + 110.0, PLAY + 175.0
+    bay_y = max(far_height(rr, aa) for rr in (bay_r0, (bay_r0 + bay_r1) / 2, bay_r1) for aa in [ia - 0.5 + k * 0.05 for k in range(21)]) + 0.4
+    for k in range(10):
+        a0, a1 = ia - 0.5 + k * 0.1, ia - 0.5 + (k + 1) * 0.1
+        town.face([_ring_point(a0, bay_r0, bay_y), _ring_point(a1, bay_r0, bay_y), _ring_point(a1, bay_r1, bay_y), _ring_point(a0, bay_r1, bay_y)][::-1], "far_water")
+    for k in range(3):
+        a = ia - 0.25 + k * 0.25
+        cx, cz = math.cos(a) * (bay_r0 - 4.0), math.sin(a) * (bay_r0 - 4.0)
+        side = (math.cos(a + math.pi / 2), math.sin(a + math.pi / 2))
+        for leg in (-6.0, 6.0):
+            bar(cx + side[0] * leg, bay_y + 15.0, cz + side[1] * leg, a, 1.4, 30.0, 1.4, "far_red")
+        bar(cx + math.cos(a) * 10.0, bay_y + 31.0, cz + math.sin(a) * 10.0, a, 44.0, 2.0, 2.0, "far_red")
+        bar(cx, bay_y + 30.0, cz, a + math.pi / 2, 14.0, 1.4, 1.4, "far_red")
+    sx, sz = math.cos(ia) * (bay_r0 + 30.0), math.sin(ia) * (bay_r0 + 30.0)
+    bar(sx, bay_y + 3.0, sz, ia + math.pi / 2, 80.0, 7.0, 14.0, "far_metal2")
+    # Construction: cleared dirt, a few streets of new houses (some still bare frames), two tower cranes
+    for n in range(4):
+        s = spot("Construction", PLAY + 30.0, PLAY + 120.0, 0.5, 26.0)
+        if s:
+            y = _cone(s[0], s[1]) + 0.2
+            w = rng.uniform(36.0, 50.0)
+            town.face([(s[0] - w / 2, y, s[1] - w / 2), (s[0] - w / 2, y, s[1] + w / 2), (s[0] + w / 2, y, s[1] + w / 2), (s[0] + w / 2, y, s[1] - w / 2)], "far_dirt")
+    for n in range(3):
+        s = spot("Construction", PLAY + 30.0, PLAY + 110.0, 0.45, 26.0)
+        if s:
+            turn = s[2] + math.pi / 2
+            for k in range(4):
+                hx, hz = s[0] + math.cos(turn) * (k - 1.5) * 13.0, s[1] + math.sin(turn) * (k - 1.5) * 13.0
+                block(hx, hz, turn, 8.0, 9.0, 5.5, "far_lumber" if k % 3 == 1 else "far_wall2", "far_roof" if k % 3 != 1 else None, 2.2, top="far_lumber")
+    for n in range(2):
+        s = spot("Construction", PLAY + 50.0, PLAY + 110.0, 0.35, 20.0)
+        if s:
+            mast(s[0], s[1], rng.uniform(34.0, 42.0), rng.uniform(28.0, 36.0), rng.uniform(0.0, math.tau), "far_yellow")
+    # Rural: big fields, a few barns and farmhouses, rows of trees along the fields' edges
+    for n in range(16):
+        s = spot("Rural", PLAY + 20.0, PLAY + 150.0, 0.6, 26.0)
+        if s:
+            y = _cone(s[0], s[1]) + 0.2
+            w, d = rng.uniform(46.0, 70.0), rng.uniform(32.0, 50.0)
+            c, sn = math.cos(s[2]), math.sin(s[2])
+            q = [(s[0] + u * c - v * sn, y, s[1] + u * sn + v * c) for u, v in ((-w / 2, -d / 2), (-w / 2, d / 2), (w / 2, d / 2), (w / 2, -d / 2))]
+            town.face(q, ("far_field", "far_field2", "far_field3")[n % 3])
+    for n in range(7):
+        s = spot("Rural", PLAY + 30.0, PLAY + 130.0, 0.55, 8.0)
+        if s:
+            if n < 3:
+                block(s[0], s[1], s[2], 10.0, 16.0, 6.0, "far_red", "far_roof", 4.0)
             else:
-                block(x, z, turn, rng.uniform(10.0, 18.0), rng.uniform(10.0, 16.0), rng.uniform(8.0, 14.0), rng.choice(("far_brick", "far_wall2")), top="far_roof3")
-        elif zone == "Industrial":
-            pick = rng.random()
-            if pick < 0.55:
-                block(x, z, turn, rng.uniform(30.0, 60.0), rng.uniform(18.0, 30.0), rng.uniform(8.0, 14.0), rng.choice(("far_metal", "far_metal2", "far_brick")), "far_roof", 2.0)
-            elif pick < 0.75:
-                y = _cone(x, z)
-                town.cylinder((x, y - 0.5, z), rng.uniform(1.4, 2.4), rng.uniform(30.0, 55.0), "far_brick", 8)
-            elif pick < 0.9:
-                for k in range(3):
-                    town.cylinder((x + k * 7.0, _cone(x, z) - 0.5, z), 3.0, rng.uniform(10.0, 16.0), "far_metal", 10)
-            else:
-                block(x, z, a + math.pi / 2, rng.uniform(16.0, 30.0), 3.0, 2.6, rng.choice(("far_red", "far_metal2", "far_blue")))
-        elif zone == "Construction":
-            pick = rng.random()
-            if pick < 0.55:
-                # a street of new houses, some still bare frames
-                for k in range(4):
-                    hx, hz = x + math.cos(turn) * k * 12.0, z + math.sin(turn) * k * 12.0
-                    block(hx, hz, turn, 8.0, 9.0, rng.uniform(5.0, 6.5), "far_lumber" if rng.random() < 0.4 else rng.choice(("far_wall", "far_wall2")),
-                          "far_roof" if rng.random() < 0.7 else None, 2.2, top="far_lumber")
-            elif pick < 0.7:
-                mast(x, z, rng.uniform(30.0, 45.0), rng.uniform(25.0, 40.0), rng.uniform(0.0, math.tau), "far_yellow")
-            else:
-                y = _cone(x, z) + 0.2
-                w = rng.uniform(25.0, 50.0)
-                town.face([(x - w / 2, y, z - w / 2), (x - w / 2, y, z + w / 2), (x + w / 2, y, z + w / 2), (x + w / 2, y, z - w / 2)], "far_dirt")
-        else:
-            pick = rng.random()
-            if pick < 0.45:
-                # a field, its colour by its crop
-                y = _cone(x, z) + 0.2
-                w, d = rng.uniform(30.0, 60.0), rng.uniform(20.0, 45.0)
-                c, s = math.cos(turn), math.sin(turn)
-                q = [(x + u * c - v * s, y, z + u * s + v * c) for u, v in ((-w / 2, -d / 2), (-w / 2, d / 2), (w / 2, d / 2), (w / 2, -d / 2))]
-                town.face(q, rng.choice(("far_field", "far_field2", "far_field3", "far_green")))
-            elif pick < 0.6:
-                block(x, z, turn, 10.0, 16.0, 6.0, "far_red", "far_roof", 4.0)
-            elif pick < 0.8:
-                block(x, z, turn, 9.0, 8.0, 5.5, rng.choice(("far_wall", "far_wall2")), rng.choice(("far_roof", "far_roof2")), 2.4)
-            else:
-                # a row of trees along a field's edge
-                c, s = math.cos(turn), math.sin(turn)
-                for k in range(6):
-                    tx, tz = x + c * k * 6.0, z + s * k * 6.0
-                    y = _cone(tx, tz) - 0.2
-                    town.cylinder((tx, y, tz), 2.4, 7.0, "far_tree2", 6)
-    # firs among it all (cones: no round-leaf clumps), thicker away from the City
-    for n in range(380):
+                block(s[0], s[1], s[2], 9.0, 8.0, 5.5, "far_wall", "far_roof2", 2.4)
+    for n in range(4):
+        s = spot("Rural", PLAY + 30.0, PLAY + 140.0, 0.55, 6.0)
+        if s:
+            c, sn = math.cos(s[2] + math.pi / 2), math.sin(s[2] + math.pi / 2)
+            for k in range(7):
+                fir(s[0] + c * k * 7.0, s[1] + sn * k * 7.0, 11.0, "far_tree2")
+    # firs about it all (cones: no round-leaf clumps), most between the zones' wedges, few past the City
+    for n in range(160):
         a = rng.uniform(0.0, math.tau)
         if zone_at(a) == "City" and rng.random() < 0.8:
             continue
         r = rng.uniform(PLAY + 8.0, PLAY + 160.0)
         x, z = math.cos(a) * r, math.sin(a) * r
-        y = _cone(x, z) - 0.2
-        tall = rng.uniform(9.0, 18.0)
-        wide = tall * rng.uniform(0.2, 0.28)
-        mat = "far_tree" if n % 3 else "far_tree2"
-        for i in range(6):
-            t0, t1 = math.tau * i / 6, math.tau * (i + 1) / 6
-            town.face([(x + math.cos(t0) * wide, y + tall * 0.12, z + math.sin(t0) * wide), (x + math.cos(t1) * wide, y + tall * 0.12, z + math.sin(t1) * wide),
-                       (x, y + tall, z)], mat, 0.85 + 0.25 * math.cos(t0 - 0.8))
-    # the needle tower downtown, and the port's bay and its container cranes
-    nx, nz = math.cos(math.pi / 2 + 0.12) * (PLAY + 140.0), math.sin(math.pi / 2 + 0.12) * (PLAY + 140.0)
-    ny = _cone(nx, nz)
-    town.cylinder((nx, ny, nz), 1.6, 150.0, "far_wall", 8)
-    town.cylinder((nx, ny + 140.0, nz), 11.0, 4.0, "far_wall", 16)
-    town.cylinder((nx, ny + 136.0, nz), 7.0, 4.0, "far_glass", 16)
-    town.cylinder((nx, ny + 144.0, nz), 1.0, 22.0, "far_wall", 6)
-    bay_r0, bay_r1 = PLAY + 110.0, PLAY + 175.0
-    bay_y = max(far_height(rr, aa) for rr in (bay_r0, (bay_r0 + bay_r1) / 2, bay_r1) for aa in [-0.5 + k * 0.05 for k in range(21)]) + 0.4
-    for k in range(10):
-        a0, a1 = -0.5 + k * 0.1, -0.5 + (k + 1) * 0.1
-        town.face([_ring_point(a0, bay_r0, bay_y), _ring_point(a1, bay_r0, bay_y), _ring_point(a1, bay_r1, bay_y), _ring_point(a0, bay_r1, bay_y)][::-1], "far_water")
-    for k in range(5):
-        a = -0.4 + k * 0.17
-        cx, cz = math.cos(a) * (bay_r0 - 4.0), math.sin(a) * (bay_r0 - 4.0)
-        for leg in (-6.0, 6.0):
-            town.box((cx + math.cos(a + math.pi / 2) * leg, bay_y + 16.0, cz + math.sin(a + math.pi / 2) * leg), (1.4, 32.0, 1.4), "far_red")
-        town.box((cx + math.cos(a) * 12.0, bay_y + 32.0, cz + math.sin(a) * 12.0), (abs(math.cos(a)) * 40.0 + 2.0, 2.4, abs(math.sin(a)) * 40.0 + 2.0), "far_red")
-        sx, sz = math.cos(a) * (bay_r0 + 22.0), math.sin(a) * (bay_r0 + 22.0)
-        town.box((sx, bay_y + 2.0, sz), (abs(math.sin(a)) * 60.0 + 14.0, 7.0, abs(math.cos(a)) * 60.0 + 14.0), "far_metal2")
+        if any(math.hypot(x - px, z - pz) < ps for px, pz, ps in placed):
+            continue
+        fir(x, z, rng.uniform(10.0, 16.0), "far_tree" if n % 3 else "far_tree2")
     town.done()
     # Rolling hills in the distance, ridge behind ridge as in a Ghibli background painting (the user, 2026-11-02:
     # "there should be rolling hills in the distance for the skybox", then "the hills in the distance need a little more
@@ -1706,7 +1751,7 @@ def cascades():
 # construction, one a more rural suburb vibe, one more commercial and city like, and one zone needs to be sewers,
 # substations, factories and warehouses"; "and the zones need different road layouts"). Which face is which, and
 # each layout, are Claude's picks:
-#   S City:          a grid on the slope (a steep Seattle grid): a boulevard straight down with a planted median,
+#   W City:          a grid on the slope (a steep Seattle grid): a boulevard straight down with a planted median,
 #                    three cross streets level across it with traffic lights, two avenues; brick commercial blocks and
 #                    walk-ups, ornamental lamp posts, bus shelters, phone booths, the station at the foot.
 #   E Industrial:    a trunk road straight down at an even grade, level gravel yard roads off it either side, the yards
@@ -1714,7 +1759,7 @@ def cascades():
 #                    channel down its west side, manholes; cobra-head lights.
 #   N Construction:  three runs and hairpins; houses going up along them (studs, scaffolding, tower cranes) between
 #                    new box houses and bungalows, work lights on stands, the billboard.
-#   W Rural:         one long lazy lane winding down, cul-de-sacs off it; a barn and its pasture, farmhouses, cabins,
+#   S Rural:         one long lazy lane winding down, cul-de-sacs off it; a barn and its pasture, farmhouses, cabins,
 #                    houses round the courts, an orchard, the woodlot with the hollow log.
 # Every building is tools/buildings.py's (generated, a little level of its own), set on a lot levelled for it.
 #
@@ -1730,11 +1775,14 @@ CORRIDOR = 56.0       # a face's zone: |x| within this (past it the face turns t
 PLAZA = (0.0, FOOT_Z + 16.0)    # the turning circle at the foot
 CIRCLE = (3.5, 11.0, 15.0)      # its lawn, its road's outer edge, its pavement's
 PLAY = PLAZA[1] + 36.0          # the play area: everything within this of the middle (the unseen wall round it)
+# (the user, 2026-11-02: "the construction and suburb zone should be across from each other and should be flat not on a
+# slope, and then the city and warehouse zone shoujld be across from each other and ona slope": the City and Rural
+# sides swapped, so City faces Industrial and Rural faces Construction)
 FACES = [
-    (0.0, "S", "City"),
+    (0.0, "S", "Rural"),
     (math.pi / 2, "E", "Industrial"),
     (math.pi, "N", "Construction"),
-    (3 * math.pi / 2, "W", "Rural"),
+    (3 * math.pi / 2, "W", "City"),
 ]
 _tag = "S"
 _count = {"haunt": 20, "dog": 3, "kit": 0, "tree": 1200, "dumpster": 0}
@@ -1752,9 +1800,10 @@ def _smooth(e0, e1, x):
 
 
 # How far each face falls to its foot (the user, 2026-11-02: "the hill slope doesn't need to be so severe in the
-# zones", "or not all of them at least"): the City, Industrial and Rural sides gentle, the
-# Construction side as steep as before (Claude's pick)
-FOOTS = {"City": -16.0, "Industrial": -14.0, "Construction": -34.0, "Rural": -13.0}
+# zones", "or not all of them at least", then "the construction and suburb zone ... should be flat not on a slope",
+# "the city and warehouse zone ... ona slope"): the City and Industrial sides on their slopes, the Construction and
+# Rural sides level with the hilltop all the way out
+FOOTS = {"City": -16.0, "Industrial": -14.0, "Construction": 0.0, "Rural": 0.0}
 _turn_now = 0.0
 
 
